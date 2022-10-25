@@ -3,18 +3,30 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"flag"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 )
+
+type BackendConf struct {
+	url          string
+	dial_timeout int
+	keep_alive   int
+	tls_hdshk    int
+}
+
+type LBconfig struct {
+	port int
+}
 
 const (
 	Attempts int = iota
@@ -159,23 +171,55 @@ func healthCheck() {
 	}
 }
 
+func glue(s []byte) []byte {
+	for _, i := range "\n\r\t " {
+		s = []byte(strings.ReplaceAll(string(s), string(i), ""))
+	}
+	return s
+}
+
 var serverPool ServerPool
+var err error
 
 func main() {
-	var serverList string
-	var port int
-	flag.StringVar(&serverList, "backends", "", "Load balanced backends, use commas to separate")
-	flag.IntVar(&port, "port", 3030, "Port to serve")
-	flag.Parse()
 
-	if len(serverList) == 0 {
-		log.Fatal("Please provide one or more backends to load balance")
+	serverPool.current = -1
+	var jsonBackends, jsonLbconfig []byte
+
+	// scan congig of Load Balancer
+	jsonLbconfig, err = os.ReadFile("lbconfig.json")
+	if err != nil {
+		panic("Bad file")
+	}
+	jsonLbconfig = glue(jsonLbconfig)
+
+	lbconf := LBconfig{}
+	err = json.Unmarshal(jsonLbconfig, &lbconf)
+	port := lbconf.port
+
+	// scan Backends
+	jsonBackends, err = os.ReadFile("backends.json")
+	if err != nil {
+		if serverPool.current == -1 {
+			panic("Bad open!")
+		} else {
+			panic("The lastest attempt to configure lb was unseccussful. Something is wrong with backends.json")
+		}
 	}
 
+	jsonBackends = glue(jsonBackends)
+	var tokens []BackendConf
+
 	// parse servers
-	tokens := strings.Split(serverList, ",")
+	//	err = json.Unmarshal(jsonBackends, &tokens)
+	if err != nil {
+		panic("Bad json")
+	}
+
+	fmt.Printf("%v %d %s", tokens, lbconf.port, jsonBackends) // DEBUG
+	os.Exit(0)
 	for _, tok := range tokens {
-		serverUrl, err := url.Parse(tok)
+		serverUrl, err := url.Parse(tok.url)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -207,10 +251,10 @@ func main() {
 		proxy.Transport = &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			Dial: (&net.Dialer{
-				Timeout:   2 * time.Second,
-				KeepAlive: 2 * time.Second,
+				Timeout:   time.Duration(tok.dial_timeout) * time.Second,
+				KeepAlive: time.Duration(tok.keep_alive) * time.Second,
 			}).Dial,
-			TLSHandshakeTimeout: 3 * time.Second,
+			TLSHandshakeTimeout: time.Duration(tok.tls_hdshk) * time.Second,
 			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true}, // ignore bad certificates
 		}
 
@@ -227,8 +271,6 @@ func main() {
 		Addr:    fmt.Sprintf(":%d", port),
 		Handler: http.HandlerFunc(lb),
 	}
-
-	serverPool.current = -1
 
 	// start health checking
 	go healthCheck()
