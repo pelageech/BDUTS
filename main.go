@@ -18,7 +18,6 @@ import (
 const (
 	Attempts int = iota
 	Retry
-	Cancelled
 )
 
 // Backend holds the data about a server
