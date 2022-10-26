@@ -11,7 +11,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -171,13 +170,6 @@ func healthCheck() {
 	}
 }
 
-func glue(s []byte) []byte {
-	for _, i := range "\n\r\t " {
-		s = []byte(strings.ReplaceAll(string(s), string(i), ""))
-	}
-	return s
-}
-
 var serverPool ServerPool
 var err error
 
@@ -191,10 +183,9 @@ func main() {
 	if err != nil {
 		panic("Bad file")
 	}
-	jsonLbconfig = glue(jsonLbconfig)
 
 	lbconf := LBconfig{}
-	err = json.Unmarshal(jsonLbconfig, &lbconf)
+	err = json.Unmarshal(jsonLbconfig, &lbconf) // doesn't work
 	port := lbconf.port
 
 	// scan Backends
@@ -207,16 +198,15 @@ func main() {
 		}
 	}
 
-	jsonBackends = glue(jsonBackends)
 	var tokens []BackendConf
 
 	// parse servers
-	//	err = json.Unmarshal(jsonBackends, &tokens)
+	err = json.Unmarshal(jsonBackends, &tokens)
 	if err != nil {
 		panic("Bad json")
 	}
 
-	fmt.Printf("%v %d %s", tokens, lbconf.port, jsonBackends) // DEBUG
+	fmt.Printf("%v\n%d\n%s\n", tokens, lbconf.port, jsonBackends) // DEBUG
 	os.Exit(0)
 	for _, tok := range tokens {
 		serverUrl, err := url.Parse(tok.url)
