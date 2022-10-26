@@ -7,8 +7,15 @@ import (
 )
 
 func hello(w http.ResponseWriter, req *http.Request) {
-	time.Sleep(time.Second * 5)
-	fmt.Fprintf(w, "hello from 31\n")
+	select {
+	case <-time.After(5 * time.Second):
+		fmt.Fprintf(w, "hello from 31\n")
+	case <-req.Context().Done():
+		err := req.Context().Err()
+		fmt.Println("server:", err)
+		internalError := http.StatusInternalServerError
+		http.Error(w, err.Error(), internalError)
+	}
 }
 
 func main() {
