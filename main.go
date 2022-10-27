@@ -142,7 +142,7 @@ func isBackendAlive(u *url.URL) bool {
 		log.Println("Site unreachable, error: ", err)
 		return false
 	}
-	defer conn.Close()
+	conn.Close()
 	return true
 }
 
@@ -170,6 +170,10 @@ func config(tokens []string) {
 
 		proxy.ErrorHandler = func(writer http.ResponseWriter, request *http.Request, e error) {
 			log.Printf("[%s] %s\n", serverUrl.Host, e.Error())
+			if e == context.Canceled {
+
+				return
+			}
 
 			retries := GetRetryFromContext(request)
 			if retries < 3 {
@@ -220,7 +224,7 @@ func main() {
 
 	http.HandleFunc("/", lb)
 	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
-	tlsconf := &tls.Config{Certificates: []tls.Certificate{Crt}, ServerName: "localhos:3030"}
+	tlsconf := &tls.Config{Certificates: []tls.Certificate{Crt}, ServerName: "localhost:3030"}
 
 	ln, err := tls.Listen("tcp", ":3030", tlsconf)
 	if err != nil {
