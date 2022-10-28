@@ -76,7 +76,7 @@ func (s *ServerPool) GetNextPeer() *Backend {
 	l := len(s.backends) + next // start from next and move a full cycle
 	for i := next; i < l; i++ {
 		idx := i % len(s.backends)     // take an index by modding
-		if s.backends[idx].IsAlive() { // if we have an alive backend, use it and store if its not the original one
+		if s.backends[idx].IsAlive() { // if we have an alive backend, use it and store if it's not the original one
 			if i != next {
 				atomic.StoreInt64(&s.current, int64(idx))
 			}
@@ -146,7 +146,7 @@ func isBackendAlive(u *url.URL) bool {
 	return true
 }
 
-// healthCheck runs a routine for check status of the backends every 2 mins
+// healthCheck runs a routine for check status of the backends every 2 minutes
 func healthCheck() {
 	t := time.NewTicker(time.Minute * 2)
 	for {
@@ -224,9 +224,9 @@ func main() {
 
 	http.HandleFunc("/", lb)
 	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
-	tlsconf := &tls.Config{Certificates: []tls.Certificate{Crt}, ServerName: "localhost:3030"}
+	tsconfig := &tls.Config{Certificates: []tls.Certificate{Crt}, ServerName: "localhost:3030"}
 
-	ln, err := tls.Listen("tcp", ":3030", tlsconf)
+	ln, err := tls.Listen("tcp", ":3030", tsconfig)
 	if err != nil {
 		log.Fatal("There's problem on the lb")
 	}
