@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"flag"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strings"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -19,6 +20,15 @@ const (
 	Attempts int = iota
 	Retry
 )
+
+// json structures
+type JsonBackend struct {
+	url []byte
+}
+
+type LbConfig struct {
+	port float64
+}
 
 // Backend holds the data about a server
 type Backend struct {
@@ -207,10 +217,20 @@ func config(tokens []string) {
 var serverPool ServerPool
 
 func main() {
-	var serverList string
+	//var serverList string
 	var port int
 
-	flag.StringVar(&serverList, "backends", "", "Load balanced backends, use commas to separate")
+	buffLbConfig, _ := os.ReadFile("resources/lb_config.json")
+
+	var lbConfig LbConfig
+	err := json.Unmarshal(buffLbConfig, &lbConfig)
+	if err != nil {
+		log.Fatal("Bad json")
+	}
+
+	fmt.Printf("%v", lbConfig)
+	os.Exit(0)
+	/*flag.StringVar(&serverList, "backends", "", "Load balanced backends, use commas to separate")
 	flag.IntVar(&port, "port", 3030, "Port to serve")
 	flag.Parse()
 
@@ -220,7 +240,7 @@ func main() {
 
 	// parse servers
 	tokens := strings.Split(serverList, ",")
-	config(tokens)
+	config(tokens)*/
 
 	http.HandleFunc("/", lb)
 	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
