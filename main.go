@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"flag"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strings"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -19,6 +20,15 @@ const (
 	Attempts int = iota
 	Retry
 )
+
+// json structures
+type JsonBackend struct {
+	Url string
+}
+
+type LbConfig struct {
+	Port int
+}
 
 // Backend holds the data about a server
 type Backend struct {
@@ -129,6 +139,10 @@ func lb(w http.ResponseWriter, r *http.Request) {
 	if peer != nil {
 		log.Printf("Connecting to %s\n", peer.URL) // логирование подключения
 		peer.ReverseProxy.ServeHTTP(w, r)
+		if r.Context().Err() == nil {
+			log.Printf("A response got from %s\n", peer.URL)
+		}
+
 		return
 	}
 	http.Error(w, "Service not available", http.StatusServiceUnavailable)
@@ -159,22 +173,31 @@ func healthCheck() {
 	}
 }
 
-func config(tokens []string) {
+// for each url in
+func config(tokens []JsonBackend) {
 	for _, tok := range tokens {
-		serverUrl, err := url.Parse(tok)
+
+		// Parse url
+		serverUrl, err := url.Parse(tok.Url)
 		if err != nil {
 			log.Fatal(err)
 		}
 
+		// Create new proxy-singleton
 		proxy := httputil.NewSingleHostReverseProxy(serverUrl)
 
+		// Set a behaviour on errors
 		proxy.ErrorHandler = func(writer http.ResponseWriter, request *http.Request, e error) {
-			log.Printf("[%s] %s\n", serverUrl.Host, e.Error())
-			if e == context.Canceled {
 
+			// Print an error to log
+			log.Printf("[%s] %s\n", serverUrl.Host, e.Error())
+
+			// If context is cancelled, do nothing
+			if e == context.Canceled {
 				return
 			}
 
+			// Retry connection on fail
 			retries := GetRetryFromContext(request)
 			if retries < 3 {
 				select {
@@ -185,16 +208,17 @@ func config(tokens []string) {
 				return
 			}
 
-			// after 3 retries, mark this backend as down
+			// After 3 retries, mark this backend as down
 			serverPool.MarkBackendStatus(serverUrl, false)
 
-			// if the same request routing for few attempts with different backends, increase the count
+			// If the same request routing for few attempts with different backends, increase the count
 			attempts := GetAttemptsFromContext(request)
 			log.Printf("%s(%s) Attempting retry %d\n", request.RemoteAddr, request.URL.Path, attempts)
 			ctx := context.WithValue(request.Context(), Attempts, attempts+1)
 			lb(writer, request.WithContext(ctx))
 		}
 
+		// Configure a following backend
 		serverPool.AddBackend(&Backend{
 			URL:          serverUrl,
 			Alive:        true,
@@ -207,36 +231,51 @@ func config(tokens []string) {
 var serverPool ServerPool
 
 func main() {
-	var serverList string
-	var port int
+	// Read Load-Balancer config
+	buffLoadBalancerConfig, _ := os.ReadFile("resources/lb_config.json")
 
-	flag.StringVar(&serverList, "backends", "", "Load balanced backends, use commas to separate")
-	flag.IntVar(&port, "port", 3030, "Port to serve")
-	flag.Parse()
-
-	if len(serverList) == 0 {
-		log.Fatal("Please provide one or more backends to load balance")
+	var loadBalancerConfig LbConfig
+	err := json.Unmarshal(buffLoadBalancerConfig, &loadBalancerConfig)
+	if err != nil {
+		log.Fatal("Bad lb_config.json", err)
 	}
 
-	// parse servers
-	tokens := strings.Split(serverList, ",")
-	config(tokens)
+	// Read Backends
+	buffBackends, _ := os.ReadFile("resources/backends.json")
 
+	var backends []JsonBackend
+	err = json.Unmarshal(buffBackends, &backends)
+	if err != nil {
+		log.Fatal("Bad backends.json", err)
+	}
+
+	// Configure all the backends
+	config(backends)
+
+	// Set handle for http load-balancer
 	http.HandleFunc("/", lb)
-	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
-	tsconfig := &tls.Config{Certificates: []tls.Certificate{Crt}, ServerName: "localhost:3030"}
 
-	ln, err := tls.Listen("tcp", ":3030", tsconfig)
+	// Config TLS: setting a pair crt-key
+	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
+	tsconfig := &tls.Config{Certificates: []tls.Certificate{Crt}}
+
+	// Set a port is listened by server to
+	port := fmt.Sprintf(":%d", loadBalancerConfig.Port)
+
+	// Start listening
+	ln, err := tls.Listen("tcp", port, tsconfig)
 	if err != nil {
 		log.Fatal("There's problem on the lb")
 	}
 
+	// current is -1, it's automatically will turn into 0
 	serverPool.current = -1
 
 	// start health checking
 	go healthCheck()
 
-	log.Printf("Load Balancer started at :%d\n", port)
+	// Serving
+	log.Printf("Load Balancer started at %s\n", port)
 	if err := http.Serve(ln, nil); err != nil {
 		log.Fatal(err)
 	}
