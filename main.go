@@ -9,6 +9,14 @@ import (
 	"time"
 )
 
+type server struct {
+	url string
+}
+
+type config struct {
+	port string
+}
+
 func main() {
 	// define origin server URL
 	originServerURL, err := url.Parse("http://127.0.0.1:3031")
