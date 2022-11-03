@@ -16,12 +16,14 @@ type serverJSON struct {
 }
 
 type configJSON struct {
-	Port int
+	Port            int
+	NumberOfRetries int
 }
 
 var servers []*url.URL
 
 var port int
+var numberOfRetries int
 
 func readConfig() {
 	/*
@@ -74,6 +76,7 @@ func readConfig() {
 	}
 
 	port = lbConfig.Port
+	numberOfRetries = lbConfig.NumberOfRetries
 }
 
 func main() {
