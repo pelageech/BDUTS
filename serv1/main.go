@@ -9,7 +9,9 @@ import (
 func hello(w http.ResponseWriter, req *http.Request) {
 	select {
 	case <-time.After(5 * time.Second):
-		fmt.Fprintf(w, "hello from 31\n")
+		w.Header().Add("ferfrferf", "43yry34gfuyerh")
+		w.Header().Add("ferfrferf", "haha")
+		w.Write([]byte("hello from 3031"))
 	case <-req.Context().Done():
 		err := req.Context().Err()
 		fmt.Println("server:", err)
