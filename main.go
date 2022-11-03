@@ -21,6 +21,7 @@ type configJSON struct {
 }
 
 var servers []*url.URL
+var currentIndex int
 
 var port int
 var numberOfRetries int
@@ -79,35 +80,55 @@ func readConfig() {
 	numberOfRetries = lbConfig.NumberOfRetries
 }
 
+func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error {
+	fmt.Printf("[reverse proxy server] received request at: %s\n", time.Now())
+
+	// set req Host, URL and Request URI to forward a request to the origin server
+	req.Host = url.Host
+	req.URL.Host = url.Host
+	req.URL.Scheme = url.Scheme
+	req.RequestURI = "" // https://go.dev/src/net/http/client.go:217
+
+	// save the response from the origin server
+	originServerResponse, err := http.DefaultClient.Do(req)
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		_, _ = fmt.Print(rw, err)
+		return err
+	}
+
+	for key, values := range originServerResponse.Header {
+		for _, value := range values {
+			rw.Header().Add(key, value)
+		}
+	}
+	// return response to the client
+	rw.WriteHeader(http.StatusOK)
+	io.Copy(rw, originServerResponse.Body)
+
+	return nil
+}
+
+func loadBalancer(rw http.ResponseWriter, req *http.Request) {
+out:
+	for i := 0; i < len(servers); i++ {
+		url := servers[currentIndex]
+		for j := 0; j < numberOfRetries; j++ {
+			err := makeRequest(rw, req, url)
+			if err == nil {
+				break out
+			}
+		}
+
+		currentIndex++
+		if currentIndex == len(servers) {
+			currentIndex = 0
+		}
+	}
+}
+
 func main() {
 	readConfig()
 
-	loadBalancer := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		fmt.Printf("[reverse proxy server] received request at: %s\n", time.Now())
-
-		// set req Host, URL and Request URI to forward a request to the origin server
-		req.Host = originServerURL.Host
-		req.URL.Host = originServerURL.Host
-		req.URL.Scheme = originServerURL.Scheme
-		req.RequestURI = "" // https://go.dev/src/net/http/client.go:217
-
-		// save the response from the origin server
-		originServerResponse, err := http.DefaultClient.Do(req)
-		if err != nil {
-			rw.WriteHeader(http.StatusInternalServerError)
-			_, _ = fmt.Print(rw, err)
-			return
-		}
-
-		for key, values := range originServerResponse.Header {
-			for _, value := range values {
-				rw.Header().Add(key, value)
-			}
-		}
-		// return response to the client
-		rw.WriteHeader(http.StatusOK)
-		io.Copy(rw, originServerResponse.Body)
-	})
-
-	log.Fatal(http.ListenAndServe(":8080", loadBalancer))
+	log.Fatal(http.ListenAndServe(":8080", http.HandlerFunc(loadBalancer)))
 }
