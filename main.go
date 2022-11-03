@@ -109,20 +109,25 @@ func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error 
 	return nil
 }
 
+func calculateNextIndex() {
+	currentIndex++
+	if currentIndex == len(servers) {
+		currentIndex = 0
+	}
+}
+
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 out:
 	for i := 0; i < len(servers); i++ {
 		url := servers[currentIndex]
-		currentIndex++
+
+		calculateNextIndex()
+
 		for j := 0; j < numberOfRetries; j++ {
 			err := makeRequest(rw, req, url)
 			if err == nil {
 				break out
 			}
-		}
-
-		if currentIndex == len(servers) {
-			currentIndex = 0
 		}
 	}
 }
