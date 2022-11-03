@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"strings"
 )
 
 type serverJSON struct {
@@ -14,12 +13,12 @@ type serverJSON struct {
 }
 
 type configJSON struct {
-	Port string
+	Port int
 }
 
 var servers []*url.URL
 
-var port string
+var port int
 
 func readConfig() {
 	/*
@@ -71,7 +70,7 @@ func readConfig() {
 		log.Fatal("Failed to unmarshal load balancer config: ", err)
 	}
 
-	port = strings.Clone(lbConfig.Port)
+	port = lbConfig.Port
 }
 
 func main() {
