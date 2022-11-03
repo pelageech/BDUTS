@@ -104,9 +104,9 @@ func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error 
 	}
 	// return response to the client
 	rw.WriteHeader(http.StatusOK)
-	io.Copy(rw, originServerResponse.Body)
+	_, err = io.Copy(rw, originServerResponse.Body)
 
-	return nil
+	return err
 }
 
 func calculateNextIndex() {
