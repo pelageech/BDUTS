@@ -16,7 +16,7 @@ func main() {
 		log.Fatal("invalid origin server URL")
 	}
 
-	reverseProxy := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+	loadBalancer := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		fmt.Printf("[reverse proxy server] received request at: %s\n", time.Now())
 
 		// set req Host, URL and Request URI to forward a request to the origin server
@@ -43,5 +43,5 @@ func main() {
 		io.Copy(rw, originServerResponse.Body)
 	})
 
-	log.Fatal(http.ListenAndServe(":8080", reverseProxy))
+	log.Fatal(http.ListenAndServe(":8080", loadBalancer))
 }
