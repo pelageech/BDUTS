@@ -119,12 +119,12 @@ func calculateNextIndex() {
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 out:
 	for i := 0; i < len(servers); i++ {
-		url := servers[currentIndex]
+		server := servers[currentIndex]
 
 		calculateNextIndex()
 
 		for j := 0; j < numberOfRetries; j++ {
-			err := makeRequest(rw, req, url)
+			err := makeRequest(rw, req, server)
 			if err == nil {
 				break out
 			}
