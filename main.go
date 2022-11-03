@@ -11,7 +11,7 @@ import (
 
 func main() {
 	// define origin server URL
-	originServerURL, err := url.Parse("https://google.ru")
+	originServerURL, err := url.Parse("http://127.0.0.1:3031")
 	if err != nil {
 		log.Fatal("invalid origin server URL")
 	}
@@ -35,7 +35,7 @@ func main() {
 
 		for key, values := range originServerResponse.Header {
 			for _, value := range values {
-				rw.Header().Set(key, value)
+				rw.Header().Add(key, value)
 			}
 		}
 		// return response to the client
