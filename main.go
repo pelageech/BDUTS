@@ -113,6 +113,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 out:
 	for i := 0; i < len(servers); i++ {
 		url := servers[currentIndex]
+		currentIndex++
 		for j := 0; j < numberOfRetries; j++ {
 			err := makeRequest(rw, req, url)
 			if err == nil {
@@ -120,7 +121,6 @@ out:
 			}
 		}
 
-		currentIndex++
 		if currentIndex == len(servers) {
 			currentIndex = 0
 		}
