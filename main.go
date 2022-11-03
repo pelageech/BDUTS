@@ -34,11 +34,15 @@ func readConfig() {
 	if err != nil {
 		log.Fatal("Failed to open servers config: ", err)
 	}
-	defer serversFile.Close()
 
 	serversFileByte, err := io.ReadAll(serversFile)
 	if err != nil {
 		log.Fatal("Failed to read servers config file: ", err)
+	}
+
+	err = serversFile.Close()
+	if err != nil {
+		log.Print("Failed to close servers config: ", err)
 	}
 
 	var serversJSON []serverJSON
@@ -63,11 +67,15 @@ func readConfig() {
 	if err != nil {
 		log.Fatal("Failed to open load balancer config file: ", err)
 	}
-	defer lbConfigFile.Close()
 
 	lbConfigFileByte, err := io.ReadAll(lbConfigFile)
 	if err != nil {
 		log.Fatal("Failed to read load balancer config file: ", err)
+	}
+
+	err = lbConfigFile.Close()
+	if err != nil {
+		log.Print("Failed to close load balancer config file: ", err)
 	}
 
 	var lbConfig configJSON
