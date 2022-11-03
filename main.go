@@ -130,5 +130,5 @@ out:
 func main() {
 	readConfig()
 
-	log.Fatal(http.ListenAndServe(":8080", http.HandlerFunc(loadBalancer)))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), http.HandlerFunc(loadBalancer)))
 }
