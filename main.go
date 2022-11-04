@@ -101,7 +101,9 @@ func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error 
 	req.Host = url.Host
 	req.URL.Host = url.Host
 	req.URL.Scheme = url.Scheme
-	req.RequestURI = "" // https://go.dev/src/net/http/client.go:217
+
+	// https://go.dev/src/net/http/client.go:217
+	req.RequestURI = ""
 
 	// save the response from the origin server
 	originServerResponse, err := http.DefaultClient.Do(req)
@@ -111,6 +113,7 @@ func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error 
 		return err
 	}
 
+	// copy headers from origin server response to our response
 	for key, values := range originServerResponse.Header {
 		for _, value := range values {
 			rw.Header().Add(key, value)
