@@ -121,6 +121,7 @@ func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error 
 			rw.Header().Add(key, value)
 		}
 	}
+
 	// return response to the client
 	rw.WriteHeader(http.StatusOK)
 	_, err = io.Copy(rw, originServerResponse.Body)
