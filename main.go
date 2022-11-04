@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -20,8 +21,13 @@ type configJSON struct {
 	NumberOfRetries int
 }
 
+type index struct {
+	currentIndex int
+	mu           sync.Mutex
+}
+
 var servers []*url.URL
-var currentIndex int
+var serverCounter index
 
 var port int
 var numberOfRetries int
@@ -118,16 +124,18 @@ func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error 
 }
 
 func calculateNextIndex() {
-	currentIndex++
-	if currentIndex == len(servers) {
-		currentIndex = 0
+	serverCounter.mu.Lock()
+	serverCounter.currentIndex++
+	if serverCounter.currentIndex == len(servers) {
+		serverCounter.currentIndex = 0
 	}
+	serverCounter.mu.Unlock()
 }
 
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 out:
 	for i := 0; i < len(servers); i++ {
-		server := servers[currentIndex]
+		server := servers[serverCounter.currentIndex]
 
 		calculateNextIndex()
 
