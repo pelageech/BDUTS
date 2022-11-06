@@ -94,6 +94,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 func main() {
 	readConfig()
+	serverPool.current = -1
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), http.HandlerFunc(loadBalancer)))
 }
