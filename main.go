@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -94,7 +95,25 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 func main() {
 	readConfig()
+
+	// Config TLS: setting a pair crt-key
+	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
+	tlsConfig := &tls.Config{Certificates: []tls.Certificate{Crt}}
+
+	// Start listening
+	ln, err := tls.Listen("tcp", fmt.Sprintf(":%d", port), tlsConfig)
+	if err != nil {
+		log.Fatal("There's problem with listening")
+	}
+
+	// current is -1, it's automatically will turn into 0
 	serverPool.current = -1
 
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), http.HandlerFunc(loadBalancer)))
+	// Serving
+	http.HandleFunc("/", loadBalancer)
+
+	log.Printf("Load Balancer started at :%d\n", port)
+	if err := http.Serve(ln, nil); err != nil {
+		log.Fatal(err)
+	}
 }
