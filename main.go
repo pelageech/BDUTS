@@ -79,6 +79,10 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 	return nil, errors.New("all the backends are turned down")
 }
 
+func faviconHandler(http.ResponseWriter, *http.Request) {
+	// do nothing
+}
+
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	server, err := serverPool.GetNextPeer()
 
@@ -118,6 +122,7 @@ func main() {
 
 	// Serving
 	http.HandleFunc("/", loadBalancer)
+	http.HandleFunc("/favicon.ico", faviconHandler)
 
 	log.Printf("Load Balancer started at :%d\n", port)
 	if err := http.Serve(ln, nil); err != nil {
