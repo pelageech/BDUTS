@@ -10,6 +10,7 @@ func hello(w http.ResponseWriter, req *http.Request) {
 	select {
 	case <-time.After(5 * time.Second):
 		fmt.Fprintf(w, "hello from 31\n")
+		w.WriteHeader(http.StatusOK)
 	case <-req.Context().Done():
 		err := req.Context().Err()
 		fmt.Println("server:", err)

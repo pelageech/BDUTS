@@ -21,7 +21,7 @@ const (
 	Retry
 )
 
-// json structures
+// JsonBackend - backend structures
 type JsonBackend struct {
 	Url string
 }
@@ -117,7 +117,7 @@ func GetAttemptsFromContext(r *http.Request) int {
 	return 1
 }
 
-// GetAttemptsFromContext returns the attempts for request
+// GetRetryFromContext returns the retries for request
 func GetRetryFromContext(r *http.Request) int {
 	if retry, ok := r.Context().Value(Retry).(int); ok {
 		return retry
@@ -138,11 +138,12 @@ func lb(w http.ResponseWriter, r *http.Request) {
 	peer := serverPool.GetNextPeer()
 	if peer != nil {
 		log.Printf("Connecting to %s\n", peer.URL) // логирование подключения
-		peer.ReverseProxy.ServeHTTP(w, r)
-		if r.Context().Err() == nil {
-			log.Printf("A response got from %s\n", peer.URL)
-		}
 
+		// Send a request
+		peer.ReverseProxy.ServeHTTP(w, r)
+
+		log.Printf("Success %s\n", peer.URL)
+		}
 		return
 	}
 	http.Error(w, "Service not available", http.StatusServiceUnavailable)
@@ -156,7 +157,7 @@ func isBackendAlive(u *url.URL) bool {
 		log.Println("Site unreachable, error: ", err)
 		return false
 	}
-	conn.Close()
+	defer conn.Close()
 	return true
 }
 
@@ -215,6 +216,7 @@ func config(tokens []JsonBackend) {
 			attempts := GetAttemptsFromContext(request)
 			log.Printf("%s(%s) Attempting retry %d\n", request.RemoteAddr, request.URL.Path, attempts)
 			ctx := context.WithValue(request.Context(), Attempts, attempts+1)
+			log.Printf("Unsuccess %s", serverUrl.Host)
 			lb(writer, request.WithContext(ctx))
 		}
 
