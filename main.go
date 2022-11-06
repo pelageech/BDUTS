@@ -39,8 +39,11 @@ func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error 
 	originServerResponse, err := http.DefaultClient.Do(req)
 
 	if err != nil {
-		rw.WriteHeader(http.StatusInternalServerError)
-		fmt.Println(rw, err)
+		// rw.WriteHeader(http.StatusInternalServerError)
+		// при переподключении http жалуется
+
+		log.Println(err)
+		//	fmt.Println(rw, err)
 		return err
 	}
 
@@ -54,6 +57,8 @@ func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error 
 	// return response to the client
 	rw.WriteHeader(http.StatusOK)
 	_, err = io.Copy(rw, originServerResponse.Body)
+
+	log.Printf("[%s] returned %s\n", url, originServerResponse.Status)
 
 	return err
 }
@@ -92,6 +97,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 	for j := 0; j < numberOfRetries; j++ {
 		err := makeRequest(rw, req, server.URL)
+
 		if err == nil {
 			return
 		}
