@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -55,7 +56,7 @@ func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error 
 	return err
 }
 
-func (serverPool *ServerPool) GetNextPeer() *Backend {
+func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 
 	serverList := serverPool.servers
 
@@ -69,15 +70,19 @@ func (serverPool *ServerPool) GetNextPeer() *Backend {
 			if index != current {
 				atomic.StoreInt32(&serverPool.current, index)
 			}
-			return serverList[index]
+			return serverList[index], nil
 		}
 	}
 
-	return nil
+	return nil, errors.New("all the backends are turned down")
 }
 
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
-	server := serverPool.GetNextPeer()
+	server, err := serverPool.GetNextPeer()
+
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusServiceUnavailable)
+	}
 
 	for j := 0; j < numberOfRetries; j++ {
 		err := makeRequest(rw, req, server.URL)
