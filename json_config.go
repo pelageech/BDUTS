@@ -26,6 +26,8 @@ type configJSON struct {
 var port int
 var numberOfRetries int
 
+var serverPool ServerPool
+
 func readConfig() {
 	/*
 		read servers config
@@ -52,13 +54,26 @@ func readConfig() {
 		log.Fatal("Failed to unmarshal servers config: ", err)
 	}
 
+	/*
+		Configure server pool.
+		For each backend we set up
+			- URL,
+			- Alive bool
+		and then add it to the `serverPool`` var.
+	*/
 	for _, server := range serversJSON {
-		serverURL, err := url.Parse(server.URL)
+
+		var backend Backend
+
+		backend.URL, err = url.Parse(server.URL)
 		if err != nil {
-			log.Fatal("Failed to parse server URL", err)
+			log.Printf("Failed to parse server URL: %s\n", err)
+			continue
 		}
 
-		servers = append(servers, serverURL)
+		backend.alive = true
+
+		serverPool.servers = append(serverPool.servers, &backend)
 	}
 
 	/*

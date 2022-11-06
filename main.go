@@ -7,16 +7,20 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
-type index struct {
-	currentIndex int
-	mu           sync.Mutex
+type Backend struct {
+	URL   *url.URL
+	mux   sync.Mutex
+	alive bool
 }
 
-var servers []*url.URL
-var serverCounter index
+type ServerPool struct {
+	servers []*Backend
+	current int32
+}
 
 func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error {
 	fmt.Printf("[reverse proxy server] received request at: %s\n", time.Now())
@@ -51,27 +55,34 @@ func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error 
 	return err
 }
 
-func calculateNextIndex() {
-	serverCounter.mu.Lock()
-	serverCounter.currentIndex++
-	if serverCounter.currentIndex == len(servers) {
-		serverCounter.currentIndex = 0
+func (serverPool *ServerPool) GetNextPeer() *Backend {
+
+	serverList := serverPool.servers
+
+	current := atomic.AddInt32(&serverPool.current, 1)
+	index := current % int32(len(serverList))
+
+	for i := current; i < current+int32(len(serverList)); i++ {
+
+		index = i % int32(len(serverList))
+		if serverList[index].alive {
+			if index != current {
+				atomic.StoreInt32(&serverPool.current, index)
+			}
+			return serverList[index]
+		}
 	}
-	serverCounter.mu.Unlock()
+
+	return nil
 }
 
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
-out:
-	for i := 0; i < len(servers); i++ {
-		server := servers[serverCounter.currentIndex]
+	server := serverPool.GetNextPeer()
 
-		calculateNextIndex()
-
-		for j := 0; j < numberOfRetries; j++ {
-			err := makeRequest(rw, req, server)
-			if err == nil {
-				break out
-			}
+	for j := 0; j < numberOfRetries; j++ {
+		err := makeRequest(rw, req, server.URL)
+		if err == nil {
+			break
 		}
 	}
 }
