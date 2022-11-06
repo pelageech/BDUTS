@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	"net/url"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 type Backend struct {
@@ -25,7 +25,7 @@ type ServerPool struct {
 }
 
 func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error {
-	fmt.Printf("[reverse proxy server] received request at: %s\n", time.Now())
+	log.Printf("[%s] received a request\n", url)
 
 	// set req Host, URL and Request URI to forward a request to the origin server
 	req.Host = url.Host
@@ -37,9 +37,10 @@ func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error 
 
 	// save the response from the origin server
 	originServerResponse, err := http.DefaultClient.Do(req)
+
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
-		_, _ = fmt.Print(rw, err)
+		fmt.Println(rw, err)
 		return err
 	}
 
@@ -88,7 +89,13 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	for j := 0; j < numberOfRetries; j++ {
 		err := makeRequest(rw, req, server.URL)
 		if err == nil {
-			break
+			return
+		}
+
+		if uerr, ok := err.(*url.Error); ok {
+			if uerr.Err == context.Canceled {
+				return
+			}
 		}
 	}
 }
