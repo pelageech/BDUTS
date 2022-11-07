@@ -87,7 +87,7 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 		}
 	}
 
-	return nil, errors.New("All the backends are turned down")
+	return nil, errors.New("all backends are turned down")
 }
 
 func faviconHandler(rw http.ResponseWriter, req *http.Request) {
