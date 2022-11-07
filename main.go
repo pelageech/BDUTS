@@ -19,6 +19,12 @@ type Backend struct {
 	alive bool
 }
 
+func (server *Backend) setAlive(b bool) {
+	server.mux.Lock()
+	server.alive = b
+	server.mux.Unlock()
+}
+
 type ServerPool struct {
 	servers []*Backend
 	current int32
@@ -81,33 +87,42 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 		}
 	}
 
-	return nil, errors.New("all the backends are turned down")
+	return nil, errors.New("All the backends are turned down")
 }
 
-func faviconHandler(http.ResponseWriter, *http.Request) {
-	// do nothing
+func faviconHandler(rw http.ResponseWriter, req *http.Request) {
+	http.Error(rw, "Not Found", http.StatusNotFound)
 }
 
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
-	server, err := serverPool.GetNextPeer()
 
-	if err != nil {
-		http.Error(rw, err.Error(), http.StatusServiceUnavailable)
-	}
-
-	for j := 0; j < numberOfRetries; j++ {
-		err := makeRequest(rw, req, server.URL)
-
-		if err == nil {
+	for retry := 0; retry < 2; retry++ {
+		server, err := serverPool.GetNextPeer()
+		if err != nil {
+			http.Error(rw, "Service not available", http.StatusServiceUnavailable)
+			log.Println(err.Error())
 			return
 		}
 
-		if uerr, ok := err.(*url.Error); ok {
-			if uerr.Err == context.Canceled {
+		for j := 0; j < numberOfRetries; j++ {
+			err := makeRequest(rw, req, server.URL)
+
+			if err == nil {
 				return
 			}
+
+			if uerr, ok := err.(*url.Error); ok {
+				if uerr.Err == context.Canceled {
+					return
+				}
+			}
 		}
+
+		server.setAlive(false)
+
 	}
+
+	http.Error(rw, "Cannot resolve a request", http.StatusInternalServerError)
 }
 
 func main() {
