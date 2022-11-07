@@ -90,7 +90,7 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 	return nil, errors.New("all backends are turned down")
 }
 
-func faviconHandler(rw http.ResponseWriter, req *http.Request) {
+func faviconHandler(rw http.ResponseWriter, _ *http.Request) {
 	http.Error(rw, "Not Found", http.StatusNotFound)
 }
 
