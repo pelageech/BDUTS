@@ -12,19 +12,25 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"time"
 )
 
 type serverJSON struct {
-	URL string
+	URL                   string
+	HealthCheckTcpTimeout time.Duration
 }
 
 type configJSON struct {
-	Port            int
-	NumberOfRetries int
+	Port              int
+	Retries           int
+	Attempts          int
+	HealthCheckPeriod time.Duration
 }
 
 var port int
-var numberOfRetries int
+var retries int
+var attempts int
+var healthCheckPeriod time.Duration
 
 var serverPool ServerPool
 
@@ -70,8 +76,8 @@ func readConfig() {
 			log.Printf("Failed to parse server URL: %s\n", err)
 			continue
 		}
-
-		backend.alive = true
+		backend.healthCheckTcpTimeout = server.HealthCheckTcpTimeout * time.Millisecond
+		backend.alive = false
 
 		serverPool.servers = append(serverPool.servers, &backend)
 	}
@@ -102,5 +108,7 @@ func readConfig() {
 	}
 
 	port = lbConfig.Port
-	numberOfRetries = lbConfig.NumberOfRetries
+	retries = lbConfig.Retries
+	attempts = lbConfig.Attempts
+	healthCheckPeriod = lbConfig.HealthCheckPeriod * time.Second
 }

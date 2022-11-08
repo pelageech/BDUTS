@@ -7,16 +7,19 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type Backend struct {
-	URL   *url.URL
-	mux   sync.Mutex
-	alive bool
+	URL                   *url.URL
+	healthCheckTcpTimeout time.Duration
+	mux                   sync.Mutex
+	alive                 bool
 }
 
 func (server *Backend) setAlive(b bool) {
@@ -96,7 +99,7 @@ func faviconHandler(rw http.ResponseWriter, _ *http.Request) {
 
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
-	for retry := 0; retry < 2; retry++ {
+	for attempt := 0; attempt < attempts; attempt++ {
 		server, err := serverPool.GetNextPeer()
 		if err != nil {
 			http.Error(rw, "Service not available", http.StatusServiceUnavailable)
@@ -104,7 +107,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		for j := 0; j < numberOfRetries; j++ {
+		for j := 0; j < retries; j++ {
 			err := makeRequest(rw, req, server.URL)
 
 			if err == nil {
@@ -123,6 +126,41 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	http.Error(rw, "Cannot resolve a request", http.StatusInternalServerError)
+}
+
+func HealthChecker() {
+	ticker := time.NewTicker(healthCheckPeriod)
+
+	for {
+		select {
+		case <-ticker.C:
+			log.Println("Health Check has been started!")
+			healthCheck()
+			log.Println("All the checks has been completed!")
+		}
+	}
+}
+
+func healthCheck() {
+	for _, server := range serverPool.servers {
+		alive := server.IsAlive()
+		server.setAlive(alive)
+		if alive {
+			log.Printf("[%s] is alive.\n", server.URL.Host)
+		} else {
+			log.Printf("[%s] is down.\n", server.URL.Host)
+		}
+	}
+}
+
+func (server *Backend) IsAlive() bool {
+	conn, err := net.DialTimeout("tcp", server.URL.Host, server.healthCheckTcpTimeout)
+	if err != nil {
+		log.Println("Connection problem: ", err)
+		return false
+	}
+	defer conn.Close()
+	return true
 }
 
 func main() {
@@ -144,6 +182,14 @@ func main() {
 	// Serving
 	http.HandleFunc("/", loadBalancer)
 	http.HandleFunc("/favicon.ico", faviconHandler)
+
+	// Firstly, identify the working servers
+	log.Println("Configured! Now setting up the first health check...")
+	healthCheck()
+	log.Println("Ready!")
+
+	// go health check
+	go HealthChecker()
 
 	log.Printf("Load Balancer started at :%d\n", port)
 	if err := http.Serve(ln, nil); err != nil {
