@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 )
@@ -13,7 +14,7 @@ func hello(w http.ResponseWriter, req *http.Request) {
 	case <-req.Context().Done():
 		err := req.Context().Err()
 		fmt.Println("server:", err)
-		internalError := http.StatusInternalServerError
+		internalError := http.StatusBadRequest
 		http.Error(w, err.Error(), internalError)
 	}
 
@@ -23,5 +24,9 @@ func main() {
 
 	http.HandleFunc("/", hello)
 
-	http.ListenAndServe(":3032", nil)
+	err := http.ListenAndServe(":3032", nil)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 }
