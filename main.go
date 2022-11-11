@@ -33,13 +33,14 @@ type ServerPool struct {
 	current int32
 }
 
-func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error {
-	log.Printf("[%s] received a request\n", url)
+func (server *Backend) MakeRequest(rw http.ResponseWriter, req *http.Request) error {
+	serverUrl := server.URL
+	log.Printf("[%s] received a request\n", serverUrl)
 
 	// set req Host, URL and Request URI to forward a request to the origin server
-	req.Host = url.Host
-	req.URL.Host = url.Host
-	req.URL.Scheme = url.Scheme
+	req.Host = serverUrl.Host
+	req.URL.Host = serverUrl.Host
+	req.URL.Scheme = serverUrl.Scheme
 
 	// https://go.dev/src/net/http/client.go:217
 	req.RequestURI = ""
@@ -48,11 +49,14 @@ func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error 
 	originServerResponse, err := http.DefaultClient.Do(req)
 
 	if err != nil {
-		// rw.WriteHeader(http.StatusInternalServerError)
-		// при переподключении http жалуется
-
-		log.Println(err)
-		//	fmt.Println(rw, err)
+		if uerr, ok := err.(*url.Error); ok {
+			if uerr.Op == "Get" {
+				http.Error(rw, uerr.Err.Error(), http.StatusInternalServerError)
+			} else if uerr.Err == context.Canceled {
+				http.Error(rw, context.Canceled.Error(), http.StatusBadRequest)
+			}
+			log.Println(uerr)
+		}
 		return err
 	}
 
@@ -67,7 +71,7 @@ func makeRequest(rw http.ResponseWriter, req *http.Request, url *url.URL) error 
 	rw.WriteHeader(http.StatusOK)
 	_, err = io.Copy(rw, originServerResponse.Body)
 
-	log.Printf("[%s] returned %s\n", url, originServerResponse.Status)
+	log.Printf("[%s] returned %s\n", serverUrl, originServerResponse.Status)
 
 	return err
 }
@@ -93,10 +97,6 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 	return nil, errors.New("all backends are turned down")
 }
 
-func faviconHandler(rw http.ResponseWriter, _ *http.Request) {
-	http.Error(rw, "Not Found", http.StatusNotFound)
-}
-
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 	for attempt := 0; attempt < attempts; attempt++ {
@@ -108,7 +108,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 		}
 
 		for j := 0; j < retries; j++ {
-			err := makeRequest(rw, req, server.URL)
+			err := server.MakeRequest(rw, req)
 
 			if err == nil {
 				return
@@ -181,15 +181,15 @@ func main() {
 
 	// Serving
 	http.HandleFunc("/", loadBalancer)
-	http.HandleFunc("/favicon.ico", faviconHandler)
+	http.HandleFunc("/favicon.ico", http.NotFound)
 
 	// Firstly, identify the working servers
 	log.Println("Configured! Now setting up the first health check...")
 	healthCheck()
 	log.Println("Ready!")
 
-	// go health check
-	go HealthChecker()
+	// set up health check
+	//go HealthChecker()
 
 	log.Printf("Load Balancer started at :%d\n", port)
 	if err := http.Serve(ln, nil); err != nil {
