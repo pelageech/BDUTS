@@ -207,12 +207,12 @@ func main() {
 
 	// Firstly, identify the working servers
 	log.Println("Configured! Now setting up the first health check...")
-	//healthCheck()
+	healthCheck()
 
 	log.Println("Ready!")
 
 	// set up health check
-	//go HealthChecker()
+	go HealthChecker()
 
 	log.Printf("Load Balancer started at :%d\n", port)
 	if err := http.Serve(ln, nil); err != nil {

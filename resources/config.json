@@ -1,6 +1,6 @@
 {
   "port" : 8080,
-  "retries" : 5,
+  "retries" : 3,
   "attempts" : 2,
   "healthCheckPeriod" : 120
 }
