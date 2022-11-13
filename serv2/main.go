@@ -22,7 +22,7 @@ func hello(w http.ResponseWriter, req *http.Request) {
 
 func main() {
 
-	http.HandleFunc("/", hello)
+	http.HandleFunc("/hello", hello)
 
 	err := http.ListenAndServe(":3032", nil)
 	if err != nil {
