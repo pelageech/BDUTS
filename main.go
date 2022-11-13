@@ -33,9 +33,17 @@ type ServerPool struct {
 	current int32
 }
 
-func (server *Backend) MakeRequest(rw http.ResponseWriter, req *http.Request) error {
+func checkCancelled(err error) bool {
+	if uerr, ok := err.(*url.Error); ok {
+		if uerr.Err == context.Canceled {
+			return true
+		}
+	}
+	return false
+}
+
+func (server *Backend) MakeRequest(rw http.ResponseWriter, req *http.Request) (*http.Response, error) {
 	serverUrl := server.URL
-	log.Printf("[%s] received a request\n", serverUrl)
 
 	// set req Host, URL and Request URI to forward a request to the origin server
 	req.Host = serverUrl.Host
@@ -48,32 +56,32 @@ func (server *Backend) MakeRequest(rw http.ResponseWriter, req *http.Request) er
 	// save the response from the origin server
 	originServerResponse, err := http.DefaultClient.Do(req)
 
-	if err != nil {
+	// retry until we have error and response is nil
+	for i := 1; i <= retries && err != nil && originServerResponse == nil; i++ {
+		if checkCancelled(err) {
+			break
+		}
+		log.Println(err)
+		log.Printf("Retry number %d of %d\n", i, retries)
+		originServerResponse, err = http.DefaultClient.Do(req)
+	}
+
+	// error handler
+	if err != nil && originServerResponse == nil {
+		resp := &http.Response{}
 		if uerr, ok := err.(*url.Error); ok {
-			if uerr.Op == "Get" {
-				http.Error(rw, uerr.Err.Error(), http.StatusInternalServerError)
-			} else if uerr.Err == context.Canceled {
-				http.Error(rw, context.Canceled.Error(), http.StatusBadRequest)
+			resp.Status = uerr.Err.Error()
+
+			if uerr.Err == context.Canceled {
+				resp.StatusCode = http.StatusBadRequest
+			} else { // server error
+				resp.StatusCode = http.StatusInternalServerError
 			}
-			log.Println(uerr)
 		}
-		return err
+		return resp, err
 	}
 
-	// copy headers from origin server response to our response
-	for key, values := range originServerResponse.Header {
-		for _, value := range values {
-			rw.Header().Add(key, value)
-		}
-	}
-
-	// return response to the client
-	rw.WriteHeader(http.StatusOK)
-	_, err = io.Copy(rw, originServerResponse.Body)
-
-	log.Printf("[%s] returned %s\n", serverUrl, originServerResponse.Status)
-
-	return err
+	return originServerResponse, err
 }
 
 func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
@@ -100,6 +108,8 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 	for attempt := 0; attempt < attempts; attempt++ {
+
+		// get next server to send a request
 		server, err := serverPool.GetNextPeer()
 		if err != nil {
 			http.Error(rw, "Service not available", http.StatusServiceUnavailable)
@@ -107,25 +117,37 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		for j := 0; j < retries; j++ {
-			err := server.MakeRequest(rw, req)
+		// send it to the backend
+		log.Printf("[%s] received a request\n", server.URL)
+		resp, err := server.MakeRequest(rw, req)
 
-			if err == nil {
-				return
-			}
-
-			if uerr, ok := err.(*url.Error); ok {
-				if uerr.Err == context.Canceled {
-					return
+		// if Status OK
+		if err == nil {
+			log.Printf("[%s] returned %s\n", server.URL, resp.Status)
+			for key, values := range resp.Header {
+				for _, value := range values {
+					rw.Header().Add(key, value)
 				}
 			}
+			io.Copy(rw, resp.Body)
+			return
+		}
+
+		// on user errors
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			log.Println(err)
+			return
+		}
+
+		// on server errors
+		if resp.StatusCode >= 500 && resp.StatusCode < 600 {
+			log.Println(err)
 		}
 
 		server.setAlive(false)
-
 	}
 
-	http.Error(rw, "Cannot resolve a request", http.StatusInternalServerError)
+	http.Error(rw, "Cannot resolve a request", http.StatusBadRequest)
 }
 
 func HealthChecker() {
@@ -185,7 +207,8 @@ func main() {
 
 	// Firstly, identify the working servers
 	log.Println("Configured! Now setting up the first health check...")
-	healthCheck()
+	//healthCheck()
+
 	log.Println("Ready!")
 
 	// set up health check
