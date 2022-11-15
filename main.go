@@ -15,6 +15,14 @@ import (
 	"time"
 )
 
+type LoadBalancerConfig struct {
+	hostname          string
+	port              int
+	retries           int
+	attempts          int
+	healthCheckPeriod time.Duration
+}
+
 type Backend struct {
 	URL                   *url.URL
 	healthCheckTcpTimeout time.Duration
@@ -42,7 +50,14 @@ func checkCancelled(err error) bool {
 	return false
 }
 
-func (server *Backend) MakeRequest(rw http.ResponseWriter, req *http.Request) (*http.Response, error) {
+type ResponseError struct {
+	request    *http.Request
+	statusCode int
+	err        error
+}
+
+func (server *Backend) MakeRequest(req *http.Request) (*http.Response, *ResponseError) {
+	respError := &ResponseError{request: req}
 	serverUrl := server.URL
 
 	// set req Host, URL and Request URI to forward a request to the origin server
@@ -57,31 +72,38 @@ func (server *Backend) MakeRequest(rw http.ResponseWriter, req *http.Request) (*
 	originServerResponse, err := http.DefaultClient.Do(req)
 
 	// retry until we have error and response is nil
-	for i := 1; i <= retries && err != nil && originServerResponse == nil; i++ {
+	for i := 1; i <= loadBalancerConfig.retries && err != nil && originServerResponse == nil; i++ {
 		if checkCancelled(err) {
 			break
 		}
 		log.Println(err)
-		log.Printf("Retry number %d of %d\n", i, retries)
+		log.Printf("Retry number %d of %d\n", i, loadBalancerConfig.retries)
 		originServerResponse, err = http.DefaultClient.Do(req)
 	}
 
 	// error handler
 	if err != nil && originServerResponse == nil {
-		resp := &http.Response{}
 		if uerr, ok := err.(*url.Error); ok {
-			resp.Status = uerr.Err.Error()
+			respError.err = uerr.Err
 
 			if uerr.Err == context.Canceled {
-				resp.StatusCode = http.StatusBadRequest
+				respError.statusCode = http.StatusBadRequest
 			} else { // server error
-				resp.StatusCode = http.StatusInternalServerError
+				respError.statusCode = http.StatusInternalServerError
 			}
 		}
-		return resp, err
+		return nil, respError
 	}
 
-	return originServerResponse, err
+	if !(originServerResponse.StatusCode >= 200 && originServerResponse.StatusCode < 300) {
+		defer originServerResponse.Body.Close()
+		respError.statusCode = originServerResponse.StatusCode
+		respError.err = errors.New(originServerResponse.Status)
+
+		return nil, respError
+	}
+
+	return originServerResponse, nil
 }
 
 func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
@@ -107,7 +129,7 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
-	for attempt := 0; attempt < attempts; attempt++ {
+	for attempt := 0; attempt < loadBalancerConfig.attempts; attempt++ {
 
 		// get next server to send a request
 		server, err := serverPool.GetNextPeer()
@@ -119,39 +141,44 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 		// send it to the backend
 		log.Printf("[%s] received a request\n", server.URL)
-		resp, err := server.MakeRequest(rw, req)
+		resp, respError := server.MakeRequest(req)
 
-		// if Status OK
-		if err == nil {
-			log.Printf("[%s] returned %s\n", server.URL, resp.Status)
-			for key, values := range resp.Header {
-				for _, value := range values {
-					rw.Header().Add(key, value)
-				}
+		if respError != nil {
+			// on user errors
+			if respError.statusCode >= 400 && respError.statusCode < 500 {
+				http.Error(rw, respError.err.Error(), respError.statusCode)
+				log.Printf("[%s] got an error: %s", server.URL, respError.err)
+				return
 			}
-			io.Copy(rw, resp.Body)
-			return
+
+			// on server errors
+			if respError.statusCode >= 500 && respError.statusCode < 600 {
+				server.setAlive(false)
+				log.Println(respError.err)
+				continue
+			}
 		}
 
-		// on user errors
-		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
-			log.Println(err)
-			return
+		// if Status 200 OK
+		log.Printf("[%s] returned %s\n", server.URL, resp.Status)
+		for key, values := range resp.Header {
+			for _, value := range values {
+				rw.Header().Add(key, value)
+			}
+		}
+		if _, err := io.Copy(rw, resp.Body); err != nil {
+			log.Panic(err)
 		}
 
-		// on server errors
-		if resp.StatusCode >= 500 && resp.StatusCode < 600 {
-			log.Println(err)
-		}
-
-		server.setAlive(false)
+		resp.Body.Close()
+		return
 	}
 
-	http.Error(rw, "Cannot resolve a request", http.StatusBadRequest)
+	http.Error(rw, "We are sorry, but something went wrong", http.StatusInternalServerError)
 }
 
 func HealthChecker() {
-	ticker := time.NewTicker(healthCheckPeriod)
+	ticker := time.NewTicker(loadBalancerConfig.healthCheckPeriod)
 
 	for {
 		select {
@@ -193,7 +220,7 @@ func main() {
 	tlsConfig := &tls.Config{Certificates: []tls.Certificate{Crt}}
 
 	// Start listening
-	ln, err := tls.Listen("tcp", fmt.Sprintf(":%d", port), tlsConfig)
+	ln, err := tls.Listen("tcp", fmt.Sprintf(":%d", loadBalancerConfig.port), tlsConfig)
 	if err != nil {
 		log.Fatal("There's problem with listening")
 	}
@@ -214,7 +241,7 @@ func main() {
 	// set up health check
 	go HealthChecker()
 
-	log.Printf("Load Balancer started at :%d\n", port)
+	log.Printf("Load Balancer started at :%d\n", loadBalancerConfig.port)
 	if err := http.Serve(ln, nil); err != nil {
 		log.Fatal(err)
 	}
