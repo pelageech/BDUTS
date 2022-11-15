@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"sync"
 	"sync/atomic"
@@ -56,7 +57,33 @@ type ResponseError struct {
 	err        error
 }
 
+func makeRequestTimeTracker(url *url.URL, req *http.Request) *http.Request {
+	var start, connect, dns time.Time
+
+	trace := &httptrace.ClientTrace{
+		DNSStart: func(dsi httptrace.DNSStartInfo) { dns = time.Now() },
+		DNSDone: func(ddi httptrace.DNSDoneInfo) {
+			fmt.Printf("[%s] DNS Done: %v\n", url, time.Since(dns))
+		},
+
+		ConnectStart: func(network, addr string) { connect = time.Now() },
+		ConnectDone: func(network, addr string, err error) {
+			fmt.Printf("[%s] Connect time: %v\n", url, time.Since(connect))
+		},
+
+		GotFirstResponseByte: func() {
+			fmt.Printf("[%s] Time from start to first byte: %v\n", url, time.Since(start))
+		},
+	}
+
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+	start = time.Now()
+
+	return req
+}
+
 func (server *Backend) MakeRequest(req *http.Request) (*http.Response, *ResponseError) {
+
 	respError := &ResponseError{request: req}
 	serverUrl := server.URL
 
@@ -69,6 +96,7 @@ func (server *Backend) MakeRequest(req *http.Request) (*http.Response, *Response
 	req.RequestURI = ""
 
 	// save the response from the origin server
+	req = makeRequestTimeTracker(server.URL, req)
 	originServerResponse, err := http.DefaultClient.Do(req)
 
 	// retry until we have error and response is nil
