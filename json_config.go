@@ -27,11 +27,7 @@ type configJSON struct {
 	HealthCheckPeriod time.Duration
 }
 
-var port int
-var retries int
-var attempts int
-var healthCheckPeriod time.Duration
-
+var loadBalancerConfig LoadBalancerConfig
 var serverPool ServerPool
 
 func readConfig() {
@@ -107,8 +103,8 @@ func readConfig() {
 		log.Fatal("Failed to unmarshal load balancer config: ", err)
 	}
 
-	port = lbConfig.Port
-	retries = lbConfig.Retries
-	attempts = lbConfig.Attempts
-	healthCheckPeriod = lbConfig.HealthCheckPeriod * time.Second
+	loadBalancerConfig.port = lbConfig.Port
+	loadBalancerConfig.retries = lbConfig.Retries
+	loadBalancerConfig.attempts = lbConfig.Attempts
+	loadBalancerConfig.healthCheckPeriod = lbConfig.HealthCheckPeriod * time.Second
 }
