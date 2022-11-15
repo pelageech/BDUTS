@@ -16,6 +16,8 @@ import (
 	"time"
 )
 
+// LoadBalancerConfig is parse from `config.json` file.
+// It contains all the necessary information of the load balancer.
 type LoadBalancerConfig struct {
 	hostname          string
 	port              int
@@ -57,8 +59,9 @@ type ResponseError struct {
 	err        error
 }
 
-func makeRequestTimeTracker(url *url.URL, req *http.Request) *http.Request {
+func makeRequestTimeTracker(url *url.URL, req *http.Request) (*http.Request, *time.Duration) {
 	var start, connect, dns time.Time
+	var finish time.Duration
 
 	trace := &httptrace.ClientTrace{
 		DNSStart: func(dsi httptrace.DNSStartInfo) { dns = time.Now() },
@@ -72,14 +75,15 @@ func makeRequestTimeTracker(url *url.URL, req *http.Request) *http.Request {
 		},
 
 		GotFirstResponseByte: func() {
-			fmt.Printf("[%s] Time from start to first byte: %v\n", url, time.Since(start))
+			finish = time.Since(start)
+			fmt.Printf("[%s] Time from start to first byte: %v\n", url, finish)
 		},
 	}
 
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 	start = time.Now()
 
-	return req
+	return req, &finish
 }
 
 func (server *Backend) MakeRequest(req *http.Request) (*http.Response, *ResponseError) {
@@ -96,7 +100,7 @@ func (server *Backend) MakeRequest(req *http.Request) (*http.Response, *Response
 	req.RequestURI = ""
 
 	// save the response from the origin server
-	req = makeRequestTimeTracker(server.URL, req)
+	req, _ = makeRequestTimeTracker(server.URL, req)
 	originServerResponse, err := http.DefaultClient.Do(req)
 
 	// retry until we have error and response is nil
