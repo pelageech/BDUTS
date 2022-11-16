@@ -22,8 +22,6 @@ type serverJSON struct {
 
 type configJSON struct {
 	Port              int
-	Retries           int
-	Attempts          int
 	HealthCheckPeriod time.Duration
 }
 
@@ -104,7 +102,5 @@ func readConfig() {
 	}
 
 	loadBalancerConfig.port = lbConfig.Port
-	loadBalancerConfig.retries = lbConfig.Retries
-	loadBalancerConfig.attempts = lbConfig.Attempts
 	loadBalancerConfig.healthCheckPeriod = lbConfig.HealthCheckPeriod * time.Second
 }
