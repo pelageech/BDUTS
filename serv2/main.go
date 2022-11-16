@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -10,12 +9,7 @@ import (
 func hello(w http.ResponseWriter, req *http.Request) {
 	select {
 	case <-time.After(5 * time.Second):
-		fmt.Fprintf(w, "hello from 32\n")
-	case <-req.Context().Done():
-		err := req.Context().Err()
-		fmt.Println("server:", err)
-		internalError := http.StatusBadRequest
-		http.Error(w, err.Error(), internalError)
+		w.Write([]byte("hello from 3032"))
 	}
 
 }
