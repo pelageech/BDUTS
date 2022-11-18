@@ -8,10 +8,12 @@ import (
 
 func hello(w http.ResponseWriter, req *http.Request) {
 	select {
-	case <-time.After(5 * time.Second):
+	case <-time.After(10 * time.Second):
 		w.Header().Add("server-name", "PORT_32_SERVER")
 		w.Header().Add("header_test", "hahaha")
 		w.Write([]byte("hello from 3031"))
+	case <-req.Context().Done():
+		log.Println("canceled")
 	}
 }
 

@@ -10,6 +10,8 @@ func hello(w http.ResponseWriter, req *http.Request) {
 	select {
 	case <-time.After(5 * time.Second):
 		w.Write([]byte("hello from 3032"))
+	case <-req.Context().Done():
+		log.Println("canceled")
 	}
 
 }
