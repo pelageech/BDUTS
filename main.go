@@ -44,15 +44,6 @@ type ServerPool struct {
 	current int32
 }
 
-func checkCancelled(err error) bool {
-	if uerr, ok := err.(*url.Error); ok {
-		if uerr.Err == context.Canceled {
-			return true
-		}
-	}
-	return false
-}
-
 type ResponseError struct {
 	request    *http.Request
 	statusCode int
@@ -142,7 +133,6 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	for {
-
 		// get next server to send a request
 		server, err := serverPool.GetNextPeer()
 		if err != nil {
@@ -158,6 +148,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 		if respError != nil {
 			// on cancellation
 			if respError.err == context.Canceled {
+				//	cancel()
 				log.Printf("[%s] %s", server.URL, respError.err)
 				return
 			}
@@ -174,11 +165,11 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 				rw.Header().Add(key, value)
 			}
 		}
+
 		if _, err := io.Copy(rw, resp.Body); err != nil {
 			log.Panic(err)
 		}
 
-		resp.Body.Close()
 		return
 	}
 }
