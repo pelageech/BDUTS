@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -77,7 +76,7 @@ func (s *ServerPool) GetNextPeer() *Backend {
 	l := len(s.backends) + next // start from next and move a full cycle
 	for i := next; i < l; i++ {
 		idx := i % len(s.backends)     // take an index by modding
-		if s.backends[idx].IsAlive() { // if we have an alive backend, use it and store if its not the original one
+		if s.backends[idx].IsAlive() { // if we have an alive backend, use it and store if it's not the original one
 			if i != next {
 				atomic.StoreInt64(&s.current, int64(idx))
 			}
@@ -118,6 +117,7 @@ func GetRetryFromContext(r *http.Request) int {
 
 // lb load balances the incoming request
 func lb(w http.ResponseWriter, r *http.Request) {
+
 	attempts := GetAttemptsFromContext(r)
 	if attempts > 3 {
 		log.Printf("%s(%s) Max attempts reached, terminating\n", r.RemoteAddr, r.URL.Path)
@@ -142,11 +142,11 @@ func isBackendAlive(u *url.URL) bool {
 		log.Println("Site unreachable, error: ", err)
 		return false
 	}
-	defer conn.Close()
+	conn.Close()
 	return true
 }
 
-// healthCheck runs a routine for check status of the backends every 2 mins
+// healthCheck runs a routine for check status of the backends every 2 minutes
 func healthCheck() {
 	t := time.NewTicker(time.Minute * 2)
 	for {
@@ -159,21 +159,7 @@ func healthCheck() {
 	}
 }
 
-var serverPool ServerPool
-
-func main() {
-	var serverList string
-	var port int
-	flag.StringVar(&serverList, "backends", "", "Load balanced backends, use commas to separate")
-	flag.IntVar(&port, "port", 3030, "Port to serve")
-	flag.Parse()
-
-	if len(serverList) == 0 {
-		log.Fatal("Please provide one or more backends to load balance")
-	}
-
-	// parse servers
-	tokens := strings.Split(serverList, ",")
+func config(tokens []string) {
 	for _, tok := range tokens {
 		serverUrl, err := url.Parse(tok)
 		if err != nil {
@@ -181,8 +167,14 @@ func main() {
 		}
 
 		proxy := httputil.NewSingleHostReverseProxy(serverUrl)
+
 		proxy.ErrorHandler = func(writer http.ResponseWriter, request *http.Request, e error) {
 			log.Printf("[%s] %s\n", serverUrl.Host, e.Error())
+			if e == context.Canceled {
+
+				return
+			}
+
 			retries := GetRetryFromContext(request)
 			if retries < 3 {
 				select {
@@ -203,17 +195,6 @@ func main() {
 			lb(writer, request.WithContext(ctx))
 		}
 
-		// change transport rules
-		proxy.Transport = &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			Dial: (&net.Dialer{
-				Timeout:   2 * time.Second,
-				KeepAlive: 2 * time.Second,
-			}).Dial,
-			TLSHandshakeTimeout: 3 * time.Second,
-			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true}, // ignore bad certificates
-		}
-
 		serverPool.AddBackend(&Backend{
 			URL:          serverUrl,
 			Alive:        true,
@@ -221,11 +202,33 @@ func main() {
 		})
 		log.Printf("Configured server: %s\n", serverUrl)
 	}
+}
 
-	// create http server
-	server := http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
-		Handler: http.HandlerFunc(lb),
+var serverPool ServerPool
+
+func main() {
+	var serverList string
+	var port int
+
+	flag.StringVar(&serverList, "backends", "", "Load balanced backends, use commas to separate")
+	flag.IntVar(&port, "port", 3030, "Port to serve")
+	flag.Parse()
+
+	if len(serverList) == 0 {
+		log.Fatal("Please provide one or more backends to load balance")
+	}
+
+	// parse servers
+	tokens := strings.Split(serverList, ",")
+	config(tokens)
+
+	http.HandleFunc("/", lb)
+	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
+	tsconfig := &tls.Config{Certificates: []tls.Certificate{Crt}, ServerName: "localhost:3030"}
+
+	ln, err := tls.Listen("tcp", ":3030", tsconfig)
+	if err != nil {
+		log.Fatal("There's problem on the lb")
 	}
 
 	serverPool.current = -1
@@ -234,7 +237,7 @@ func main() {
 	go healthCheck()
 
 	log.Printf("Load Balancer started at :%d\n", port)
-	if err := server.ListenAndServe(); err != nil {
+	if err := http.Serve(ln, nil); err != nil {
 		log.Fatal(err)
 	}
 }
