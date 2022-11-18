@@ -3,14 +3,14 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -20,15 +20,6 @@ const (
 	Attempts int = iota
 	Retry
 )
-
-// JsonBackend - backend structures
-type JsonBackend struct {
-	Url string
-}
-
-type LbConfig struct {
-	Port int
-}
 
 // Backend holds the data about a server
 type Backend struct {
@@ -86,7 +77,7 @@ func (s *ServerPool) GetNextPeer() *Backend {
 	l := len(s.backends) + next // start from next and move a full cycle
 	for i := next; i < l; i++ {
 		idx := i % len(s.backends)     // take an index by modding
-		if s.backends[idx].IsAlive() { // if we have an alive backend, use it and store if it's not the original one
+		if s.backends[idx].IsAlive() { // if we have an alive backend, use it and store if its not the original one
 			if i != next {
 				atomic.StoreInt64(&s.current, int64(idx))
 			}
@@ -117,7 +108,7 @@ func GetAttemptsFromContext(r *http.Request) int {
 	return 1
 }
 
-// GetRetryFromContext returns the retries for request
+// GetAttemptsFromContext returns the attempts for request
 func GetRetryFromContext(r *http.Request) int {
 	if retry, ok := r.Context().Value(Retry).(int); ok {
 		return retry
@@ -127,7 +118,6 @@ func GetRetryFromContext(r *http.Request) int {
 
 // lb load balances the incoming request
 func lb(w http.ResponseWriter, r *http.Request) {
-
 	attempts := GetAttemptsFromContext(r)
 	if attempts > 3 {
 		log.Printf("%s(%s) Max attempts reached, terminating\n", r.RemoteAddr, r.URL.Path)
@@ -138,12 +128,7 @@ func lb(w http.ResponseWriter, r *http.Request) {
 	peer := serverPool.GetNextPeer()
 	if peer != nil {
 		log.Printf("Connecting to %s\n", peer.URL) // логирование подключения
-
-		// Send a request
 		peer.ReverseProxy.ServeHTTP(w, r)
-
-		log.Printf("Success %s\n", peer.URL)
-		}
 		return
 	}
 	http.Error(w, "Service not available", http.StatusServiceUnavailable)
@@ -161,7 +146,7 @@ func isBackendAlive(u *url.URL) bool {
 	return true
 }
 
-// healthCheck runs a routine for check status of the backends every 2 minutes
+// healthCheck runs a routine for check status of the backends every 2 mins
 func healthCheck() {
 	t := time.NewTicker(time.Minute * 2)
 	for {
@@ -174,31 +159,30 @@ func healthCheck() {
 	}
 }
 
-// for each url in
-func config(tokens []JsonBackend) {
-	for _, tok := range tokens {
+var serverPool ServerPool
 
-		// Parse url
-		serverUrl, err := url.Parse(tok.Url)
+func main() {
+	var serverList string
+	var port int
+	flag.StringVar(&serverList, "backends", "", "Load balanced backends, use commas to separate")
+	flag.IntVar(&port, "port", 3030, "Port to serve")
+	flag.Parse()
+
+	if len(serverList) == 0 {
+		log.Fatal("Please provide one or more backends to load balance")
+	}
+
+	// parse servers
+	tokens := strings.Split(serverList, ",")
+	for _, tok := range tokens {
+		serverUrl, err := url.Parse(tok)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		// Create new proxy-singleton
 		proxy := httputil.NewSingleHostReverseProxy(serverUrl)
-
-		// Set a behaviour on errors
 		proxy.ErrorHandler = func(writer http.ResponseWriter, request *http.Request, e error) {
-
-			// Print an error to log
 			log.Printf("[%s] %s\n", serverUrl.Host, e.Error())
-
-			// If context is cancelled, do nothing
-			if e == context.Canceled {
-				return
-			}
-
-			// Retry connection on fail
 			retries := GetRetryFromContext(request)
 			if retries < 3 {
 				select {
@@ -209,18 +193,27 @@ func config(tokens []JsonBackend) {
 				return
 			}
 
-			// After 3 retries, mark this backend as down
+			// after 3 retries, mark this backend as down
 			serverPool.MarkBackendStatus(serverUrl, false)
 
-			// If the same request routing for few attempts with different backends, increase the count
+			// if the same request routing for few attempts with different backends, increase the count
 			attempts := GetAttemptsFromContext(request)
 			log.Printf("%s(%s) Attempting retry %d\n", request.RemoteAddr, request.URL.Path, attempts)
 			ctx := context.WithValue(request.Context(), Attempts, attempts+1)
-			log.Printf("Unsuccess %s", serverUrl.Host)
 			lb(writer, request.WithContext(ctx))
 		}
 
-		// Configure a following backend
+		// change transport rules
+		proxy.Transport = &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			Dial: (&net.Dialer{
+				Timeout:   2 * time.Second,
+				KeepAlive: 2 * time.Second,
+			}).Dial,
+			TLSHandshakeTimeout: 3 * time.Second,
+			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true}, // ignore bad certificates
+		}
+
 		serverPool.AddBackend(&Backend{
 			URL:          serverUrl,
 			Alive:        true,
@@ -228,57 +221,20 @@ func config(tokens []JsonBackend) {
 		})
 		log.Printf("Configured server: %s\n", serverUrl)
 	}
-}
 
-var serverPool ServerPool
-
-func main() {
-	// Read Load-Balancer config
-	buffLoadBalancerConfig, _ := os.ReadFile("resources/lb_config.json")
-
-	var loadBalancerConfig LbConfig
-	err := json.Unmarshal(buffLoadBalancerConfig, &loadBalancerConfig)
-	if err != nil {
-		log.Fatal("Bad lb_config.json", err)
+	// create http server
+	server := http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: http.HandlerFunc(lb),
 	}
 
-	// Read Backends
-	buffBackends, _ := os.ReadFile("resources/backends.json")
-
-	var backends []JsonBackend
-	err = json.Unmarshal(buffBackends, &backends)
-	if err != nil {
-		log.Fatal("Bad backends.json", err)
-	}
-
-	// Configure all the backends
-	config(backends)
-
-	// Set handle for http load-balancer
-	http.HandleFunc("/", lb)
-
-	// Config TLS: setting a pair crt-key
-	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
-	tsconfig := &tls.Config{Certificates: []tls.Certificate{Crt}}
-
-	// Set a port is listened by server to
-	port := fmt.Sprintf(":%d", loadBalancerConfig.Port)
-
-	// Start listening
-	ln, err := tls.Listen("tcp", port, tsconfig)
-	if err != nil {
-		log.Fatal("There's problem on the lb")
-	}
-
-	// current is -1, it's automatically will turn into 0
 	serverPool.current = -1
 
 	// start health checking
 	go healthCheck()
 
-	// Serving
-	log.Printf("Load Balancer started at %s\n", port)
-	if err := http.Serve(ln, nil); err != nil {
+	log.Printf("Load Balancer started at :%d\n", port)
+	if err := server.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }
