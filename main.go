@@ -1,11 +1,9 @@
 package main
 
 import (
-	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -28,7 +26,7 @@ type Backend struct {
 	URL                   *url.URL
 	healthCheckTcpTimeout time.Duration
 	server                *httputil.ReverseProxy
-	alive                 *atomic.Bool
+	alive                 atomic.Bool
 }
 
 func (server *Backend) setAlive(b bool) {
@@ -46,33 +44,56 @@ type ResponseError struct {
 	err        error
 }
 
-func makeRequestTimeTracker(url *url.URL, req *http.Request) (*http.Request, *time.Duration) {
-	var start, connect, dns time.Time
-	var finish time.Duration
+type BackendResources struct {
+	url      *url.URL
+	dns      *time.Duration
+	connect  *time.Duration
+	response *time.Duration
+	general  *time.Duration
+}
+
+func makeRequestTimeTracker(req *http.Request) (*http.Request, *BackendResources) {
+	var rDns, rConn, rResp, rGen time.Duration
+	resources := &BackendResources{
+		url:      req.URL,
+		dns:      &rDns,
+		connect:  &rConn,
+		response: &rResp,
+		general:  &rGen,
+	}
+
+	var start, dns, connect, wroteReq time.Time
 
 	trace := &httptrace.ClientTrace{
 		DNSStart: func(dsi httptrace.DNSStartInfo) { dns = time.Now() },
 		DNSDone: func(ddi httptrace.DNSDoneInfo) {
-			fmt.Printf("[%s] DNS Done: %v\n", url, time.Since(dns))
+			rDns = time.Since(dns)
 		},
 
 		ConnectStart: func(network, addr string) { connect = time.Now() },
 		ConnectDone: func(network, addr string, err error) {
-			fmt.Printf("[%s] Connect time: %v\n", url, time.Since(connect))
+			rConn = time.Since(connect)
+		},
+
+		WroteRequest: func(_ httptrace.WroteRequestInfo) {
+			wroteReq = time.Now()
 		},
 
 		GotFirstResponseByte: func() {
-			finish = time.Since(start)
-			fmt.Printf("[%s] Time from start to first byte: %v\n", url, finish)
+			now := time.Now()
+			rGen = now.Sub(start)
+			rResp = now.Sub(wroteReq)
+			log.Println(rGen, rResp)
 		},
 	}
 
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 	start = time.Now()
 
-	return req, &finish
+	return req, resources
 }
 
+/*
 func (server *Backend) MakeRequest(req *http.Request) (*http.Response, *ResponseError) {
 	respError := &ResponseError{request: req}
 	serverUrl := server.URL
@@ -105,6 +126,7 @@ func (server *Backend) MakeRequest(req *http.Request) (*http.Response, *Response
 
 	return originServerResponse, nil
 }
+*/
 
 func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 
@@ -128,46 +150,21 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 }
 
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
-	for {
-		// get next server to send a request
-		server, err := serverPool.GetNextPeer()
-		if err != nil {
-			http.Error(rw, "Service not available", http.StatusServiceUnavailable)
-			log.Println(err.Error())
-			return
-		}
 
-		// send it to the backend
-		log.Printf("[%s] received a request\n", server.URL)
-		resp, respError := server.MakeRequest(req)
-
-		if respError != nil {
-			// on cancellation
-			if respError.err == context.Canceled {
-				//	cancel()
-				log.Printf("[%s] %s", server.URL, respError.err)
-				return
-			}
-
-			server.setAlive(false) // СДЕЛАТЬ СЧЁТЧИК ИЛИ ПОЧИТАТЬ КАК У НДЖИНКС
-			log.Println(respError.err)
-			continue
-		}
-
-		// if resp != nil
-		log.Printf("[%s] returned %s\n", server.URL, resp.Status)
-		for key, values := range resp.Header {
-			for _, value := range values {
-				rw.Header().Add(key, value)
-			}
-		}
-
-		if _, err := io.Copy(rw, resp.Body); err != nil {
-			log.Panic(err)
-		}
-
+	// get next server to send a request
+	backend, err := serverPool.GetNextPeer()
+	if err != nil {
+		http.Error(rw, "Service not available", http.StatusServiceUnavailable)
+		log.Println(err.Error())
 		return
 	}
+
+	//req = req.WithContext(context.Background())
+	req, resources := makeRequestTimeTracker(req)
+	// send it to the backend
+	log.Printf("[%s] received a request\n", backend.URL)
+	backend.server.ServeHTTP(rw, req)
+	fmt.Println(*resources.general, *resources.response, *resources.connect, *resources.dns)
 }
 
 func HealthChecker() {
