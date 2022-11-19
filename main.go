@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptrace"
+	"net/http/httputil"
 	"net/url"
 	"sync/atomic"
 	"time"
@@ -26,8 +27,8 @@ type LoadBalancerConfig struct {
 type Backend struct {
 	URL                   *url.URL
 	healthCheckTcpTimeout time.Duration
-	//	mux                   sync.Mutex
-	alive *atomic.Bool
+	server                *httputil.ReverseProxy
+	alive                 *atomic.Bool
 }
 
 func (server *Backend) setAlive(b bool) {
