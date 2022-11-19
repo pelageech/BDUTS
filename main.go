@@ -38,12 +38,6 @@ type ServerPool struct {
 	current int32
 }
 
-type ResponseError struct {
-	request    *http.Request
-	statusCode int
-	err        error
-}
-
 type BackendResources struct {
 	url      *url.URL
 	dns      *time.Duration
@@ -92,41 +86,6 @@ func makeRequestTimeTracker(req *http.Request) (*http.Request, *BackendResources
 
 	return req, resources
 }
-
-/*
-func (server *Backend) MakeRequest(req *http.Request) (*http.Response, *ResponseError) {
-	respError := &ResponseError{request: req}
-	serverUrl := server.URL
-
-	// set req Host, URL and Request URI to forward a request to the origin server
-	req.Host = serverUrl.Host
-	req.URL.Host = serverUrl.Host
-	req.URL.Scheme = serverUrl.Scheme
-
-	// https://go.dev/src/net/http/client.go:217
-	req.RequestURI = ""
-
-	// save the response from the origin server
-	req, _ = makeRequestTimeTracker(server.URL, req)
-	originServerResponse, err := http.DefaultClient.Do(req)
-
-	// error handler
-	if err != nil {
-		if uerr, ok := err.(*url.Error); ok {
-			respError.err = uerr.Err
-
-			if uerr.Err == context.Canceled {
-				respError.statusCode = -1
-			} else { // server error
-				respError.statusCode = http.StatusInternalServerError
-			}
-		}
-		return nil, respError
-	}
-
-	return originServerResponse, nil
-}
-*/
 
 func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 
