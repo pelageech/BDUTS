@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -39,34 +40,26 @@ type ServerPool struct {
 }
 
 type BackendResources struct {
+	start    time.Time
 	url      *url.URL
-	dns      *time.Duration
-	connect  *time.Duration
-	response *time.Duration
-	general  *time.Duration
+	dns      time.Duration
+	connect  time.Duration
+	response time.Duration
+	general  time.Duration
 }
 
-func makeRequestTimeTracker(req *http.Request) (*http.Request, *BackendResources) {
-	var rDns, rConn, rResp, rGen time.Duration
-	resources := &BackendResources{
-		url:      req.URL,
-		dns:      &rDns,
-		connect:  &rConn,
-		response: &rResp,
-		general:  &rGen,
-	}
-
-	var start, dns, connect, wroteReq time.Time
+func makeRequestTimeTracker(req *http.Request, resources *BackendResources) *http.Request {
+	var dns, connect, wroteReq time.Time
 
 	trace := &httptrace.ClientTrace{
 		DNSStart: func(dsi httptrace.DNSStartInfo) { dns = time.Now() },
 		DNSDone: func(ddi httptrace.DNSDoneInfo) {
-			rDns = time.Since(dns)
+			resources.dns = time.Since(dns)
 		},
 
 		ConnectStart: func(network, addr string) { connect = time.Now() },
 		ConnectDone: func(network, addr string, err error) {
-			rConn = time.Since(connect)
+			resources.connect = time.Since(connect)
 		},
 
 		WroteRequest: func(_ httptrace.WroteRequestInfo) {
@@ -75,16 +68,14 @@ func makeRequestTimeTracker(req *http.Request) (*http.Request, *BackendResources
 
 		GotFirstResponseByte: func() {
 			now := time.Now()
-			rGen = now.Sub(start)
-			rResp = now.Sub(wroteReq)
-			log.Println(rGen, rResp)
+			resources.general = now.Sub(resources.start)
+			resources.response = now.Sub(wroteReq)
 		},
 	}
 
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
-	start = time.Now()
 
-	return req, resources
+	return req
 }
 
 func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
@@ -118,12 +109,11 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	//req = req.WithContext(context.Background())
-	req, resources := makeRequestTimeTracker(req)
-	// send it to the backend
+	resources := &BackendResources{start: time.Now()}
+	req = req.WithContext(context.WithValue(req.Context(), "resource", resources))
+	req = makeRequestTimeTracker(req, resources)
 	log.Printf("[%s] received a request\n", backend.URL)
 	backend.server.ServeHTTP(rw, req)
-	fmt.Println(*resources.general, *resources.response, *resources.connect, *resources.dns)
 }
 
 func HealthChecker() {
