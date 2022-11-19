@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -27,14 +26,12 @@ type LoadBalancerConfig struct {
 type Backend struct {
 	URL                   *url.URL
 	healthCheckTcpTimeout time.Duration
-	mux                   sync.Mutex
-	alive                 bool
+	//	mux                   sync.Mutex
+	alive *atomic.Bool
 }
 
 func (server *Backend) setAlive(b bool) {
-	server.mux.Lock()
-	server.alive = b
-	server.mux.Unlock()
+	server.alive.Store(b)
 }
 
 type ServerPool struct {
@@ -118,7 +115,7 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 	for i := current; i < current+int32(len(serverList)); i++ {
 
 		index = i % int32(len(serverList))
-		if serverList[index].alive {
+		if serverList[index].alive.Load() {
 			if index != current {
 				atomic.StoreInt32(&serverPool.current, index)
 			}
