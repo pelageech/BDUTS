@@ -7,7 +7,9 @@ package main
 */
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -86,7 +88,7 @@ func readConfig() {
 		Configure server pool.
 		For each backend we set up
 		  - URL    *url.Url
-		  - alive  *atomic.Bool
+		  - alive  atomic.Bool
 	      - server *httputil.ReverseProxy
 
 		and then add it to the `serverPool` var.
@@ -104,12 +106,44 @@ func configureServers(serversJSON []serverJSON) {
 		backend.healthCheckTcpTimeout = server.HealthCheckTcpTimeout * time.Millisecond
 		backend.alive.Store(false)
 		backend.server = httputil.NewSingleHostReverseProxy(backend.URL)
-		backend.server.Director = lbDirector
+
+		backend.server.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
+			log.Println(err)
+			if uerr, ok := err.(*url.Error); ok {
+				if uerr == context.Canceled {
+					return
+				}
+			}
+
+			backend.alive.Store(false)
+
+			backend, err := serverPool.GetNextPeer()
+			if err != nil {
+				http.Error(rw, "Service not available", http.StatusServiceUnavailable)
+				log.Println(err.Error())
+				return
+			}
+
+			var resources *BackendResources
+			if resourcesCtx, ok := req.Context().Value("resource").(*BackendResources); ok {
+				resources = resourcesCtx
+			} else {
+				resources = &BackendResources{start: time.Now()}
+			}
+			req = makeRequestTimeTracker(req, resources)
+
+			log.Printf("[%s] received a request\n", backend.URL)
+			backend.server.ServeHTTP(rw, req)
+		}
+
+		backend.server.ModifyResponse = func(response *http.Response) error {
+			req := response.Request
+			if resources, ok := req.Context().Value("resource").(*BackendResources); ok {
+				fmt.Println(resources.general, resources.response, resources.connect, resources.dns)
+			}
+			return nil
+		}
 
 		serverPool.servers = append(serverPool.servers, &backend)
 	}
-}
-
-func lbDirector(req *http.Request) {
-	req = req
 }
