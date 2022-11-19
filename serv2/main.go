@@ -21,5 +21,9 @@ func main() {
 
 	http.HandleFunc("/hello", hello)
 
-	http.ListenAndServe(":3032", nil)
+	err := http.ListenAndServe(":3032", nil)
+	if err != nil {
+		log.Fatal("unsuccessful listening")
+		return
+	}
 }
