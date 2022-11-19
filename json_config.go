@@ -10,6 +10,8 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"time"
@@ -37,8 +39,7 @@ func readConfig() {
 		log.Fatal("Failed to open servers config: ", err)
 	}
 	defer func() {
-		err = serversFile.Close()
-		if err != nil {
+		if err := serversFile.Close(); err != nil {
 			log.Fatal("Failed to close servers config: ", err)
 		}
 	}()
@@ -49,32 +50,10 @@ func readConfig() {
 	}
 
 	var serversJSON []serverJSON
-	err = json.Unmarshal(serversFileByte, &serversJSON)
-	if err != nil {
+	if err := json.Unmarshal(serversFileByte, &serversJSON); err != nil {
 		log.Fatal("Failed to unmarshal servers config: ", err)
 	}
-
-	/*
-		Configure server pool.
-		For each backend we set up
-			- URL,
-			- Alive bool
-		and then add it to the `serverPool`` var.
-	*/
-	for _, server := range serversJSON {
-
-		var backend Backend
-
-		backend.URL, err = url.Parse(server.URL)
-		if err != nil {
-			log.Printf("Failed to parse server URL: %s\n", err)
-			continue
-		}
-		backend.healthCheckTcpTimeout = server.HealthCheckTcpTimeout * time.Millisecond
-		backend.alive = false
-
-		serverPool.servers = append(serverPool.servers, &backend)
-	}
+	configureServers(serversJSON)
 
 	/*
 		read load balancer config
@@ -84,8 +63,7 @@ func readConfig() {
 		log.Fatal("Failed to open load balancer config file: ", err)
 	}
 	defer func() {
-		err = lbConfigFile.Close()
-		if err != nil {
+		if err := lbConfigFile.Close(); err != nil {
 			log.Fatal("Failed to close load balancer config file: ", err)
 		}
 	}()
@@ -96,11 +74,42 @@ func readConfig() {
 	}
 
 	var lbConfig configJSON
-	err = json.Unmarshal(lbConfigFileByte, &lbConfig)
-	if err != nil {
+	if err := json.Unmarshal(lbConfigFileByte, &lbConfig); err != nil {
 		log.Fatal("Failed to unmarshal load balancer config: ", err)
 	}
 
 	loadBalancerConfig.port = lbConfig.Port
 	loadBalancerConfig.healthCheckPeriod = lbConfig.HealthCheckPeriod * time.Second
+}
+
+/*
+		Configure server pool.
+		For each backend we set up
+		  - URL    *url.Url
+		  - alive  *atomic.Bool
+	      - server *httputil.ReverseProxy
+
+		and then add it to the `serverPool` var.
+*/
+func configureServers(serversJSON []serverJSON) {
+	for _, server := range serversJSON {
+		var backend Backend
+		var err error
+
+		backend.URL, err = url.Parse(server.URL)
+		if err != nil {
+			log.Printf("Failed to parse server URL: %s\n", err)
+			continue
+		}
+		backend.healthCheckTcpTimeout = server.HealthCheckTcpTimeout * time.Millisecond
+		backend.alive.Store(false)
+		backend.server = httputil.NewSingleHostReverseProxy(backend.URL)
+		backend.server.Director = lbDirector
+
+		serverPool.servers = append(serverPool.servers, &backend)
+	}
+}
+
+func lbDirector(req *http.Request) {
+	req = req
 }
