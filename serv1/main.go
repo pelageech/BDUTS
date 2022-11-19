@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 )
@@ -11,16 +13,13 @@ func hello(w http.ResponseWriter, req *http.Request) {
 	case <-time.After(5 * time.Second):
 		fmt.Fprintf(w, "hello from 31\n")
 	case <-req.Context().Done():
-		err := req.Context().Err()
-		fmt.Println("server:", err)
-		internalError := http.StatusInternalServerError
-		http.Error(w, err.Error(), internalError)
+		log.Println(context.Canceled)
 	}
 }
 
 func main() {
 
-	http.HandleFunc("/", hello)
+	http.HandleFunc("/hello", hello)
 
 	http.ListenAndServe(":3031", nil)
 }
