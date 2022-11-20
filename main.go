@@ -40,24 +40,20 @@ type ServerPool struct {
 }
 
 type BackendResources struct {
-	start    time.Time
 	url      *url.URL
-	dns      time.Duration
 	connect  time.Duration
 	response time.Duration
-	general  time.Duration
+	transfer time.Duration
 }
 
-func makeRequestTimeTracker(req *http.Request, resources *BackendResources) *http.Request {
-	var dns, connect, wroteReq time.Time
+func makeRequestTimeTracker(req *http.Request, resources *BackendResources) {
+	var start, connect, wroteReq time.Time
 
 	trace := &httptrace.ClientTrace{
-		DNSStart: func(dsi httptrace.DNSStartInfo) { dns = time.Now() },
-		DNSDone: func(ddi httptrace.DNSDoneInfo) {
-			resources.dns = time.Since(dns)
-		},
 
-		ConnectStart: func(network, addr string) { connect = time.Now() },
+		ConnectStart: func(network, addr string) {
+			connect = time.Now()
+		},
 		ConnectDone: func(network, addr string, err error) {
 			resources.connect = time.Since(connect)
 		},
@@ -68,14 +64,13 @@ func makeRequestTimeTracker(req *http.Request, resources *BackendResources) *htt
 
 		GotFirstResponseByte: func() {
 			now := time.Now()
-			resources.general = now.Sub(resources.start)
+			resources.transfer = now.Sub(start)
 			resources.response = now.Sub(wroteReq)
 		},
 	}
 
-	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
-
-	return req
+	*req = *req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+	start = time.Now()
 }
 
 func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
@@ -109,10 +104,11 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	resources := &BackendResources{start: time.Now()}
+	resources := &BackendResources{}
+	req = req.WithContext(context.Background())
 	req = req.WithContext(context.WithValue(req.Context(), "resource", resources))
-	req = makeRequestTimeTracker(req, resources)
 	log.Printf("[%s] received a request\n", backend.URL)
+	makeRequestTimeTracker(req, resources)
 	backend.server.ServeHTTP(rw, req)
 }
 
