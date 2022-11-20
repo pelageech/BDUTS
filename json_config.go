@@ -106,8 +106,9 @@ func configureServers(serversJSON []serverJSON) {
 		}
 		backend.healthCheckTcpTimeout = server.HealthCheckTcpTimeout * time.Millisecond
 		backend.alive.Store(false)
-		backend.server = httputil.NewSingleHostReverseProxy(backend.URL)
 
+		// Creation a new reverseProxy item for serving them
+		backend.server = httputil.NewSingleHostReverseProxy(backend.URL)
 		backend.server.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
 
 			if uerr, ok := err.(*net.OpError); ok {
