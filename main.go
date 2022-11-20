@@ -119,6 +119,10 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	backend.server.ServeHTTP(rw, req)
 }
 
+func teapot(rw http.ResponseWriter, _ *http.Request) {
+	http.Error(rw, "I'm a teapot!!!", http.StatusTeapot)
+}
+
 func HealthChecker() {
 	ticker := time.NewTicker(loadBalancerConfig.healthCheckPeriod)
 
@@ -171,8 +175,9 @@ func main() {
 	serverPool.current = -1
 
 	// Serving
-	http.HandleFunc("/", loadBalancer)
+	http.HandleFunc("/hello", loadBalancer)
 	http.HandleFunc("/favicon.ico", http.NotFound)
+	http.HandleFunc("/teapot", teapot)
 
 	// Firstly, identify the working servers
 	log.Println("Configured! Now setting up the first health check...")
