@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -108,30 +109,33 @@ func configureServers(serversJSON []serverJSON) {
 		backend.server = httputil.NewSingleHostReverseProxy(backend.URL)
 
 		backend.server.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
-			log.Println(err)
-			if uerr, ok := err.(*url.Error); ok {
-				if uerr == context.Canceled {
+
+			if uerr, ok := err.(*net.OpError); ok {
+				log.Println(uerr)
+
+				backend.alive.Store(false)
+
+				backend, err := serverPool.GetNextPeer()
+				if err != nil {
+					http.Error(rw, "Service not available", http.StatusServiceUnavailable)
+					log.Println(err.Error())
 					return
 				}
-			}
 
-			backend.alive.Store(false)
-
-			backend, err := serverPool.GetNextPeer()
-			if err != nil {
-				http.Error(rw, "Service not available", http.StatusServiceUnavailable)
-				log.Println(err.Error())
+				log.Printf("[%s] received a request\n", backend.URL)
+				backend.server.ServeHTTP(rw, req)
+			} else if err == context.Canceled {
+				log.Println(err)
 				return
 			}
 
-			log.Printf("[%s] received a request\n", backend.URL)
-			backend.server.ServeHTTP(rw, req)
 		}
 
 		backend.server.ModifyResponse = func(response *http.Response) error {
 			req := response.Request
 			if resources, ok := req.Context().Value("resource").(*BackendResources); ok {
-				fmt.Println(resources.general, resources.response, resources.connect, resources.dns)
+				fmt.Println(resources.transfer, resources.response, resources.connect)
+				fmt.Println(response.Proto)
 			}
 			return nil
 		}
