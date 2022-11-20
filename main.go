@@ -96,6 +96,13 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
+	if maj, min, ok := http.ParseHTTPVersion(req.Proto); ok {
+		if !(maj == 1 && min == 1) {
+			http.Error(rw, "HTTP/1.1 required", http.StatusHTTPVersionNotSupported)
+			log.Println(req.URL, "HTTP/1.1 required but was", req.Proto)
+		}
+	}
+
 	// get next server to send a request
 	backend, err := serverPool.GetNextPeer()
 	if err != nil {
