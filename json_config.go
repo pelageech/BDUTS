@@ -124,14 +124,6 @@ func configureServers(serversJSON []serverJSON) {
 				return
 			}
 
-			var resources *BackendResources
-			if resourcesCtx, ok := req.Context().Value("resource").(*BackendResources); ok {
-				resources = resourcesCtx
-			} else {
-				resources = &BackendResources{start: time.Now()}
-			}
-			req = makeRequestTimeTracker(req, resources)
-
 			log.Printf("[%s] received a request\n", backend.URL)
 			backend.server.ServeHTTP(rw, req)
 		}
