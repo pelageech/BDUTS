@@ -5,13 +5,12 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httptrace"
+	"net/http/httputil"
 	"net/url"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -27,14 +26,12 @@ type LoadBalancerConfig struct {
 type Backend struct {
 	URL                   *url.URL
 	healthCheckTcpTimeout time.Duration
-	mux                   sync.Mutex
-	alive                 bool
+	server                *httputil.ReverseProxy
+	alive                 atomic.Bool
 }
 
 func (server *Backend) setAlive(b bool) {
-	server.mux.Lock()
-	server.alive = b
-	server.mux.Unlock()
+	server.alive.Store(b)
 }
 
 type ServerPool struct {
@@ -42,70 +39,38 @@ type ServerPool struct {
 	current int32
 }
 
-type ResponseError struct {
-	request    *http.Request
-	statusCode int
-	err        error
+type BackendResources struct {
+	url      *url.URL
+	connect  time.Duration
+	response time.Duration
+	transfer time.Duration
 }
 
-func makeRequestTimeTracker(url *url.URL, req *http.Request) (*http.Request, *time.Duration) {
-	var start, connect, dns time.Time
-	var finish time.Duration
+func makeRequestTimeTracker(req *http.Request, resources *BackendResources) {
+	var start, connect, wroteReq time.Time
 
 	trace := &httptrace.ClientTrace{
-		DNSStart: func(dsi httptrace.DNSStartInfo) { dns = time.Now() },
-		DNSDone: func(ddi httptrace.DNSDoneInfo) {
-			fmt.Printf("[%s] DNS Done: %v\n", url, time.Since(dns))
+
+		ConnectStart: func(network, addr string) {
+			connect = time.Now()
+		},
+		ConnectDone: func(network, addr string, err error) {
+			resources.connect = time.Since(connect)
 		},
 
-		ConnectStart: func(network, addr string) { connect = time.Now() },
-		ConnectDone: func(network, addr string, err error) {
-			fmt.Printf("[%s] Connect time: %v\n", url, time.Since(connect))
+		WroteRequest: func(_ httptrace.WroteRequestInfo) {
+			wroteReq = time.Now()
 		},
 
 		GotFirstResponseByte: func() {
-			finish = time.Since(start)
-			fmt.Printf("[%s] Time from start to first byte: %v\n", url, finish)
+			now := time.Now()
+			resources.transfer = now.Sub(start)
+			resources.response = now.Sub(wroteReq)
 		},
 	}
 
-	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+	*req = *req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 	start = time.Now()
-
-	return req, &finish
-}
-
-func (server *Backend) MakeRequest(req *http.Request) (*http.Response, *ResponseError) {
-	respError := &ResponseError{request: req}
-	serverUrl := server.URL
-
-	// set req Host, URL and Request URI to forward a request to the origin server
-	req.Host = serverUrl.Host
-	req.URL.Host = serverUrl.Host
-	req.URL.Scheme = serverUrl.Scheme
-
-	// https://go.dev/src/net/http/client.go:217
-	req.RequestURI = ""
-
-	// save the response from the origin server
-	req, _ = makeRequestTimeTracker(server.URL, req)
-	originServerResponse, err := http.DefaultClient.Do(req)
-
-	// error handler
-	if err != nil {
-		if uerr, ok := err.(*url.Error); ok {
-			respError.err = uerr.Err
-
-			if uerr.Err == context.Canceled {
-				respError.statusCode = -1
-			} else { // server error
-				respError.statusCode = http.StatusInternalServerError
-			}
-		}
-		return nil, respError
-	}
-
-	return originServerResponse, nil
 }
 
 func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
@@ -118,7 +83,7 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 	for i := current; i < current+int32(len(serverList)); i++ {
 
 		index = i % int32(len(serverList))
-		if serverList[index].alive {
+		if serverList[index].alive.Load() {
 			if index != current {
 				atomic.StoreInt32(&serverPool.current, index)
 			}
@@ -130,46 +95,32 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 }
 
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
-	for {
-		// get next server to send a request
-		server, err := serverPool.GetNextPeer()
-		if err != nil {
-			http.Error(rw, "Service not available", http.StatusServiceUnavailable)
-			log.Println(err.Error())
-			return
+
+	if maj, min, ok := http.ParseHTTPVersion(req.Proto); ok {
+		if !(maj == 1 && min == 1) {
+			http.Error(rw, "HTTP/1.1 required", http.StatusHTTPVersionNotSupported)
+			log.Println(req.URL, "HTTP/1.1 required but was", req.Proto)
 		}
+	}
 
-		// send it to the backend
-		log.Printf("[%s] received a request\n", server.URL)
-		resp, respError := server.MakeRequest(req)
-
-		if respError != nil {
-			// on cancellation
-			if respError.err == context.Canceled {
-				//	cancel()
-				log.Printf("[%s] %s", server.URL, respError.err)
-				return
-			}
-
-			server.setAlive(false) // СДЕЛАТЬ СЧЁТЧИК ИЛИ ПОЧИТАТЬ КАК У НДЖИНКС
-			log.Println(respError.err)
-			continue
-		}
-
-		// if resp != nil
-		log.Printf("[%s] returned %s\n", server.URL, resp.Status)
-		for key, values := range resp.Header {
-			for _, value := range values {
-				rw.Header().Add(key, value)
-			}
-		}
-
-		if _, err := io.Copy(rw, resp.Body); err != nil {
-			log.Panic(err)
-		}
-
+	// get next server to send a request
+	backend, err := serverPool.GetNextPeer()
+	if err != nil {
+		http.Error(rw, "Service not available", http.StatusServiceUnavailable)
+		log.Println(err.Error())
 		return
 	}
+
+	resources := &BackendResources{}
+	req = req.WithContext(context.Background())
+	req = req.WithContext(context.WithValue(req.Context(), "resource", resources))
+	log.Printf("[%s] received a request\n", backend.URL)
+	makeRequestTimeTracker(req, resources)
+	backend.server.ServeHTTP(rw, req)
+}
+
+func teapot(rw http.ResponseWriter, _ *http.Request) {
+	http.Error(rw, "I'm a teapot!!!", http.StatusTeapot)
 }
 
 func HealthChecker() {
@@ -224,8 +175,9 @@ func main() {
 	serverPool.current = -1
 
 	// Serving
-	http.HandleFunc("/", loadBalancer)
+	http.HandleFunc("/hello", loadBalancer)
 	http.HandleFunc("/favicon.ico", http.NotFound)
+	http.HandleFunc("/teapot", teapot)
 
 	// Firstly, identify the working servers
 	log.Println("Configured! Now setting up the first health check...")
