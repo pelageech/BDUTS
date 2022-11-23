@@ -102,7 +102,13 @@ func (server *Backend) MakeRequest(req *http.Request) (*http.Response, *Response
 		}
 		return nil, respError
 	}
-
+	status := originServerResponse.StatusCode
+	if status >= 500 && status < 600 &&
+		status != http.StatusHTTPVersionNotSupported &&
+		status != http.StatusNotImplemented {
+		respError.statusCode = status
+		return nil, respError
+	}
 	return originServerResponse, nil
 }
 
