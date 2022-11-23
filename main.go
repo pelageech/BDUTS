@@ -51,23 +51,19 @@ type ResponseError struct {
 }
 
 func makeRequestTimeTracker(url *url.URL, req *http.Request) (*http.Request, *time.Duration) {
-	var start, connect, dns time.Time
-	var finish time.Duration
+	var start, connStart time.Time
+	var finish, finishBackend time.Duration
 
 	trace := &httptrace.ClientTrace{
-		DNSStart: func(dsi httptrace.DNSStartInfo) { dns = time.Now() },
-		DNSDone: func(ddi httptrace.DNSDoneInfo) {
-			fmt.Printf("[%s] DNS Done: %v\n", url, time.Since(dns))
-		},
 
-		ConnectStart: func(network, addr string) { connect = time.Now() },
-		ConnectDone: func(network, addr string, err error) {
-			fmt.Printf("[%s] Connect time: %v\n", url, time.Since(connect))
+		GotConn: func(_ httptrace.GotConnInfo) {
+			connStart = time.Now()
 		},
 
 		GotFirstResponseByte: func() {
+			finishBackend = time.Since(connStart)
 			finish = time.Since(start)
-			fmt.Printf("[%s] Time from start to first byte: %v\n", url, finish)
+			fmt.Printf("[%s] Time from start to first bytes: %v %v\n", url, finish, finishBackend)
 		},
 	}
 
@@ -132,6 +128,7 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 }
 
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
+
 	for {
 		// get next server to send a request
 		server, err := serverPool.GetNextPeer()
