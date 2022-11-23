@@ -9,7 +9,9 @@ import (
 func hello(w http.ResponseWriter, req *http.Request) {
 	select {
 	case <-time.After(5 * time.Second):
-		w.Write([]byte("hello from 3032"))
+		if _, err := w.Write([]byte("hello from 3032")); err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
 	case <-req.Context().Done():
 		log.Println("canceled")
 	}

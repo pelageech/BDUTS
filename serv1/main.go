@@ -11,7 +11,9 @@ func hello(w http.ResponseWriter, req *http.Request) {
 	case <-time.After(10 * time.Second):
 		w.Header().Add("server-name", "PORT_32_SERVER")
 		w.Header().Add("header_test", "hahaha")
-		w.Write([]byte("hello from 3031"))
+		if _, err := w.Write([]byte("hello from 3031")); err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
 	case <-req.Context().Done():
 		log.Println("canceled")
 	}
