@@ -128,6 +128,11 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 }
 
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
+	if maj, min, ok := http.ParseHTTPVersion(req.Proto); ok {
+		if !(maj == 1 && min == 1) {
+			http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
+		}
+	}
 
 	for {
 		// get next server to send a request
@@ -164,7 +169,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 		}
 
 		if _, err := io.Copy(rw, resp.Body); err != nil {
-			log.Panic(err)
+			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
 		}
 
 		return
