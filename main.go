@@ -51,23 +51,19 @@ type ResponseError struct {
 }
 
 func makeRequestTimeTracker(url *url.URL, req *http.Request) (*http.Request, *time.Duration) {
-	var start, connect, dns time.Time
-	var finish time.Duration
+	var start, connStart time.Time
+	var finish, finishBackend time.Duration
 
 	trace := &httptrace.ClientTrace{
-		DNSStart: func(dsi httptrace.DNSStartInfo) { dns = time.Now() },
-		DNSDone: func(ddi httptrace.DNSDoneInfo) {
-			fmt.Printf("[%s] DNS Done: %v\n", url, time.Since(dns))
-		},
 
-		ConnectStart: func(network, addr string) { connect = time.Now() },
-		ConnectDone: func(network, addr string, err error) {
-			fmt.Printf("[%s] Connect time: %v\n", url, time.Since(connect))
+		GotConn: func(_ httptrace.GotConnInfo) {
+			connStart = time.Now()
 		},
 
 		GotFirstResponseByte: func() {
+			finishBackend = time.Since(connStart)
 			finish = time.Since(start)
-			fmt.Printf("[%s] Time from start to first byte: %v\n", url, finish)
+			fmt.Printf("[%s] Time from start to first bytes: %v %v\n", url, finish, finishBackend)
 		},
 	}
 
@@ -106,7 +102,13 @@ func (server *Backend) MakeRequest(req *http.Request) (*http.Response, *Response
 		}
 		return nil, respError
 	}
-
+	status := originServerResponse.StatusCode
+	if status >= 500 && status < 600 &&
+		status != http.StatusHTTPVersionNotSupported &&
+		status != http.StatusNotImplemented {
+		respError.statusCode = status
+		return nil, respError
+	}
 	return originServerResponse, nil
 }
 
@@ -132,6 +134,12 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 }
 
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
+	if maj, min, ok := http.ParseHTTPVersion(req.Proto); ok {
+		if !(maj == 1 && min == 1) {
+			http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
+		}
+	}
+
 	for {
 		// get next server to send a request
 		server, err := serverPool.GetNextPeer()
@@ -167,7 +175,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 		}
 
 		if _, err := io.Copy(rw, resp.Body); err != nil {
-			log.Panic(err)
+			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
 		}
 
 		return
