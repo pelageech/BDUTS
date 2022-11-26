@@ -21,8 +21,6 @@ import (
 type LoadBalancerConfig struct {
 	hostname          string
 	port              int
-	retries           int
-	attempts          int
 	healthCheckPeriod time.Duration
 }
 
