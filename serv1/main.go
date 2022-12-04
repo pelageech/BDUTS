@@ -6,7 +6,14 @@ import (
 	"time"
 )
 
+const maxClients = 2
+
+var semaphore = make(chan struct{}, maxClients)
+
 func hello(w http.ResponseWriter, req *http.Request) {
+	semaphore <- struct{}{}
+	defer func() { <-semaphore }()
+
 	select {
 	case <-time.After(10 * time.Second):
 		w.Header().Add("server-name", "PORT_32_SERVER")
