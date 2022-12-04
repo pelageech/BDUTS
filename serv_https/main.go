@@ -8,7 +8,14 @@ import (
 	"time"
 )
 
+const maxClients = 2
+
+var semaphore = make(chan struct{}, maxClients)
+
 func hello(w http.ResponseWriter, req *http.Request) {
+	semaphore <- struct{}{}
+	defer func() { <-semaphore }()
+
 	time.Sleep(time.Second * 5)
 	fmt.Fprintf(w, "hello from 33\n")
 }
