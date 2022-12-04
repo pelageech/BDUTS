@@ -6,7 +6,14 @@ import (
 	"time"
 )
 
+const maxClients = 2
+
+var semaphore = make(chan struct{}, maxClients)
+
 func hello(w http.ResponseWriter, req *http.Request) {
+	semaphore <- struct{}{}
+	defer func() { <-semaphore }()
+
 	select {
 	case <-time.After(5 * time.Second):
 		if _, err := w.Write([]byte("hello from 3032")); err != nil {
