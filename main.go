@@ -48,7 +48,7 @@ type ResponseError struct {
 	err        error
 }
 
-func makeRequestTimeTracker(url *url.URL, req *http.Request) (*http.Request, *time.Duration) {
+func makeRequestTimeTracker(req *http.Request) (*http.Request, *time.Duration) {
 	var start, connStart time.Time
 	var finish, finishBackend time.Duration
 
@@ -61,7 +61,7 @@ func makeRequestTimeTracker(url *url.URL, req *http.Request) (*http.Request, *ti
 		GotFirstResponseByte: func() {
 			finishBackend = time.Since(connStart)
 			finish = time.Since(start)
-			fmt.Printf("[%s] Time from start to first bytes: %v %v\n", url, finish, finishBackend)
+			fmt.Printf("[%s] Time from start to first bytes: full trip: %v, backend: %v\n", req.URL, finish, finishBackend)
 		},
 	}
 
@@ -84,7 +84,6 @@ func (server *Backend) MakeRequest(req *http.Request) (*http.Response, *Response
 	req.RequestURI = ""
 
 	// save the response from the origin server
-	req, _ = makeRequestTimeTracker(server.URL, req)
 	originServerResponse, err := http.DefaultClient.Do(req)
 
 	// error handler
@@ -137,7 +136,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 			http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
 		}
 	}
-
+	req, _ = makeRequestTimeTracker(req)
 	for {
 		// get next server to send a request
 		server, err := serverPool.GetNextPeer()
