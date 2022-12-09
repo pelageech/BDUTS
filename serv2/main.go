@@ -4,39 +4,23 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
+	"os"
+	"os/exec"
 )
 
-const maxClients = 2
-
-var semaphore = make(chan struct{}, maxClients)
-
 func hello(w http.ResponseWriter, req *http.Request) {
-	requestReceived := time.Now()
-
-	semaphore <- struct{}{}
-	defer func() { <-semaphore }()
-
-	select {
-	case <-time.After(5 * time.Second):
-		requestProcessed := time.Now()
-
-		if _, err := fmt.Fprintln(w, "hello from 3032"); err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		}
-		if _, err := fmt.Fprintf(w, "Request received: %s\n", requestReceived.String()); err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		}
-		if _, err := fmt.Fprintf(w, "Request processed: %s\n", requestProcessed.String()); err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		}
-		if _, err := fmt.Fprintf(w, "Request processing time: %s\n", requestProcessed.Sub(requestReceived).String()); err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		}
-	case <-req.Context().Done():
-		log.Println("canceled")
+	log.Println("conn")
+	e := exec.Command("Graphics-exe.exe", "Sin X" /*, "--width", "5000", "--height", "3000"*/)
+	if err := e.Run(); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 
+	str, err := os.ReadFile("./output.svg")
+	if err == nil {
+		if _, err := fmt.Fprintln(w, string(str)); err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+	}
 }
 
 func main() {
