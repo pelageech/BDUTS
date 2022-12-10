@@ -29,6 +29,8 @@ type Backend struct {
 	healthCheckTcpTimeout time.Duration
 	mux                   sync.Mutex
 	alive                 bool
+	currentRequests       int32
+	maximalRequests       int32
 }
 
 func (server *Backend) setAlive(b bool) {
@@ -139,7 +141,17 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	req, _ = makeRequestTimeTracker(req)
 	for {
 		// get next server to send a request
-		server, err := serverPool.GetNextPeer()
+		var server *Backend
+		var err error
+		log.Println("fuck")
+		for {
+			server, err = serverPool.GetNextPeer()
+			if server.currentRequests+1 <= server.maximalRequests {
+				atomic.AddInt32(&server.currentRequests, int32(1))
+				break
+			}
+		}
+
 		if err != nil {
 			http.Error(rw, "Service not available", http.StatusServiceUnavailable)
 			log.Println(err.Error())
@@ -174,6 +186,8 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 		if _, err := io.Copy(rw, resp.Body); err != nil {
 			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
 		}
+
+		atomic.AddInt32(&server.currentRequests, int32(-1))
 
 		return
 	}
@@ -210,7 +224,9 @@ func (server *Backend) IsAlive() bool {
 		log.Println("Connection problem: ", err)
 		return false
 	}
-	defer conn.Close()
+	defer func(conn net.Conn) {
+		_ = conn.Close()
+	}(conn)
 	return true
 }
 
