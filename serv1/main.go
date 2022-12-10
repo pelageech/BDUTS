@@ -12,7 +12,7 @@ func hello(w http.ResponseWriter, req *http.Request) {
 	var stdout bytes.Buffer
 	log.Println("conn")
 
-	e := exec.Command("Graphics-exe.exe", "Sin X", "--width", "5000", "--height", "3000")
+	e := exec.Command("Graphics-exe.exe", "Sin X" /*, "--width", "5000", "--height", "3000"*/)
 	e.Stdout = &stdout
 
 	if err := e.Start(); err != nil {
