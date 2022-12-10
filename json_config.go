@@ -18,6 +18,7 @@ import (
 type serverJSON struct {
 	URL                   string
 	HealthCheckTcpTimeout time.Duration
+	MaximalRequests       int32
 }
 
 type configJSON struct {
@@ -62,7 +63,7 @@ func readConfig() {
 		and then add it to the `serverPool`` var.
 	*/
 	for _, server := range serversJSON {
-
+		log.Printf("%v", server)
 		var backend Backend
 
 		backend.URL, err = url.Parse(server.URL)
@@ -72,6 +73,9 @@ func readConfig() {
 		}
 		backend.healthCheckTcpTimeout = server.HealthCheckTcpTimeout * time.Millisecond
 		backend.alive = false
+
+		backend.currentRequests = 0
+		backend.maximalRequests = server.MaximalRequests
 
 		serverPool.servers = append(serverPool.servers, &backend)
 	}
