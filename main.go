@@ -19,7 +19,6 @@ import (
 // LoadBalancerConfig is parse from `config.json` file.
 // It contains all the necessary information of the load balancer.
 type LoadBalancerConfig struct {
-	hostname          string
 	port              int
 	healthCheckPeriod time.Duration
 }
@@ -116,11 +115,9 @@ func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
 	serverList := serverPool.servers
 
 	current := atomic.AddInt32(&serverPool.current, 1)
-	index := current % int32(len(serverList))
 
 	for i := current; i < current+int32(len(serverList)); i++ {
-
-		index = i % int32(len(serverList))
+		index := i % int32(len(serverList))
 		if serverList[index].alive {
 			if index != current {
 				atomic.StoreInt32(&serverPool.current, index)
@@ -197,12 +194,10 @@ func HealthChecker() {
 	ticker := time.NewTicker(loadBalancerConfig.healthCheckPeriod)
 
 	for {
-		select {
-		case <-ticker.C:
-			log.Println("Health Check has been started!")
-			healthCheck()
-			log.Println("All the checks has been completed!")
-		}
+		<-ticker.C
+		log.Println("Health Check has been started!")
+		healthCheck()
+		log.Println("All the checks has been completed!")
 	}
 }
 

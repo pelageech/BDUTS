@@ -19,7 +19,7 @@ func hello(w http.ResponseWriter, req *http.Request) {
 	defer func() { <-semaphore }()
 
 	time.Sleep(time.Second * 5)
-	
+
 	requestProcessed := time.Now()
 
 	if _, err := fmt.Fprintln(w, "hello from 33"); err != nil {
@@ -53,5 +53,8 @@ func main() {
 	}
 
 	// deal with reqs
-	http.Serve(ln, nil)
+	err = http.Serve(ln, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
