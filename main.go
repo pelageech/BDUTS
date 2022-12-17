@@ -196,12 +196,10 @@ func HealthChecker() {
 	ticker := time.NewTicker(loadBalancerConfig.healthCheckPeriod)
 
 	for {
-		select {
-		case <-ticker.C:
-			log.Println("Health Check has been started!")
-			healthCheck()
-			log.Println("All the checks has been completed!")
-		}
+		<-ticker.C
+		log.Println("Health Check has been started!")
+		healthCheck()
+		log.Println("All the checks has been completed!")
 	}
 }
 
