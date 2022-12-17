@@ -19,7 +19,6 @@ import (
 // LoadBalancerConfig is parse from `config.json` file.
 // It contains all the necessary information of the load balancer.
 type LoadBalancerConfig struct {
-	hostname          string
 	port              int
 	healthCheckPeriod time.Duration
 }
