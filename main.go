@@ -140,7 +140,6 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 		// get next server to send a request
 		var server *Backend
 		var err error
-		log.Println("fuck")
 		for {
 			server, err = serverPool.getNextPeer()
 			if server.currentRequests+1 <= server.maximalRequests {
