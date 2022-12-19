@@ -203,7 +203,7 @@ func healthChecker() {
 
 func healthCheck() {
 	for _, server := range serverPool.servers {
-		alive := server.IsAlive()
+		alive := server.isAlive()
 		server.setAlive(alive)
 		if alive {
 			log.Printf("[%s] is alive.\n", server.URL.Host)
@@ -213,7 +213,7 @@ func healthCheck() {
 	}
 }
 
-func (server *Backend) IsAlive() bool {
+func (server *Backend) isAlive() bool {
 	conn, err := net.DialTimeout("tcp", server.URL.Host, server.healthCheckTcpTimeout)
 	if err != nil {
 		log.Println("Connection problem: ", err)
