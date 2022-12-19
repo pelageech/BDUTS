@@ -110,7 +110,7 @@ func (server *Backend) MakeRequest(req *http.Request) (*http.Response, *Response
 	return originServerResponse, nil
 }
 
-func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
+func (serverPool *ServerPool) getNextPeer() (*Backend, error) {
 
 	serverList := serverPool.servers
 
@@ -142,7 +142,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 		var err error
 		log.Println("fuck")
 		for {
-			server, err = serverPool.GetNextPeer()
+			server, err = serverPool.getNextPeer()
 			if server.currentRequests+1 <= server.maximalRequests {
 				atomic.AddInt32(&server.currentRequests, int32(1))
 				break
