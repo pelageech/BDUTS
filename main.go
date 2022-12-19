@@ -72,7 +72,7 @@ func makeRequestTimeTracker(req *http.Request) (*http.Request, *time.Duration) {
 	return req, &finish
 }
 
-func (server *Backend) MakeRequest(req *http.Request) (*http.Response, *ResponseError) {
+func (server *Backend) makeRequest(req *http.Request) (*http.Response, *ResponseError) {
 	respError := &ResponseError{request: req}
 	serverUrl := server.URL
 
@@ -157,7 +157,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 		// send it to the backend
 		log.Printf("[%s] received a request\n", server.URL)
-		resp, respError := server.MakeRequest(req)
+		resp, respError := server.makeRequest(req)
 
 		if respError != nil {
 			// on cancellation
