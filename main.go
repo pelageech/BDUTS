@@ -190,7 +190,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func HealthChecker() {
+func healthChecker() {
 	ticker := time.NewTicker(loadBalancerConfig.healthCheckPeriod)
 
 	for {
@@ -252,7 +252,7 @@ func main() {
 	log.Println("Ready!")
 
 	// set up health check
-	go HealthChecker()
+	go healthChecker()
 
 	log.Printf("Load Balancer started at :%d\n", loadBalancerConfig.port)
 	if err := http.Serve(ln, nil); err != nil {
