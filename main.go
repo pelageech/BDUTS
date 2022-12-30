@@ -222,13 +222,17 @@ func healthCheck() {
 
 func (server *Backend) isAlive() bool {
 	conn, err := net.DialTimeout("tcp", server.URL.Host, server.healthCheckTcpTimeout)
+	defer func(conn net.Conn) {
+		err := conn.Close()
+		if err != nil {
+			log.Println("Failed to close connection: ", err)
+		}
+	}(conn)
+
 	if err != nil {
 		log.Println("Connection problem: ", err)
 		return false
 	}
-	defer func(conn net.Conn) {
-		_ = conn.Close()
-	}(conn)
 	return true
 }
 
