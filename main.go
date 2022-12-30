@@ -129,12 +129,20 @@ func (serverPool *ServerPool) getNextPeer() (*Backend, error) {
 	return nil, errors.New("all backends are turned down")
 }
 
-func loadBalancer(rw http.ResponseWriter, req *http.Request) {
+func isHTTPVersionSupported(req *http.Request) bool {
 	if maj, min, ok := http.ParseHTTPVersion(req.Proto); ok {
-		if !(maj == 1 && min == 1) {
-			http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
+		if maj == 1 && min == 1 {
+			return true
 		}
 	}
+	return false
+}
+
+func loadBalancer(rw http.ResponseWriter, req *http.Request) {
+	if !isHTTPVersionSupported(req) {
+		http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
+	}
+
 	req, _ = makeRequestTimeTracker(req)
 	for {
 		// get next server to send a request
@@ -214,13 +222,17 @@ func healthCheck() {
 
 func (server *Backend) isAlive() bool {
 	conn, err := net.DialTimeout("tcp", server.URL.Host, server.healthCheckTcpTimeout)
+	defer func(conn net.Conn) {
+		err := conn.Close()
+		if err != nil {
+			log.Println("Failed to close connection: ", err)
+		}
+	}(conn)
+
 	if err != nil {
 		log.Println("Connection problem: ", err)
 		return false
 	}
-	defer func(conn net.Conn) {
-		_ = conn.Close()
-	}(conn)
 	return true
 }
 
