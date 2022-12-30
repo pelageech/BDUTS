@@ -1,10 +1,12 @@
 [
   {
     "url" : "http://localhost:3031",
-    "healthCheckTcpTimeout" : 2000
+    "healthCheckTcpTimeout" : 2000,
+    "maximalRequests" : 5
   },
   {
     "url" : "http://localhost:3032",
-    "healthCheckTcpTimeout" : 2000
+    "healthCheckTcpTimeout" : 2000,
+    "maximalRequests" : 6
   }
 ]
