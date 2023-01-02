@@ -29,10 +29,7 @@ type configJSON struct {
 var loadBalancerConfig LoadBalancerConfig
 var serverPool ServerPool
 
-func readConfig() {
-	/*
-		read servers config
-	*/
+func readServersConfig() []serverJSON {
 	serversFile, err := os.Open("resources/servers.json")
 	if err != nil {
 		log.Fatal("Failed to open servers config: ", err)
@@ -55,22 +52,30 @@ func readConfig() {
 		log.Fatal("Failed to unmarshal servers config: ", err)
 	}
 
-	/*
-		Configure server pool.
-		For each backend we set up
-			- URL,
-			- Alive bool
-		and then add it to the `serverPool`` var.
-	*/
-	for _, server := range serversJSON {
+	return serversJSON
+}
+
+/*
+Configure server pool.
+For each backend we set up
+  - URL,
+  - Alive bool
+
+and then add it to the `serverPool“ var.
+*/
+func configureServerPool(servers []serverJSON) {
+	for _, server := range servers {
 		log.Printf("%v", server)
+
 		var backend Backend
+		var err error
 
 		backend.URL, err = url.Parse(server.URL)
 		if err != nil {
 			log.Printf("Failed to parse server URL: %s\n", err)
 			continue
 		}
+
 		backend.healthCheckTcpTimeout = server.HealthCheckTcpTimeout * time.Millisecond
 		backend.alive = false
 
@@ -79,10 +84,9 @@ func readConfig() {
 
 		serverPool.servers = append(serverPool.servers, &backend)
 	}
+}
 
-	/*
-		read load balancer config
-	*/
+func readLoadBalancerConfig() {
 	lbConfigFile, err := os.Open("resources/config.json")
 	if err != nil {
 		log.Fatal("Failed to open load balancer config file: ", err)
@@ -107,4 +111,10 @@ func readConfig() {
 
 	loadBalancerConfig.port = lbConfig.Port
 	loadBalancerConfig.healthCheckPeriod = lbConfig.HealthCheckPeriod * time.Second
+}
+
+func readConfig() {
+	servers := readServersConfig()
+	configureServerPool(servers)
+	readLoadBalancerConfig()
 }
