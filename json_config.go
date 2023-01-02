@@ -86,7 +86,7 @@ func configureServerPool(servers []serverJSON) {
 	}
 }
 
-func readLoadBalancerConfig() {
+func readLoadBalancerConfig() configJSON {
 	lbConfigFile, err := os.Open("resources/config.json")
 	if err != nil {
 		log.Fatal("Failed to open load balancer config file: ", err)
@@ -109,12 +109,17 @@ func readLoadBalancerConfig() {
 		log.Fatal("Failed to unmarshal load balancer config: ", err)
 	}
 
-	loadBalancerConfig.port = lbConfig.Port
-	loadBalancerConfig.healthCheckPeriod = lbConfig.HealthCheckPeriod * time.Second
+	return lbConfig
+}
+
+func configureLoadBalancer(cfg configJSON) {
+	loadBalancerConfig.port = cfg.Port
+	loadBalancerConfig.healthCheckPeriod = cfg.HealthCheckPeriod * time.Second
 }
 
 func readConfig() {
 	servers := readServersConfig()
 	configureServerPool(servers)
-	readLoadBalancerConfig()
+	lbCfg := readLoadBalancerConfig()
+	configureLoadBalancer(lbCfg)
 }
