@@ -39,6 +39,7 @@ func (server *Backend) setAlive(b bool) {
 }
 
 type ServerPool struct {
+	mux     sync.Mutex
 	servers []*Backend
 	current int32
 }
@@ -111,18 +112,18 @@ func (server *Backend) makeRequest(req *http.Request) (*http.Response, *Response
 }
 
 func (serverPool *ServerPool) getNextPeer() (*Backend, error) {
-
 	serverList := serverPool.servers
 
-	current := atomic.AddInt32(&serverPool.current, 1)
+	serverPool.mux.Lock()
+	defer serverPool.mux.Unlock()
 
-	for i := current; i < current+int32(len(serverList)); i++ {
-		index := i % int32(len(serverList))
-		if serverList[index].alive {
-			if index != current {
-				atomic.StoreInt32(&serverPool.current, index)
-			}
-			return serverList[index], nil
+	for i := 0; i < len(serverList); i++ {
+		serverPool.current++
+		if serverPool.current == int32(len(serverList)) {
+			serverPool.current = 0
+		}
+		if serverList[serverPool.current].alive {
+			return serverList[serverPool.current], nil
 		}
 	}
 
