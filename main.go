@@ -145,6 +145,10 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	req, _ = makeRequestTimeTracker(req)
+
+	GetCacheIfExists(req)
+
+	// on cache miss make request to backend
 	for {
 		// get next server to send a request
 		var server *Backend
