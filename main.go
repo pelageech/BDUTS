@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/boltdb/bolt"
+	"github.com/pelageech/BDUTS/cache"
 	"io"
 	"log"
 	"net"
@@ -49,6 +51,8 @@ type ResponseError struct {
 	statusCode int
 	err        error
 }
+
+var db *bolt.DB
 
 func makeRequestTimeTracker(req *http.Request) (*http.Request, *time.Duration) {
 	var start, connStart time.Time
@@ -146,7 +150,12 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 	req, _ = makeRequestTimeTracker(req)
 
-	GetCacheIfExists(req)
+	_, err := cache.GetCacheIfExists(db, req)
+	if err == nil {
+		return
+	}
+
+	log.Println("Miss cache, starting connection to backend")
 
 	// on cache miss make request to backend
 	for {
@@ -227,17 +236,18 @@ func healthCheck() {
 
 func (server *Backend) isAlive() bool {
 	conn, err := net.DialTimeout("tcp", server.URL.Host, server.healthCheckTcpTimeout)
+
+	if err != nil {
+		log.Println("Connection problem: ", err)
+		return false
+	}
+
 	defer func(conn net.Conn) {
 		err := conn.Close()
 		if err != nil {
 			log.Println("Failed to close connection: ", err)
 		}
 	}(conn)
-
-	if err != nil {
-		log.Println("Connection problem: ", err)
-		return false
-	}
 	return true
 }
 
@@ -269,6 +279,14 @@ func main() {
 
 	// set up health check
 	go healthChecker()
+
+	// opening db
+	log.Println("Opening cache database")
+	db, err = cache.OpenDatabase("./cache-data/database.db")
+	if err != nil {
+		log.Fatalln("DB error: ", err)
+	}
+	defer cache.CloseDatabase(db)
 
 	log.Printf("Load Balancer started at :%d\n", loadBalancerConfig.port)
 	if err := http.Serve(ln, nil); err != nil {
