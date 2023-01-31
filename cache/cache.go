@@ -17,16 +17,15 @@ const (
 // GetCacheIfExists Обращается к диску для нахождения ответа на запрос.
 // Если таковой имеется - он возвращается, в противном случае выдаётся ошибка
 func GetCacheIfExists(db *bolt.DB, req *http.Request) (io.ReadCloser, error) {
-	byteKey, err := io.ReadAll(req.Body)
-	if err != nil {
-		return nil, err
-	}
+	str := req.Proto + req.Method + req.URL.Path
+	byteKey := []byte(str)
+
 	var body io.ReadCloser
 	byteResponse := findRecord(db, byteKey)
 	if byteResponse == nil {
 		return nil, errors.New("response not found")
 	}
-	_, err = body.Read(byteResponse)
+	_, err := body.Read(byteResponse)
 	if err != nil {
 		return nil, err
 	}

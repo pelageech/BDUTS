@@ -150,7 +150,12 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 	req, _ = makeRequestTimeTracker(req)
 
-	cache.GetCacheIfExists(nil, req)
+	_, err := cache.GetCacheIfExists(db, req)
+	if err == nil {
+		return
+	}
+
+	log.Println("Miss cache, starting connection to backend")
 
 	// on cache miss make request to backend
 	for {
