@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/pelageech/BDUTS/cache"
 	"io"
 	"log"
 	"net"
@@ -146,7 +147,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 	req, _ = makeRequestTimeTracker(req)
 
-	GetCacheIfExists(req)
+	cache.GetCacheIfExists(req)
 
 	// on cache miss make request to backend
 	for {

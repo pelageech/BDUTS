@@ -1,4 +1,4 @@
-package main
+package cache
 
 import (
 	"crypto/sha256"
@@ -37,8 +37,33 @@ func closeDatabase(db *bolt.DB) {
 }
 
 // Добавляет новую запись в кэш.
-func addNewRecord(db *bolt.DB, key, value []byte) {
+func addNewRecord(db *bolt.DB, key, value []byte) error {
+	requestHash := hash(key)
+	subhashLength := hashLength / subHashCount
 
+	var subHashes [][]byte
+	for i := 0; i < subHashCount; i++ {
+		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
+	}
+
+	err := db.Update(func(tx *bolt.Tx) error {
+		treeBucket, err := tx.CreateBucketIfNotExists(subHashes[0])
+
+		if err != nil {
+			return err
+		}
+		for i := 1; i < subHashCount; i++ {
+			treeBucket, err = treeBucket.CreateBucketIfNotExists(subHashes[i])
+			if err != nil {
+				return err
+			}
+		}
+
+		err = treeBucket.Put(key, value)
+		return err
+	})
+
+	return err
 }
 
 // Найти элемент по ключу
