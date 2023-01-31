@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"github.com/boltdb/bolt"
+	"io"
 	"log"
 	"net/http"
 )
@@ -15,8 +16,21 @@ const (
 
 // GetCacheIfExists Обращается к диску для нахождения ответа на запрос.
 // Если таковой имеется - он возвращается, в противном случае выдаётся ошибка
-func GetCacheIfExists(req *http.Request) (*http.Response, error) {
-	return nil, nil
+func GetCacheIfExists(db *bolt.DB, req *http.Request) (io.ReadCloser, error) {
+	byteKey, err := io.ReadAll(req.Body)
+	if err != nil {
+		return nil, err
+	}
+	var body io.ReadCloser
+	byteResponse := findRecord(db, byteKey)
+	if byteResponse == nil {
+		return nil, errors.New("response not found")
+	}
+	_, err = body.Read(byteResponse)
+	if err != nil {
+		return nil, err
+	}
+	return body, nil
 }
 
 // Открывает базу данных для дальнейшего использования
