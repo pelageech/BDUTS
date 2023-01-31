@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/boltdb/bolt"
 	"github.com/pelageech/BDUTS/cache"
 	"io"
 	"log"
@@ -50,6 +51,8 @@ type ResponseError struct {
 	statusCode int
 	err        error
 }
+
+var db *bolt.DB
 
 func makeRequestTimeTracker(req *http.Request) (*http.Request, *time.Duration) {
 	var start, connStart time.Time
@@ -147,7 +150,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 	req, _ = makeRequestTimeTracker(req)
 
-	cache.GetCacheIfExists(req)
+	cache.GetCacheIfExists(nil, req)
 
 	// on cache miss make request to backend
 	for {
@@ -270,6 +273,14 @@ func main() {
 
 	// set up health check
 	go healthChecker()
+
+	// opening db
+	log.Println("Opening cache database")
+	db, err = cache.OpenDatabase("./cache-data/database.db")
+	if err != nil {
+		log.Fatalln("DB error: ", err)
+	}
+	defer cache.CloseDatabase(db)
 
 	log.Printf("Load Balancer started at :%d\n", loadBalancerConfig.port)
 	if err := http.Serve(ln, nil); err != nil {

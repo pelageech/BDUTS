@@ -33,17 +33,17 @@ func GetCacheIfExists(db *bolt.DB, req *http.Request) (io.ReadCloser, error) {
 	return body, nil
 }
 
-// Открывает базу данных для дальнейшего использования
-func initDatabase(path string) *bolt.DB {
+// OpenDatabase Открывает базу данных для дальнейшего использования
+func OpenDatabase(path string) (*bolt.DB, error) {
 	db, err := bolt.Open(path, 0600, nil)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
-	return db
+	return db, nil
 }
 
-// Закрывает базу данных
-func closeDatabase(db *bolt.DB) {
+// CloseDatabase Закрывает базу данных
+func CloseDatabase(db *bolt.DB) {
 	err := db.Close()
 	if err != nil {
 		log.Fatalln(err)
