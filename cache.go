@@ -1,9 +1,16 @@
 package main
 
 import (
+	"crypto/sha256"
+	"errors"
 	"github.com/boltdb/bolt"
 	"log"
 	"net/http"
+)
+
+const (
+	hashLength   = sha256.Size
+	subHashCount = 8 // Количество подотрезков хэша
 )
 
 // GetCacheIfExists Обращается к диску для нахождения ответа на запрос.
@@ -30,21 +37,63 @@ func closeDatabase(db *bolt.DB) {
 }
 
 // Добавляет новую запись в кэш.
-func addNewRecord(key, value []byte) {
+func addNewRecord(db *bolt.DB, key, value []byte) {
 
 }
 
+// Найти элемент по ключу
+// Ключ переводится в хэш, тот разбивается на подотрезки - названия бакетов
+// Проходом по подотрезкам находим по ключу ответ на запрос
+func findRecord(db *bolt.DB, key []byte) []byte {
+	var result []byte = nil
+
+	requestHash := hash(key)
+	subhashLength := hashLength / subHashCount
+
+	var subHashes [][]byte
+	for i := 0; i < subHashCount; i++ {
+		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
+	}
+
+	err := db.View(func(tx *bolt.Tx) error {
+		treeBucket := tx.Bucket(subHashes[0])
+		if treeBucket == nil {
+			return errors.New("miss cache")
+		}
+		for i := 1; i < subHashCount; i++ {
+			treeBucket := treeBucket.Bucket(subHashes[i])
+			if treeBucket == nil {
+				return errors.New("miss cache")
+			}
+		}
+
+		result = treeBucket.Get(key)
+		if result == nil {
+			return errors.New("no record in cache")
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil
+	}
+
+	return result
+}
+
 // Удаляет запись из кэша
-func deleteRecord(key []byte) {
+func deleteRecord(db *bolt.DB, key []byte) {
 
 }
 
 // Сохраняет копию базы данных в файл
-func makeSnapshot(filename string) {
+func makeSnapshot(db *bolt.DB, filename string) {
 
 }
 
 // Возвращает хэш от набора байт
-func hash(value []byte) []byte {
-	return nil
+func hash(value []byte) [hashLength]byte {
+	hash := sha256.Sum256(value)
+	return hash
 }
