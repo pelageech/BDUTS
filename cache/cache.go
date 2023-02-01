@@ -34,6 +34,9 @@ func GetCacheIfExists(db *bolt.DB, req *http.Request) ([]byte, error) {
 	return responseByteArray, nil
 }
 
+// PutRecordInCache Помещает новую запись в кэш.
+// Считает хэш аттрибутов запроса, по нему проходит вниз по дереву
+// и записывает как лист новую запись.
 func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, responseByteArray []byte) error {
 	keyString := req.Proto + req.Method + req.URL.Path
 	keyByteArray := []byte(keyString)
