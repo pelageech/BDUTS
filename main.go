@@ -213,7 +213,19 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 		// if resp != nil
 		log.Printf("[%s] returned %s\n", server.URL, resp.Status)
-		err = sendResponseToClient(rw, resp)
+		for key, values := range resp.Header {
+			for _, value := range values {
+				rw.Header().Add(key, value)
+			}
+		}
+
+		byteArray, err := io.ReadAll(resp.Body)
+		if err != nil {
+			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
+			log.Println(err)
+		}
+
+		_, err = rw.Write(byteArray)
 		if err != nil {
 			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
 			log.Println(err)
@@ -221,7 +233,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 		go func() {
 			log.Println("Saving response in cache")
-			err := cache.PutRecordInCache(db, req, resp)
+			err := cache.PutRecordInCache(db, req, resp, byteArray)
 			if err != nil {
 				log.Println("Unsuccessful operation: ", err)
 				return

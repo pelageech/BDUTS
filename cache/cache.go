@@ -10,7 +10,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"github.com/boltdb/bolt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -35,16 +34,16 @@ func GetCacheIfExists(db *bolt.DB, req *http.Request) ([]byte, error) {
 	return responseByteArray, nil
 }
 
-func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response) error {
+func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, responseByteArray []byte) error {
 	keyString := req.Proto + req.Method + req.URL.Path
 	keyByteArray := []byte(keyString)
 
-	responseByteArray, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
+	// responseByteArray, err := io.ReadAll(resp.Body)
+	//if err != nil {
+	//	return err
+	//}
 
-	err = addNewRecord(db, keyByteArray, responseByteArray)
+	err := addNewRecord(db, keyByteArray, responseByteArray)
 	return err
 }
 
@@ -115,7 +114,7 @@ func getRecord(db *bolt.DB, key []byte) ([]byte, error) {
 			return errors.New("miss cache")
 		}
 		for i := 1; i < subHashCount; i++ {
-			treeBucket := treeBucket.Bucket(subHashes[i])
+			treeBucket = treeBucket.Bucket(subHashes[i])
 			if treeBucket == nil {
 				return errors.New("miss cache")
 			}
