@@ -143,6 +143,17 @@ func isHTTPVersionSupported(req *http.Request) bool {
 	return false
 }
 
+func sendResponseToClient(rw http.ResponseWriter, resp *http.Response) error {
+	for key, values := range resp.Header {
+		for _, value := range values {
+			rw.Header().Add(key, value)
+		}
+	}
+
+	_, err := io.Copy(rw, resp.Body)
+	return err
+}
+
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	if !isHTTPVersionSupported(req) {
 		http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
@@ -150,12 +161,19 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 	req, _ = makeRequestTimeTracker(req)
 
-	_, err := cache.GetCacheIfExists(db, req)
-	if err == nil {
-		return
+	log.Println("Try to get a response from cache...")
+	responseBody, err := cache.GetCacheIfExists(db, req)
+	if err != nil {
+		log.Println(err)
+	} else {
+		log.Println("Successfully got a response")
+		_, err := rw.Write(responseBody)
+		if err == nil {
+			log.Println("Transferred")
+			return
+		}
+		log.Println(err)
 	}
-
-	log.Println("Miss cache, starting connection to backend")
 
 	// on cache miss make request to backend
 	for {
@@ -164,16 +182,16 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 		var err error
 		for {
 			server, err = serverPool.getNextPeer()
-			if server.currentRequests+1 <= server.maximalRequests {
+			if err != nil {
+				http.Error(rw, "Service not available", http.StatusServiceUnavailable)
+				log.Println(err.Error())
+				return
+			}
+
+			if server.currentRequests+1 <= server.maximalRequests { // Опасно, неатомарная операция
 				atomic.AddInt32(&server.currentRequests, int32(1))
 				break
 			}
-		}
-
-		if err != nil {
-			http.Error(rw, "Service not available", http.StatusServiceUnavailable)
-			log.Println(err.Error())
-			return
 		}
 
 		// send it to the backend
@@ -201,9 +219,27 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 			}
 		}
 
-		if _, err := io.Copy(rw, resp.Body); err != nil {
+		byteArray, err := io.ReadAll(resp.Body)
+		if err != nil {
 			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
+			log.Println(err)
 		}
+
+		_, err = rw.Write(byteArray)
+		if err != nil {
+			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
+			log.Println(err)
+		}
+
+		go func() {
+			log.Println("Saving response in cache")
+			err := cache.PutRecordInCache(db, req, resp, byteArray)
+			if err != nil {
+				log.Println("Unsuccessful operation: ", err)
+				return
+			}
+			log.Println("Successfully saved")
+		}()
 
 		atomic.AddInt32(&server.currentRequests, int32(-1))
 
