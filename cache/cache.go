@@ -1,12 +1,19 @@
 package cache
 
+// запрос HEAD не на каждое обращение не каждые несколько секунд
+
+// transfer encoding gz
+
+// http 1.1 ranch
+
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"github.com/boltdb/bolt"
-	"io"
 	"log"
 	"net/http"
+	"os"
 )
 
 const (
@@ -16,20 +23,36 @@ const (
 
 // GetCacheIfExists Обращается к диску для нахождения ответа на запрос.
 // Если таковой имеется - он возвращается, в противном случае выдаётся ошибка
-func GetCacheIfExists(db *bolt.DB, req *http.Request) (io.ReadCloser, error) {
-	str := req.Proto + req.Method + req.URL.Path
-	byteKey := []byte(str)
+func GetCacheIfExists(db *bolt.DB, req *http.Request) (*http.Response, error) {
+	keyString := req.Proto + req.Method + req.URL.Path
+	keyByteArray := []byte(keyString)
 
-	var body io.ReadCloser
-	byteResponse := findRecord(db, byteKey)
-	if byteResponse == nil {
-		return nil, errors.New("response not found")
-	}
-	_, err := body.Read(byteResponse)
+	b, err := getRecord(db, keyByteArray)
 	if err != nil {
 		return nil, err
 	}
-	return body, nil
+
+	var resp http.Response
+
+	err = json.Unmarshal(b, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
+func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, packed bool) error {
+	keyString := req.Proto + req.Method + req.URL.Path
+	keyByteArray := []byte(keyString)
+
+	responseByteArray, err := json.Marshal(*resp)
+	if err != nil {
+		return err
+	}
+
+	err = addNewRecord(db, keyByteArray, responseByteArray)
+	return err
 }
 
 // OpenDatabase Открывает базу данных для дальнейшего использования
@@ -82,7 +105,7 @@ func addNewRecord(db *bolt.DB, key, value []byte) error {
 // Найти элемент по ключу
 // Ключ переводится в хэш, тот разбивается на подотрезки - названия бакетов
 // Проходом по подотрезкам находим по ключу ответ на запрос
-func findRecord(db *bolt.DB, key []byte) []byte {
+func getRecord(db *bolt.DB, key []byte) ([]byte, error) {
 	var result []byte = nil
 
 	requestHash := hash(key)
@@ -113,21 +136,52 @@ func findRecord(db *bolt.DB, key []byte) []byte {
 		return nil
 	})
 
-	if err != nil {
-		return nil
-	}
-
-	return result
+	return result, err
 }
 
 // Удаляет запись из кэша
-func deleteRecord(db *bolt.DB, key []byte) {
+func deleteRecord(db *bolt.DB, key []byte) error {
+	requestHash := hash(key)
+	subhashLength := hashLength / subHashCount
 
+	var subHashes [][]byte
+	for i := 0; i < subHashCount; i++ {
+		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
+	}
+
+	err := db.Update(func(tx *bolt.Tx) error {
+		treeBucket := tx.Bucket(subHashes[0])
+		if treeBucket == nil {
+			return errors.New("miss cache")
+		}
+		for i := 1; i < subHashCount; i++ {
+			treeBucket := treeBucket.Bucket(subHashes[i])
+			if treeBucket == nil {
+				return errors.New("miss cache")
+			}
+		}
+
+		err := treeBucket.Delete(key)
+
+		return err
+	})
+
+	return err
 }
 
 // Сохраняет копию базы данных в файл
-func makeSnapshot(db *bolt.DB, filename string) {
+func makeSnapshot(db *bolt.DB, filename string) error {
+	f, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
 
+	err = db.View(func(tx *bolt.Tx) error {
+		_, err := tx.WriteTo(f)
+		return err
+	})
+
+	return err
 }
 
 // Возвращает хэш от набора байт
