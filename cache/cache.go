@@ -8,9 +8,9 @@ package cache
 
 import (
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"github.com/boltdb/bolt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -23,30 +23,23 @@ const (
 
 // GetCacheIfExists Обращается к диску для нахождения ответа на запрос.
 // Если таковой имеется - он возвращается, в противном случае выдаётся ошибка
-func GetCacheIfExists(db *bolt.DB, req *http.Request) (*http.Response, error) {
+func GetCacheIfExists(db *bolt.DB, req *http.Request) ([]byte, error) {
 	keyString := req.Proto + req.Method + req.URL.Path
 	keyByteArray := []byte(keyString)
 
-	b, err := getRecord(db, keyByteArray)
+	responseByteArray, err := getRecord(db, keyByteArray)
 	if err != nil {
 		return nil, err
 	}
 
-	var resp http.Response
-
-	err = json.Unmarshal(b, &resp)
-	if err != nil {
-		return nil, err
-	}
-
-	return &resp, nil
+	return responseByteArray, nil
 }
 
-func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, packed bool) error {
+func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response) error {
 	keyString := req.Proto + req.Method + req.URL.Path
 	keyByteArray := []byte(keyString)
 
-	responseByteArray, err := json.Marshal(*resp)
+	responseByteArray, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -84,10 +77,10 @@ func addNewRecord(db *bolt.DB, key, value []byte) error {
 
 	err := db.Update(func(tx *bolt.Tx) error {
 		treeBucket, err := tx.CreateBucketIfNotExists(subHashes[0])
-
 		if err != nil {
 			return err
 		}
+
 		for i := 1; i < subHashCount; i++ {
 			treeBucket, err = treeBucket.CreateBucketIfNotExists(subHashes[i])
 			if err != nil {
