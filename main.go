@@ -188,7 +188,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			if server.currentRequests+1 <= server.maximalRequests {
+			if server.currentRequests+1 <= server.maximalRequests { // Опасно, неатомарная операция
 				atomic.AddInt32(&server.currentRequests, int32(1))
 				break
 			}
