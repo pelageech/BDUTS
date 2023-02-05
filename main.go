@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"github.com/boltdb/bolt"
 	"github.com/pelageech/BDUTS/cache"
+	"github.com/pelageech/BDUTS/timer"
 	"io"
 	"log"
 	"net"
 	"net/http"
-	"net/http/httptrace"
 	"net/url"
 	"sync"
 	"sync/atomic"
@@ -53,29 +53,6 @@ type ResponseError struct {
 }
 
 var db *bolt.DB
-
-func makeRequestTimeTracker(req *http.Request) (*http.Request, *time.Duration) {
-	var start, connStart time.Time
-	var finish, finishBackend time.Duration
-
-	trace := &httptrace.ClientTrace{
-
-		GotConn: func(_ httptrace.GotConnInfo) {
-			connStart = time.Now()
-		},
-
-		GotFirstResponseByte: func() {
-			finishBackend = time.Since(connStart)
-			finish = time.Since(start)
-			fmt.Printf("[%s] Time from start to first bytes: full trip: %v, backend: %v\n", req.URL, finish, finishBackend)
-		},
-	}
-
-	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
-	start = time.Now()
-
-	return req, &finish
-}
 
 func (server *Backend) makeRequest(req *http.Request) (*http.Response, *ResponseError) {
 	respError := &ResponseError{request: req}
@@ -143,7 +120,7 @@ func isHTTPVersionSupported(req *http.Request) bool {
 	return false
 }
 
-func sendResponseToClient(rw http.ResponseWriter, resp *http.Response) error {
+/* func sendResponseToClient(rw http.ResponseWriter, resp *http.Response) error {
 	for key, values := range resp.Header {
 		for _, value := range values {
 			rw.Header().Add(key, value)
@@ -152,15 +129,19 @@ func sendResponseToClient(rw http.ResponseWriter, resp *http.Response) error {
 
 	_, err := io.Copy(rw, resp.Body)
 	return err
-}
+} */
 
 func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	if !isHTTPVersionSupported(req) {
 		http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
 	}
 
-	req, _ = makeRequestTimeTracker(req)
+	start := time.Now()
 
+	var backendTime *time.Duration
+	req, backendTime = timer.MakeRequestTimeTracker(req)
+
+	// getting a response from cache
 	log.Println("Try to get a response from cache...")
 	responseBody, err := cache.GetCacheIfExists(db, req)
 	if err != nil {
@@ -170,6 +151,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 		_, err := rw.Write(responseBody)
 		if err == nil {
 			log.Println("Transferred")
+			timer.SaveTimerDataGotFromCache(time.Since(start))
 			return
 		}
 		log.Println(err)
@@ -231,8 +213,8 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 			log.Println(err)
 		}
 
+		log.Println("Saving response in cache")
 		go func() {
-			log.Println("Saving response in cache")
 			err := cache.PutRecordInCache(db, req, resp, byteArray)
 			if err != nil {
 				log.Println("Unsuccessful operation: ", err)
@@ -242,7 +224,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 		}()
 
 		atomic.AddInt32(&server.currentRequests, int32(-1))
-
+		timer.SaveTimeDataBackend(*backendTime, time.Since(start))
 		return
 	}
 }
