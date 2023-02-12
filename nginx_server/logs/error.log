@@ -1,0 +1,9 @@
+2023/02/10 09:16:51 [notice] 12820#9300: signal process started
+2023/02/10 09:18:46 [notice] 13464#3592: signal process started
+2023/02/10 09:18:46 [emerg] 15280#10048: cache "all" uses the "C:/nginx-1.22.1/data/cache" cache path while previously it used the "C:/nginx-1.22.1/data/cache" cache path
+2023/02/10 09:28:17 [notice] 1392#1808: signal process started
+2023/02/10 09:42:59 [notice] 14860#13056: signal process started
+2023/02/11 16:31:00 [notice] 15300#12252: signal process started
+2023/02/11 16:31:00 [error] 15300#12252: CreateFile() "C:\nginx-1.22.1/logs/nginx.pid" failed (2: The system cannot find the file specified)
+2023/02/12 23:15:40 [notice] 16088#16192: signal process started
+2023/02/12 23:19:40 [notice] 6748#2348: signal process started

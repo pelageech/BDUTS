@@ -1,0 +1,19 @@
+<body>
+    <center>
+        <div id="timedisplay"></div>
+        <p>TIME:</p>
+        <script language="JavaScript">
+            function fulltime () {
+            var time=new Date();
+            document.clock.full. value=time.toLocaleString();
+            setTimeout('fulltime()',500)
+            }
+        </script>
+        <form name="clock">
+            <input size="24" name="full">
+        </form>
+        <script language="JavaScript">
+            fulltime ();
+        </script>
+    </center>
+</body>
