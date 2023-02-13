@@ -23,7 +23,7 @@ func hello(w http.ResponseWriter, req *http.Request) {
 	}()
 
 	if err := e.Wait(); err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "Internal Server Errfdsfdsfsfsdferferfrferferor", http.StatusInternalServerError)
 	}
 
 	if _, err := fmt.Fprintln(w, stdout.String()); err != nil {
