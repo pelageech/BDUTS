@@ -9,10 +9,11 @@ package cache
 import (
 	"crypto/sha256"
 	"errors"
-	"github.com/boltdb/bolt"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/boltdb/bolt"
 )
 
 const (

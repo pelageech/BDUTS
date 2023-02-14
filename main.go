@@ -5,9 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/boltdb/bolt"
-	"github.com/pelageech/BDUTS/cache"
-	"github.com/pelageech/BDUTS/timer"
 	"io"
 	"log"
 	"net"
@@ -16,6 +13,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/boltdb/bolt"
+	"github.com/pelageech/BDUTS/cache"
+	"github.com/pelageech/BDUTS/timer"
 )
 
 // LoadBalancerConfig is parse from `config.json` file.
