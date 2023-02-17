@@ -279,6 +279,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer serversReader.Close()
 
 	serversConfig, err := serversReader.ReadServersConfig()
 	if err != nil {
@@ -318,6 +319,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer loadBalancerReader.Close()
 
 	lbConfig, err := loadBalancerReader.ReadLoadBalancerConfig()
 	if err != nil {
