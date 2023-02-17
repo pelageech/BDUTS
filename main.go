@@ -16,8 +16,12 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/pelageech/BDUTS/cache"
+	"github.com/pelageech/BDUTS/config"
 	"github.com/pelageech/BDUTS/timer"
 )
+
+var loadBalancerConfig LoadBalancerConfig
+var serverPool ServerPool
 
 // LoadBalancerConfig is parse from `config.json` file.
 // It contains all the necessary information of the load balancer.
@@ -271,7 +275,57 @@ func (server *Backend) isAlive() bool {
 }
 
 func main() {
-	readConfig()
+	serversReader, err := config.NewServersReader("resources/servers.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	serversConfig, err := serversReader.ReadServersConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	/*
+		Configure server pool.
+		For each backend we set up
+		  - URL,
+		  - Alive bool
+
+		and then add it to the `serverPool“ var.
+	*/
+	for _, server := range serversConfig {
+		log.Printf("%v", server)
+
+		var backend Backend
+		var err error
+
+		backend.URL, err = url.Parse(server.URL)
+		if err != nil {
+			log.Printf("Failed to parse server URL: %s\n", err)
+			continue
+		}
+
+		backend.healthCheckTcpTimeout = server.HealthCheckTcpTimeout * time.Millisecond
+		backend.alive = false
+
+		backend.currentRequests = 0
+		backend.maximalRequests = server.MaximalRequests
+
+		serverPool.servers = append(serverPool.servers, &backend)
+	}
+
+	loadBalancerReader, err := config.NewLoadBalancerReader("resources/config.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	lbConfig, err := loadBalancerReader.ReadLoadBalancerConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	loadBalancerConfig.port = lbConfig.Port
+	loadBalancerConfig.healthCheckPeriod = lbConfig.HealthCheckPeriod * time.Second
 
 	// Config TLS: setting a pair crt-key
 	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
