@@ -3,7 +3,9 @@ package config
 import (
 	"encoding/json"
 	"io"
+	"net/http"
 	"os"
+	"strings"
 )
 
 type CacheReader struct {
@@ -13,6 +15,8 @@ type CacheReader struct {
 type CacheConfig struct {
 	requestKey string
 }
+
+var RequestKey []func(r *http.Request) string
 
 func NewCacheReader(configPath string) (*CacheReader, error) {
 	file, err := os.Open(configPath)
@@ -35,4 +39,24 @@ func ReadCacheConfig(r *CacheReader) (*CacheConfig, error) {
 	}
 
 	return &cacheConfig, nil
+}
+
+func parseRequestKey(requestKey string) (result []func(r *http.Request) string) {
+	keys := strings.Split(requestKey, ";")
+	for _, v := range keys {
+		var m func(r *http.Request) string
+		switch v {
+		case "REQ_METHOD":
+			m = func(r *http.Request) string { return r.Method }
+			break
+		case "REQ_HOST":
+			m = func(r *http.Request) string { return r.Host }
+			break
+		case "REQ_URI":
+			m = func(r *http.Request) string { return r.URL.Path }
+			break
+		}
+		result = append(result, m)
+	}
+	return
 }
