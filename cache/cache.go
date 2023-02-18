@@ -13,6 +13,8 @@ import (
 	"github.com/pelageech/BDUTS/config"
 	"log"
 	"net/http"
+	"strings"
+	"time"
 )
 
 const (
@@ -20,13 +22,18 @@ const (
 	subHashCount = 8 // Количество подотрезков хэша
 )
 
+type Info struct {
+	hash           []byte
+	responseHeader http.Header
+	dateOfDeath    time.Time // nil if undying
+}
+
 // GetCacheIfExists Обращается к диску для нахождения ответа на запрос.
 // Если таковой имеется - он возвращается, в противном случае выдаётся ошибка
 func GetCacheIfExists(db *bolt.DB, req *http.Request) ([]byte, error) {
-	keyString := req.Proto + req.Method + req.URL.Path
-	keyByteArray := []byte(keyString)
+	keyString := constructKeyFromRequest(req)
 
-	responseByteArray, err := getRecord(db, keyByteArray)
+	responseByteArray, err := getRecord(db, []byte(keyString))
 	if err != nil {
 		return nil, err
 	}
@@ -38,15 +45,12 @@ func GetCacheIfExists(db *bolt.DB, req *http.Request) ([]byte, error) {
 // Считает хэш аттрибутов запроса, по нему проходит вниз по дереву
 // и записывает как лист новую запись.
 func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, responseByteArray []byte) error {
-	keyString := costructKeyFromRequest(req)
-	keyByteArray := []byte(keyString)
+	if !isStorable(req) {
+		return errors.New("can't be stored in cache:(")
+	}
 
-	// responseByteArray, err := io.ReadAll(resp.Body)
-	//if err != nil {
-	//	return err
-	//}
-
-	err := addNewRecord(db, keyByteArray, responseByteArray)
+	keyString := constructKeyFromRequest(req)
+	err := addNewRecord(db, []byte(keyString), responseByteArray)
 	return err
 }
 
@@ -188,10 +192,27 @@ func hash(value []byte) [hashLength]byte {
 	return hash
 }
 
-func costructKeyFromRequest(req *http.Request) string {
+func constructKeyFromRequest(req *http.Request) string {
 	result := ""
 	for _, addStringKey := range config.RequestKey {
 		result += addStringKey(req)
 	}
 	return result
+}
+
+func isStorable(r *http.Request) bool {
+	header := r.Header
+	cacheControlString := header.Get("cache-control")
+	if len(cacheControlString) == 0 {
+		return false
+	}
+
+	// check if we shouldn't store the page
+	cacheControl := strings.Split(cacheControlString, ";")
+	for _, v := range cacheControl {
+		if v == "no-store" {
+			return false
+		}
+	}
+	return true
 }
