@@ -9,11 +9,9 @@ package cache
 import (
 	"crypto/sha256"
 	"errors"
+	"github.com/boltdb/bolt"
 	"log"
 	"net/http"
-	"os"
-
-	"github.com/boltdb/bolt"
 )
 
 const (
@@ -136,6 +134,7 @@ func getRecord(db *bolt.DB, key []byte) ([]byte, error) {
 }
 
 // Удаляет запись из кэша
+/*
 func deleteRecord(db *bolt.DB, key []byte) error {
 	requestHash := hash(key)
 	subhashLength := hashLength / subHashCount
@@ -166,6 +165,7 @@ func deleteRecord(db *bolt.DB, key []byte) error {
 }
 
 // Сохраняет копию базы данных в файл
+/*
 func makeSnapshot(db *bolt.DB, filename string) error {
 	f, err := os.Open(filename)
 	if err != nil {
@@ -179,6 +179,7 @@ func makeSnapshot(db *bolt.DB, filename string) error {
 
 	return err
 }
+*/
 
 // Возвращает хэш от набора байт
 func hash(value []byte) [hashLength]byte {
