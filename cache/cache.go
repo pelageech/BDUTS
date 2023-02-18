@@ -8,24 +8,29 @@ package cache
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"github.com/boltdb/bolt"
 	"github.com/pelageech/BDUTS/config"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
 
 const (
+	reading = iota
+	writing
+	silent
 	hashLength   = sha256.Size
 	subHashCount = 8 // Количество подотрезков хэша
 )
 
 type Info struct {
-	hash           []byte
-	responseHeader http.Header
-	dateOfDeath    time.Time // nil if undying
+	dateOfDeath time.Time // nil if undying
+	remoteAddr  string
+	status      int
 }
 
 // GetCacheIfExists Обращается к диску для нахождения ответа на запрос.
@@ -48,9 +53,14 @@ func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, respo
 	if !isStorable(req) {
 		return errors.New("can't be stored in cache:(")
 	}
+	info := createCacheInfo(req)
+	value, err := json.Marshal(info)
+	if err != nil {
+		return err
+	}
 
 	keyString := constructKeyFromRequest(req)
-	err := addNewRecord(db, []byte(keyString), responseByteArray)
+	err = addNewRecord(db, []byte(keyString), value)
 	return err
 }
 
@@ -72,7 +82,7 @@ func CloseDatabase(db *bolt.DB) {
 }
 
 // Добавляет новую запись в кэш.
-func addNewRecord(db *bolt.DB, key, value []byte) error {
+func addNewRecord(db *bolt.DB, key []byte, value []byte) error {
 	requestHash := hash(key)
 	subhashLength := hashLength / subHashCount
 
@@ -200,8 +210,8 @@ func constructKeyFromRequest(req *http.Request) string {
 	return result
 }
 
-func isStorable(r *http.Request) bool {
-	header := r.Header
+func isStorable(req *http.Request) bool {
+	header := req.Header
 	cacheControlString := header.Get("cache-control")
 	if len(cacheControlString) == 0 {
 		return false
@@ -215,4 +225,27 @@ func isStorable(r *http.Request) bool {
 		}
 	}
 	return true
+}
+
+func createCacheInfo(req *http.Request) *Info {
+	var info Info
+
+	info.remoteAddr = req.RemoteAddr
+
+	header := req.Header
+	cacheControlString := header.Get("cache-control")
+
+	// check if we shouldn't store the page
+	cacheControl := strings.Split(cacheControlString, ";")
+	for _, v := range cacheControl {
+		if strings.Contains(v, "max-age") {
+			_, t, _ := strings.Cut(v, ":")
+			age, _ := strconv.Atoi(t)
+			if age > 0 {
+				info.dateOfDeath = time.Now().Add(time.Duration(age) * time.Second)
+			}
+		}
+	}
+
+	return &info
 }
