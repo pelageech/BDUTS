@@ -1,0 +1,3 @@
+The directory may not contain any files, but it is still necessary for the code to function properly because the code requires the directory to exist in order to create the necessary database files.
+
+Without the directory present in the repository, when someone clones the project and runs the code that requires the database, the code would not be able to find the directory and would not be able to create the necessary database files. Therefore, including the empty directory in the repository ensures that the code can run as expected when the project is cloned.

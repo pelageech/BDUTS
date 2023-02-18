@@ -5,9 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/boltdb/bolt"
-	"github.com/pelageech/BDUTS/cache"
-	"github.com/pelageech/BDUTS/timer"
 	"io"
 	"log"
 	"net"
@@ -16,7 +13,47 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/boltdb/bolt"
+	"github.com/pelageech/BDUTS/cache"
+	"github.com/pelageech/BDUTS/config"
+	"github.com/pelageech/BDUTS/timer"
 )
+
+type LoadBalancer struct {
+	config LoadBalancerConfig
+	pool   ServerPool
+}
+
+func NewLoadBalancer(config LoadBalancerConfig) *LoadBalancer {
+	return &LoadBalancer{
+		config: config,
+		pool:   ServerPool{},
+	}
+}
+
+func (b *LoadBalancer) configureServerPool(servers []config.ServerConfig) {
+	for _, server := range servers {
+		log.Printf("%v", server)
+
+		var backend Backend
+		var err error
+
+		backend.URL, err = url.Parse(server.URL)
+		if err != nil {
+			log.Printf("Failed to parse server URL: %s\n", err)
+			continue
+		}
+
+		backend.healthCheckTcpTimeout = server.HealthCheckTcpTimeout * time.Millisecond
+		backend.alive = false
+
+		backend.currentRequests = 0
+		backend.maximalRequests = server.MaximalRequests
+
+		b.pool.servers = append(b.pool.servers, &backend)
+	}
+}
 
 // LoadBalancerConfig is parse from `config.json` file.
 // It contains all the necessary information of the load balancer.
@@ -131,7 +168,7 @@ func isHTTPVersionSupported(req *http.Request) bool {
 	return err
 } */
 
-func loadBalancer(rw http.ResponseWriter, req *http.Request) {
+func (b *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	if !isHTTPVersionSupported(req) {
 		http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
 	}
@@ -163,7 +200,7 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 		var server *Backend
 		var err error
 		for {
-			server, err = serverPool.getNextPeer()
+			server, err = b.pool.getNextPeer()
 			if err != nil {
 				http.Error(rw, "Service not available", http.StatusServiceUnavailable)
 				log.Println(err.Error())
@@ -229,19 +266,19 @@ func loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func healthChecker() {
-	ticker := time.NewTicker(loadBalancerConfig.healthCheckPeriod)
+func (b *LoadBalancer) healthChecker() {
+	ticker := time.NewTicker(b.config.healthCheckPeriod)
 
 	for {
 		<-ticker.C
 		log.Println("Health Check has been started!")
-		healthCheck()
+		b.healthCheck()
 		log.Println("All the checks has been completed!")
 	}
 }
 
-func healthCheck() {
-	for _, server := range serverPool.servers {
+func (b *LoadBalancer) healthCheck() {
+	for _, server := range b.pool.servers {
 		alive := server.isAlive()
 		server.setAlive(alive)
 		if alive {
@@ -270,33 +307,70 @@ func (server *Backend) isAlive() bool {
 }
 
 func main() {
-	readConfig()
+	loadBalancerReader, err := config.NewLoadBalancerReader("resources/config.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func(loadBalancerReader *config.LoadBalancerReader) {
+		err := loadBalancerReader.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(loadBalancerReader)
+
+	lbConfig, err := loadBalancerReader.ReadLoadBalancerConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	loadBalancer := NewLoadBalancer(LoadBalancerConfig{
+		port:              lbConfig.Port,
+		healthCheckPeriod: lbConfig.HealthCheckPeriod * time.Second,
+	})
+
+	serversReader, err := config.NewServersReader("resources/servers.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func(serversReader *config.ServersReader) {
+		err := serversReader.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(serversReader)
+
+	serversConfig, err := serversReader.ReadServersConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	loadBalancer.configureServerPool(serversConfig)
 
 	// Config TLS: setting a pair crt-key
 	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
 	tlsConfig := &tls.Config{Certificates: []tls.Certificate{Crt}}
 
 	// Start listening
-	ln, err := tls.Listen("tcp", fmt.Sprintf(":%d", loadBalancerConfig.port), tlsConfig)
+	ln, err := tls.Listen("tcp", fmt.Sprintf(":%d", loadBalancer.config.port), tlsConfig)
 	if err != nil {
 		log.Fatal("There's problem with listening")
 	}
 
 	// current is -1, it's automatically will turn into 0
-	serverPool.current = -1
+	loadBalancer.pool.current = -1
 
 	// Serving
-	http.HandleFunc("/", loadBalancer)
+	http.HandleFunc("/", loadBalancer.loadBalancer)
 	http.HandleFunc("/favicon.ico", http.NotFound)
 
 	// Firstly, identify the working servers
 	log.Println("Configured! Now setting up the first health check...")
-	healthCheck()
+	loadBalancer.healthCheck()
 
 	log.Println("Ready!")
 
 	// set up health check
-	go healthChecker()
+	go loadBalancer.healthChecker()
 
 	// opening db
 	log.Println("Opening cache database")
@@ -306,7 +380,7 @@ func main() {
 	}
 	defer cache.CloseDatabase(db)
 
-	log.Printf("Load Balancer started at :%d\n", loadBalancerConfig.port)
+	log.Printf("Load Balancer started at :%d\n", loadBalancer.config.port)
 	if err := http.Serve(ln, nil); err != nil {
 		log.Fatal(err)
 	}
