@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"github.com/boltdb/bolt"
+	"github.com/pelageech/BDUTS/config"
 	"log"
 	"net/http"
 )
@@ -37,7 +38,7 @@ func GetCacheIfExists(db *bolt.DB, req *http.Request) ([]byte, error) {
 // Считает хэш аттрибутов запроса, по нему проходит вниз по дереву
 // и записывает как лист новую запись.
 func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, responseByteArray []byte) error {
-	keyString := req.Proto + req.Method + req.URL.Path
+	keyString := costructKeyFromRequest(req)
 	keyByteArray := []byte(keyString)
 
 	// responseByteArray, err := io.ReadAll(resp.Body)
@@ -185,4 +186,12 @@ func makeSnapshot(db *bolt.DB, filename string) error {
 func hash(value []byte) [hashLength]byte {
 	hash := sha256.Sum256(value)
 	return hash
+}
+
+func costructKeyFromRequest(req *http.Request) string {
+	result := ""
+	for _, addStringKey := range config.RequestKey {
+		result += addStringKey(req)
+	}
+	return result
 }
