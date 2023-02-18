@@ -13,7 +13,7 @@ type CacheReader struct {
 }
 
 type CacheConfig struct {
-	requestKey string
+	RequestKey string
 }
 
 var RequestKey []func(r *http.Request) string
@@ -24,6 +24,10 @@ func NewCacheReader(configPath string) (*CacheReader, error) {
 		return nil, err
 	}
 	return &CacheReader{file}, nil
+}
+
+func (r *CacheReader) Close() error {
+	return r.file.Close()
 }
 
 func ReadCacheConfig(r *CacheReader) (*CacheConfig, error) {
@@ -41,7 +45,11 @@ func ReadCacheConfig(r *CacheReader) (*CacheConfig, error) {
 	return &cacheConfig, nil
 }
 
-func parseRequestKey(requestKey string) (result []func(r *http.Request) string) {
+func ParseRequestKey(requestKey string) (result []func(r *http.Request) string) {
+	if len(requestKey) == 0 {
+		return nil
+	}
+
 	keys := strings.Split(requestKey, ";")
 	for _, v := range keys {
 		var m func(r *http.Request) string
