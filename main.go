@@ -91,7 +91,9 @@ type ResponseError struct {
 
 var db *bolt.DB
 
-func (server *Backend) makeRequest(req *http.Request) (*http.Response, *ResponseError) {
+func (server *Backend) makeRequest(r *http.Request) (*http.Response, *ResponseError) {
+	newReq := *r
+	req := &newReq
 	respError := &ResponseError{request: req}
 	serverUrl := server.URL
 
@@ -179,20 +181,20 @@ func (b *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	req, backendTime = timer.MakeRequestTimeTracker(req)
 
 	// getting a response from cache
-	log.Println("Try to get a response from cache...")
-	responseBody, err := cache.GetCacheIfExists(db, req)
-	if err != nil {
-		log.Println(err)
-	} else {
-		log.Println("Successfully got a response")
-		_, err := rw.Write(responseBody)
-		if err == nil {
-			log.Println("Transferred")
-			timer.SaveTimerDataGotFromCache(time.Since(start))
-			return
-		}
-		log.Println(err)
-	}
+	//log.Println("Try to get a response from cache...")
+	//responseBody, err := cache.GetCacheIfExists(db, req)
+	//if err != nil {
+	//	log.Println(err)
+	//} else {
+	//	log.Println("Successfully got a response")
+	//	_, err := rw.Write(responseBody)
+	//	if err == nil {
+	//		log.Println("Transferred")
+	//		timer.SaveTimerDataGotFromCache(time.Since(start))
+	//		return
+	//	}
+	//	log.Println(err)
+	//}
 
 	// on cache miss make request to backend
 	for {
@@ -307,6 +309,8 @@ func (server *Backend) isAlive() bool {
 }
 
 func main() {
+
+	// load balancer configuration
 	loadBalancerReader, err := config.NewLoadBalancerReader("resources/config.json")
 	if err != nil {
 		log.Fatal(err)
@@ -328,6 +332,7 @@ func main() {
 		healthCheckPeriod: lbConfig.HealthCheckPeriod * time.Second,
 	})
 
+	// backends configuration
 	serversReader, err := config.NewServersReader("resources/servers.json")
 	if err != nil {
 		log.Fatal(err)
@@ -345,6 +350,31 @@ func main() {
 	}
 
 	loadBalancer.configureServerPool(serversConfig)
+
+	// cache configuration
+	log.Println("Opening cache database")
+	db, err = cache.OpenDatabase("./cache-data/database.db")
+	if err != nil {
+		log.Fatalln("DB error: ", err)
+	}
+	defer cache.CloseDatabase(db)
+
+	cacheReader, err := config.NewCacheReader("./resources/cache_config.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func(cacheReader *config.CacheReader) {
+		err := cacheReader.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(cacheReader)
+
+	cacheConfig, err := config.ReadCacheConfig(cacheReader)
+	if err != nil {
+		log.Fatal(err)
+	}
+	config.RequestKey = config.ParseRequestKey(cacheConfig.RequestKey)
 
 	// Config TLS: setting a pair crt-key
 	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
@@ -371,14 +401,6 @@ func main() {
 
 	// set up health check
 	go loadBalancer.healthChecker()
-
-	// opening db
-	log.Println("Opening cache database")
-	db, err = cache.OpenDatabase("./cache-data/database.db")
-	if err != nil {
-		log.Fatalln("DB error: ", err)
-	}
-	defer cache.CloseDatabase(db)
 
 	log.Printf("Load Balancer started at :%d\n", loadBalancer.config.port)
 	if err := http.Serve(ln, nil); err != nil {
