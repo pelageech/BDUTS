@@ -181,20 +181,20 @@ func (b *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	req, backendTime = timer.MakeRequestTimeTracker(req)
 
 	// getting a response from cache
-	//log.Println("Try to get a response from cache...")
-	//responseBody, err := cache.GetCacheIfExists(db, req)
-	//if err != nil {
-	//	log.Println(err)
-	//} else {
-	//	log.Println("Successfully got a response")
-	//	_, err := rw.Write(responseBody)
-	//	if err == nil {
-	//		log.Println("Transferred")
-	//		timer.SaveTimerDataGotFromCache(time.Since(start))
-	//		return
-	//	}
-	//	log.Println(err)
-	//}
+	log.Println("Try to get a response from cache...")
+	responseBody, err := cache.GetCacheIfExists(db, req)
+	if err != nil {
+		log.Println(err)
+	} else {
+		log.Println("Successfully got a response")
+		_, err := rw.Write(responseBody)
+		if err == nil {
+			log.Println("Transferred")
+			timer.SaveTimerDataGotFromCache(time.Since(start))
+			return
+		}
+		log.Println(err)
+	}
 
 	// on cache miss make request to backend
 	for {
@@ -254,7 +254,7 @@ func (b *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 		log.Println("Saving response in cache")
 		go func() {
-			err := cache.PutRecordInCache(db, req, resp, byteArray)
+			err := cache.PutRecordInCache(db, req, byteArray)
 			if err != nil {
 				log.Println("Unsuccessful operation: ", err)
 				return
