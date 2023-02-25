@@ -1,22 +1,7 @@
 [
   {
-    "url" : "http://localhost:3031",
+    "url" : "http://localhost:3037",
     "healthCheckTcpTimeout" : 2000,
     "maximalRequests" : 5
-  },
-  {
-    "url" : "http://localhost:3032",
-    "healthCheckTcpTimeout" : 2000,
-    "maximalRequests" : 6
-  },
-  {
-    "url" : "http://localhost:3033",
-    "healthCheckTcpTimeout" : 2000,
-    "maximalRequests" : 5
-  },
-  {
-    "url" : "http://localhost:3034",
-    "healthCheckTcpTimeout" : 2000,
-    "maximalRequests" : 6
   }
 ]
