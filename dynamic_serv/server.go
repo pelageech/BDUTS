@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 )
@@ -39,8 +40,8 @@ func main() {
 	}
 
 	// Start the server.
-	fmt.Println("Server listening on port 3035...")
+	log.Println("Server listening on port 3035...")
 	if err := srv.ListenAndServe(); err != nil {
-		fmt.Printf("Server error: %s\n", err)
+		log.Printf("Server error: %s\n", err)
 	}
 }
