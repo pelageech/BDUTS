@@ -66,7 +66,7 @@ func drawFractal(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	fmt.Println("Starting server...")
+	fmt.Println("Starting sefdsfsdfrver...")
 
 	http.HandleFunc("/fractal.gif", drawFractal)
 
