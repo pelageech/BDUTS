@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 )
 
@@ -13,5 +14,8 @@ func main() {
 	})
 
 	// Start the server.
-	http.ListenAndServe(":3037", nil)
+	err := http.ListenAndServe(":3037", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
