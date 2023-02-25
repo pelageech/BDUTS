@@ -21,7 +21,7 @@ func PutRecordInCache(db *bolt.DB, req *http.Request, item *Item) error {
 		return errors.New("can't be stored in cache:(")
 	}
 
-	info := createCacheInfo(req)
+	info := createCacheInfo(req, item.Header)
 
 	valueInfo, err := json.Marshal(info)
 	if err != nil {
@@ -123,24 +123,24 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 //	return err
 //}
 
-func createCacheInfo(req *http.Request) *Info {
+func createCacheInfo(req *http.Request, header http.Header) *Info {
 	var info Info
 
 	info.remoteAddr = req.RemoteAddr
 	info.isPrivate = false
 
-	header := req.Header
 	cacheControlString := header.Get("cache-control")
 
 	// check if we shouldn't store the page
 	cacheControl := strings.Split(cacheControlString, ";")
 	for _, v := range cacheControl {
 		if strings.Contains(v, "max-age") {
-			_, t, _ := strings.Cut(v, ":")
+			_, t, _ := strings.Cut(v, "=")
 			age, _ := strconv.Atoi(t)
 			if age > 0 {
 				info.dateOfDeath = time.Now().Add(time.Duration(age) * time.Second)
 			}
+			fmt.Println(t, age, info.dateOfDeath, cacheControl)
 		}
 		if strings.Contains(v, "private") {
 			info.isPrivate = true

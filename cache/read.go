@@ -30,7 +30,7 @@ func GetCacheIfExists(db *bolt.DB, req *http.Request) (*Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	if info.dateOfDeath.After(time.Now()) {
+	if time.Now().After(info.dateOfDeath) {
 		// delete
 		return nil, errors.New("not fresh")
 	}
