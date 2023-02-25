@@ -14,19 +14,23 @@ import (
 	"github.com/pelageech/BDUTS/config"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 )
 
 const (
-	reading = iota
+	/*reading = iota
 	writing
-	silent
+	silent*/
 	hashLength   = sha1.Size * 2
 	subHashCount = 4 // Количество подотрезков хэша
 	root         = "./cache-data/"
 )
+
+type Item struct {
+	Body   []byte
+	Header http.Header
+}
 
 type Info struct {
 	dateOfDeath time.Time // nil if undying
@@ -53,7 +57,7 @@ func CloseDatabase(db *bolt.DB) {
 }
 
 // Сохраняет копию базы данных в файл
-func makeSnapshot(db *bolt.DB, filename string) error {
+/*func makeSnapshot(db *bolt.DB, filename string) error {
 	f, err := os.Open(filename)
 	if err != nil {
 		return err
@@ -65,7 +69,7 @@ func makeSnapshot(db *bolt.DB, filename string) error {
 	})
 
 	return err
-}
+}*/
 
 // Возвращает хэш от набора байт
 func hash(value []byte) []byte {
@@ -104,7 +108,7 @@ func getBucket(tx *bolt.Tx, key []byte) (*bolt.Bucket, error) {
 	return nil, errors.New("miss cache")
 }
 
-func setStatusReading(db *bolt.DB, requestHash []byte) error {
+/*func setStatusReading(db *bolt.DB, requestHash []byte) error {
 
 	err := db.Update(func(tx *bolt.Tx) error {
 		treeBucket, err := getBucket(tx, requestHash)
@@ -154,4 +158,4 @@ func setStatusSilent(db *bolt.DB, requestHash []byte) error {
 	})
 
 	return err
-}
+}*/

@@ -11,7 +11,7 @@ import (
 
 // GetCacheIfExists Обращается к диску для нахождения ответа на запрос.
 // Если таковой имеется - он возвращается, в противном случае выдаётся ошибка
-func GetCacheIfExists(db *bolt.DB, req *http.Request) ([]byte, error) {
+func GetCacheIfExists(db *bolt.DB, req *http.Request) (*Item, error) {
 	keyString := constructKeyFromRequest(req)
 	requestHash := hash([]byte(keyString))
 
@@ -39,7 +39,15 @@ func GetCacheIfExists(db *bolt.DB, req *http.Request) ([]byte, error) {
 		return nil, errors.New("private page: addresses are not equal")
 	}
 
-	return readPageFromDisk(requestHash)
+	bytes, err := readPageFromDisk(requestHash)
+
+	var item Item
+	err = json.Unmarshal(bytes, &item)
+	if err != nil {
+		return nil, err
+	}
+
+	return &item, nil
 }
 
 // Найти элемент по ключу

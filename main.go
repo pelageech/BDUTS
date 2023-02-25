@@ -182,12 +182,20 @@ func (b *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 	// getting a response from cache
 	log.Println("Try to get a response from cache...")
-	responseBody, err := cache.GetCacheIfExists(db, req)
+	cacheItem, err := cache.GetCacheIfExists(db, req)
 	if err != nil {
 		log.Println(err)
 	} else {
 		log.Println("Successfully got a response")
-		_, err := rw.Write(responseBody)
+
+		for key, values := range cacheItem.Header {
+			for _, value := range values {
+				rw.Header().Add(key, value)
+			}
+		}
+
+		_, err := rw.Write(cacheItem.Body)
+
 		if err == nil {
 			log.Println("Transferred")
 			timer.SaveTimerDataGotFromCache(time.Since(start))
@@ -256,7 +264,11 @@ func (b *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 			log.Println("Saving response in cache")
 			go func() {
-				err := cache.PutRecordInCache(db, req, byteArray)
+				cacheItem := &cache.Item{
+					Body:   byteArray,
+					Header: resp.Header,
+				}
+				err := cache.PutRecordInCache(db, req, cacheItem)
 				if err != nil {
 					log.Println("Unsuccessful operation: ", err)
 					return

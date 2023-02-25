@@ -16,7 +16,7 @@ import (
 // PutRecordInCache Помещает новую запись в кэш.
 // Считает хэш аттрибутов запроса, по нему проходит вниз по дереву
 // и записывает как лист новую запись.
-func PutRecordInCache(db *bolt.DB, req *http.Request, resp []byte) error {
+func PutRecordInCache(db *bolt.DB, req *http.Request, item *Item) error {
 	if !isStorable(req) {
 		return errors.New("can't be stored in cache:(")
 	}
@@ -24,6 +24,11 @@ func PutRecordInCache(db *bolt.DB, req *http.Request, resp []byte) error {
 	info := createCacheInfo(req)
 
 	valueInfo, err := json.Marshal(info)
+	if err != nil {
+		return err
+	}
+
+	page, err := json.Marshal(item)
 	if err != nil {
 		return err
 	}
@@ -36,7 +41,7 @@ func PutRecordInCache(db *bolt.DB, req *http.Request, resp []byte) error {
 	if err != nil {
 		return err
 	}
-	err = writePageToDisk(requestHash, resp)
+	err = writePageToDisk(requestHash, page)
 	return err
 }
 
