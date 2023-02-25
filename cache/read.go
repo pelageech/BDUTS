@@ -48,23 +48,10 @@ func GetCacheIfExists(db *bolt.DB, req *http.Request) ([]byte, error) {
 func getPageInfo(db *bolt.DB, requestHash []byte) (*Info, error) {
 	var result []byte = nil
 
-	subhashLength := hashLength / subHashCount
-
-	var subHashes [][]byte
-	for i := 0; i < subHashCount; i++ {
-		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
-	}
-
 	err := db.View(func(tx *bolt.Tx) error {
-		treeBucket := tx.Bucket(subHashes[0])
-		if treeBucket == nil {
-			return errors.New("miss cache")
-		}
-		for i := 1; i < subHashCount; i++ {
-			treeBucket = treeBucket.Bucket(subHashes[i])
-			if treeBucket == nil {
-				return errors.New("miss cache")
-			}
+		treeBucket, err := getBucket(tx, requestHash)
+		if err != nil {
+			return err
 		}
 
 		result = treeBucket.Get(requestHash[:])

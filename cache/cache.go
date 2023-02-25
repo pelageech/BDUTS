@@ -14,6 +14,7 @@ import (
 	"github.com/pelageech/BDUTS/config"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -52,7 +53,6 @@ func CloseDatabase(db *bolt.DB) {
 }
 
 // Сохраняет копию базы данных в файл
-/*
 func makeSnapshot(db *bolt.DB, filename string) error {
 	f, err := os.Open(filename)
 	if err != nil {
@@ -66,7 +66,6 @@ func makeSnapshot(db *bolt.DB, filename string) error {
 
 	return err
 }
-*/
 
 // Возвращает хэш от набора байт
 func hash(value []byte) []byte {
@@ -96,30 +95,28 @@ func isStorable(req *http.Request) bool {
 	return true
 }
 
-func setStatusReading(db *bolt.DB, requestHash []byte) error {
-	subhashLength := hashLength / subHashCount
-
-	var subHashes [][]byte
-	for i := 0; i < subHashCount; i++ {
-		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
+func getBucket(tx *bolt.Tx, key []byte) (*bolt.Bucket, error) {
+	bucket := tx.Bucket(key)
+	if bucket != nil {
+		return bucket, nil
 	}
 
+	return nil, errors.New("miss cache")
+}
+
+func setStatusReading(db *bolt.DB, requestHash []byte) error {
+
 	err := db.Update(func(tx *bolt.Tx) error {
-		treeBucket := tx.Bucket(subHashes[0])
-		if treeBucket == nil {
-			return errors.New("miss cache")
+		treeBucket, err := getBucket(tx, requestHash)
+		if err != nil {
+			return err
 		}
-		for i := 1; i < subHashCount; i++ {
-			treeBucket = treeBucket.Bucket(subHashes[i])
-			if treeBucket == nil {
-				return errors.New("miss cache")
-			}
-		}
+
 		status := treeBucket.Get([]byte("status"))
 		if status[0] == writing {
 			return errors.New("writing")
 		}
-		err := treeBucket.Put([]byte("status"), []byte{reading})
+		err = treeBucket.Put([]byte("status"), []byte{reading})
 
 		return err
 	})
@@ -128,26 +125,14 @@ func setStatusReading(db *bolt.DB, requestHash []byte) error {
 }
 
 func setStatusWriting(db *bolt.DB, requestHash []byte) error {
-	subhashLength := hashLength / subHashCount
-
-	var subHashes [][]byte
-	for i := 0; i < subHashCount; i++ {
-		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
-	}
 
 	err := db.Update(func(tx *bolt.Tx) error {
-		treeBucket := tx.Bucket(subHashes[0])
-		if treeBucket == nil {
-			return errors.New("miss cache")
-		}
-		for i := 1; i < subHashCount; i++ {
-			treeBucket = treeBucket.Bucket(subHashes[i])
-			if treeBucket == nil {
-				return errors.New("miss cache")
-			}
+		treeBucket, err := getBucket(tx, requestHash)
+		if err != nil {
+			return err
 		}
 
-		err := treeBucket.Put([]byte("status"), []byte{writing})
+		err = treeBucket.Put([]byte("status"), []byte{writing})
 
 		return err
 	})
@@ -156,26 +141,14 @@ func setStatusWriting(db *bolt.DB, requestHash []byte) error {
 }
 
 func setStatusSilent(db *bolt.DB, requestHash []byte) error {
-	subhashLength := hashLength / subHashCount
-
-	var subHashes [][]byte
-	for i := 0; i < subHashCount; i++ {
-		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
-	}
 
 	err := db.Update(func(tx *bolt.Tx) error {
-		treeBucket := tx.Bucket(subHashes[0])
-		if treeBucket == nil {
-			return errors.New("miss cache")
-		}
-		for i := 1; i < subHashCount; i++ {
-			treeBucket = treeBucket.Bucket(subHashes[i])
-			if treeBucket == nil {
-				return errors.New("miss cache")
-			}
+		treeBucket, err := getBucket(tx, requestHash)
+		if err != nil {
+			return err
 		}
 
-		err := treeBucket.Put([]byte("status"), []byte{silent})
+		err = treeBucket.Put([]byte("status"), []byte{silent})
 
 		return err
 	})

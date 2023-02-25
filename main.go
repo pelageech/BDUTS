@@ -252,15 +252,18 @@ func (b *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 			log.Println(err)
 		}
 
-		log.Println("Saving response in cache")
-		go func() {
-			err := cache.PutRecordInCache(db, req, byteArray)
-			if err != nil {
-				log.Println("Unsuccessful operation: ", err)
-				return
-			}
-			log.Println("Successfully saved")
-		}()
+		// caching
+		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+			log.Println("Saving response in cache")
+			go func() {
+				err := cache.PutRecordInCache(db, req, byteArray)
+				if err != nil {
+					log.Println("Unsuccessful operation: ", err)
+					return
+				}
+				log.Println("Successfully saved")
+			}()
+		}
 
 		atomic.AddInt32(&server.currentRequests, int32(-1))
 		timer.SaveTimeDataBackend(*backendTime, time.Since(start))

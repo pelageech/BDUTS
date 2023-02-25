@@ -3,6 +3,7 @@ package cache
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/boltdb/bolt"
 	"log"
 	"net/http"
@@ -28,6 +29,7 @@ func PutRecordInCache(db *bolt.DB, req *http.Request, resp []byte) error {
 	}
 
 	keyString := constructKeyFromRequest(req)
+	fmt.Println(keyString)
 	requestHash := hash([]byte(keyString))
 	err = putPageInfoIntoDB(db, requestHash, valueInfo)
 
@@ -40,24 +42,10 @@ func PutRecordInCache(db *bolt.DB, req *http.Request, resp []byte) error {
 
 // Добавляет новую запись в кэш.
 func putPageInfoIntoDB(db *bolt.DB, requestHash []byte, value []byte) error {
-	subhashLength := hashLength / subHashCount
-
-	var subHashes [][]byte
-	for i := 0; i < subHashCount; i++ {
-		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
-	}
-
 	err := db.Update(func(tx *bolt.Tx) error {
-		treeBucket, err := tx.CreateBucketIfNotExists(subHashes[0])
+		treeBucket, err := tx.CreateBucketIfNotExists(requestHash)
 		if err != nil {
 			return err
-		}
-
-		for i := 1; i < subHashCount; i++ {
-			treeBucket, err = treeBucket.CreateBucketIfNotExists(subHashes[i])
-			if err != nil {
-				return err
-			}
 		}
 
 		err = treeBucket.Put(requestHash[:], value)
