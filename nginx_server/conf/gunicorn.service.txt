@@ -1,0 +1,13 @@
+[Unit]
+Description=gunicorn daemon
+Requires=gunicorn.socket
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/var/www/geekhero #путь до каталога с файлом manage.py
+ExecStart=/var/www/geekhero/geekhero_env/bin/gunicorn --workers 5 --bind unix:/run/gunicorn.sock ghproj.wsgi:application
+#путь до файла gunicorn в виртуальном окружении
+
+[Install]
+WantedBy=multi-user.target
