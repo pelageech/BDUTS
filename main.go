@@ -20,6 +20,13 @@ import (
 	"github.com/pelageech/BDUTS/timer"
 )
 
+const (
+	dbPATH           = "./cache-data/database.db"
+	lbConfigPath     = "resources/config.json"
+	serversCofigPath = "resources/servers.json"
+	cacheConfigPath  = "./resources/cache_config.json"
+)
+
 type LoadBalancer struct {
 	config LoadBalancerConfig
 	pool   ServerPool
@@ -326,7 +333,7 @@ func (server *Backend) isAlive() bool {
 func main() {
 
 	// load balancer configuration
-	loadBalancerReader, err := config.NewLoadBalancerReader("resources/config.json")
+	loadBalancerReader, err := config.NewLoadBalancerReader(lbConfigPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -348,7 +355,7 @@ func main() {
 	})
 
 	// backends configuration
-	serversReader, err := config.NewServersReader("resources/servers.json")
+	serversReader, err := config.NewServersReader(serversCofigPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -368,13 +375,13 @@ func main() {
 
 	// cache configuration
 	log.Println("Opening cache database")
-	db, err = cache.OpenDatabase("./cache-data/database.db")
+	db, err = cache.OpenDatabase(dbPATH)
 	if err != nil {
 		log.Fatalln("DB error: ", err)
 	}
 	defer cache.CloseDatabase(db)
 
-	cacheReader, err := config.NewCacheReader("./resources/cache_config.json")
+	cacheReader, err := config.NewCacheReader(cacheConfigPath)
 	if err != nil {
 		log.Fatal(err)
 	}
