@@ -30,12 +30,13 @@ func GetCacheIfExists(db *bolt.DB, req *http.Request) (*Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	if time.Now().After(info.dateOfDeath) {
+
+	if time.Now().After(info.DateOfDeath) {
 		// delete
 		return nil, errors.New("not fresh")
 	}
 
-	if info.isPrivate && req.RemoteAddr != info.remoteAddr {
+	if info.IsPrivate && req.RemoteAddr != info.RemoteAddr {
 		return nil, errors.New("private page: addresses are not equal")
 	}
 

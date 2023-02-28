@@ -3,7 +3,6 @@ package cache
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/boltdb/bolt"
 	"log"
 	"net/http"
@@ -23,18 +22,18 @@ func PutRecordInCache(db *bolt.DB, req *http.Request, item *Item) error {
 
 	info := createCacheInfo(req, item.Header)
 
-	valueInfo, err := json.Marshal(info)
+	valueInfo, err := json.Marshal(*info)
 	if err != nil {
 		return err
 	}
 
-	page, err := json.Marshal(item)
+	page, err := json.Marshal(*item)
 	if err != nil {
 		return err
 	}
 
 	keyString := constructKeyFromRequest(req)
-	fmt.Println(keyString)
+
 	requestHash := hash([]byte(keyString))
 	err = putPageInfoIntoDB(db, requestHash, valueInfo)
 
@@ -126,8 +125,8 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 func createCacheInfo(req *http.Request, header http.Header) *Info {
 	var info Info
 
-	info.remoteAddr = req.RemoteAddr
-	info.isPrivate = false
+	info.RemoteAddr = req.RemoteAddr
+	info.IsPrivate = false
 
 	cacheControlString := header.Get("cache-control")
 
@@ -138,12 +137,11 @@ func createCacheInfo(req *http.Request, header http.Header) *Info {
 			_, t, _ := strings.Cut(v, "=")
 			age, _ := strconv.Atoi(t)
 			if age > 0 {
-				info.dateOfDeath = time.Now().Add(time.Duration(age) * time.Second)
+				info.DateOfDeath = time.Now().Add(time.Duration(age) * time.Second)
 			}
-			fmt.Println(t, age, info.dateOfDeath, cacheControl)
 		}
 		if strings.Contains(v, "private") {
-			info.isPrivate = true
+			info.IsPrivate = true
 		}
 	}
 
