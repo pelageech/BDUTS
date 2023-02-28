@@ -33,9 +33,9 @@ type Item struct {
 }
 
 type Info struct {
-	dateOfDeath time.Time // nil if undying
-	remoteAddr  string
-	isPrivate   bool
+	DateOfDeath time.Time // nil if undying
+	RemoteAddr  string
+	IsPrivate   bool
 	//	status      int
 }
 
