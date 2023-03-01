@@ -56,13 +56,10 @@ func ParseRequestKey(requestKey string) (result []func(r *http.Request) string) 
 		switch v {
 		case "REQ_METHOD":
 			m = func(r *http.Request) string { return r.Method }
-			break
 		case "REQ_HOST":
 			m = func(r *http.Request) string { return r.Host }
-			break
 		case "REQ_URI":
 			m = func(r *http.Request) string { return r.URL.Path }
-			break
 		}
 		result = append(result, m)
 	}
