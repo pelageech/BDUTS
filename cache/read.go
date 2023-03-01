@@ -30,6 +30,9 @@ func GetCacheIfExists(db *bolt.DB, req *http.Request) (*Item, error) {
 	}
 
 	bytes, err := readPageFromDisk(requestHash)
+	if err != nil {
+		return nil, err
+	}
 
 	var item Item
 	err = json.Unmarshal(bytes, &item)
