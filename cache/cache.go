@@ -9,12 +9,10 @@ package cache
 import (
 	"crypto/sha1"
 	"encoding/hex"
-	"errors"
 	"github.com/boltdb/bolt"
 	"github.com/pelageech/BDUTS/config"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -27,16 +25,18 @@ const (
 	root         = "./cache-data/"
 )
 
+// Item структура, хранящая на диске страницу, которая
+// возвращается клиенту из кэша.
 type Item struct {
 	Body   []byte
 	Header http.Header
 }
 
+// Info - метаданные страницы, хранящейся в базе данных
 type Info struct {
 	DateOfDeath time.Time // nil if undying
 	RemoteAddr  string
 	IsPrivate   bool
-	//	status      int
 }
 
 // OpenDatabase Открывает базу данных для дальнейшего использования
@@ -71,39 +71,19 @@ func CloseDatabase(db *bolt.DB) {
 	return err
 }*/
 
-// Возвращает хэш от набора байт
+// Возвращает хэш-encode от набора байт
 func hash(value []byte) []byte {
 	bytes := sha1.Sum(value)
 	return []byte(hex.EncodeToString(bytes[:]))
 }
 
+// constructKeyFromRequest использует массив config.RequestKey
+// для того, чтобы составить строку-ключ, по которому будет сохраняться
+// страница в кэше и её метаданные в БД.
 func constructKeyFromRequest(req *http.Request) string {
 	result := ""
 	for _, addStringKey := range config.RequestKey {
 		result += addStringKey(req)
 	}
 	return result
-}
-
-func isStorable(req *http.Request) bool {
-	header := req.Header
-	cacheControlString := header.Get("cache-control")
-
-	// check if we shouldn't store the page
-	cacheControl := strings.Split(cacheControlString, ";")
-	for _, v := range cacheControl {
-		if v == "no-store" {
-			return false
-		}
-	}
-	return true
-}
-
-func getBucket(tx *bolt.Tx, key []byte) (*bolt.Bucket, error) {
-	bucket := tx.Bucket(key)
-	if bucket != nil {
-		return bucket, nil
-	}
-
-	return nil, errors.New("miss cache")
 }
