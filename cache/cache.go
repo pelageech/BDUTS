@@ -9,7 +9,6 @@ package cache
 import (
 	"crypto/sha1"
 	"encoding/hex"
-	"errors"
 	"log"
 	"net/http"
 	"time"
