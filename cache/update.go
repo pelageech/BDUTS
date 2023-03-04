@@ -13,9 +13,11 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-// PutRecordInCache Помещает новую запись в кэш.
-// Считает хэш аттрибутов запроса, по нему проходит вниз по дереву
-// и записывает как лист новую запись.
+// PutRecordInCache Помещает новую страницу в кэш или перезаписывает её.
+// Сначала добавляет в базу данных метаданные о странице, хранимой в cache.Info.
+// Затем начинает транзакционную запись на диск.
+//
+// Сохраняется json-файл, хранящий Item - тело страницы и заголовок.
 func PutRecordInCache(db *bolt.DB, req *http.Request, item *Item) error {
 	if !isStorable(req) {
 		return errors.New("can't be stored in cache:(")
@@ -45,19 +47,17 @@ func PutRecordInCache(db *bolt.DB, req *http.Request, item *Item) error {
 	return err
 }
 
-// Добавляет новую запись в кэш.
+// Помещает в базу данных метаданные страницы, помещаемой в кэш
 func putPageInfoIntoDB(db *bolt.DB, requestHash []byte, value []byte) error {
-	err := db.Update(func(tx *bolt.Tx) error {
+	return db.Update(func(tx *bolt.Tx) error {
 		treeBucket, err := tx.CreateBucketIfNotExists(requestHash)
 		if err != nil {
 			return err
 		}
 
-		err = treeBucket.Put(requestHash[:], value)
+		err = treeBucket.Put([]byte("pageInfo"), value)
 		return err
 	})
-
-	return err
 }
 
 func writePageToDisk(requestHash []byte, value []byte) error {
@@ -93,6 +93,9 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 	return err
 }
 
+/*
+	НЕ ИСПОЛЬЗОВАТЬ!!! ТРЕБУЕТ ИСПРАВЛЕНИЯ!!!
+*/
 // Удаляет запись из кэша
 func DeleteRecord(db *bolt.DB, key []byte) error {
 	requestHash := hash(key)
@@ -123,28 +126,47 @@ func DeleteRecord(db *bolt.DB, key []byte) error {
 	return err
 }
 
+// Создаёт экземпляр структуры cache.Info, в которой хранится
+// информация о странице, помещаемой в кэш.
 func createCacheInfo(req *http.Request, header http.Header) *Info {
 	var info Info
 
 	info.RemoteAddr = req.RemoteAddr
 	info.IsPrivate = false
 
-	cacheControlString := header.Get("cache-control")
-
 	// check if we shouldn't store the page
+	cacheControlString := header.Get("cache-control")
 	cacheControl := strings.Split(cacheControlString, ";")
+
 	for _, v := range cacheControl {
 		if strings.Contains(v, "max-age") {
 			_, t, _ := strings.Cut(v, "=")
 			age, _ := strconv.Atoi(t)
-			if age > 0 {
+			if age > 0 { // Create a point after that the page goes off
 				info.DateOfDeath = time.Now().Add(time.Duration(age) * time.Second)
 			}
 		}
+
 		if strings.Contains(v, "private") {
 			info.IsPrivate = true
 		}
 	}
 
 	return &info
+}
+
+// isStorable проверяет, можно ли поместить в кэш страницу,
+// по её директивам в Cache-Control.
+func isStorable(req *http.Request) bool {
+	header := req.Header
+	cacheControlString := header.Get("cache-control")
+
+	// check if we shouldn't store the page
+	cacheControl := strings.Split(cacheControlString, ";")
+	for _, v := range cacheControl {
+		if v == "no-store" {
+			return false
+		}
+	}
+	return true
 }

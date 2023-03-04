@@ -16,17 +16,6 @@ func GetCacheIfExists(db *bolt.DB, req *http.Request) (*Item, error) {
 	keyString := constructKeyFromRequest(req)
 	requestHash := hash([]byte(keyString))
 
-	//err := setStatusReading(db, requestHash)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//defer func(db *bolt.DB, requestHash []byte) {
-	//	err := setStatusSilent(db, requestHash)
-	//	if err != nil {
-	//		log.Fatalln(err)
-	//	}
-	//}(db, requestHash)
-
 	info, err := getPageInfo(db, requestHash)
 	if err != nil {
 		return nil, err
@@ -55,9 +44,7 @@ func GetCacheIfExists(db *bolt.DB, req *http.Request) (*Item, error) {
 	return &item, nil
 }
 
-// Найти элемент по ключу
-// Ключ переводится в хэш, тот разбивается на подотрезки - названия бакетов
-// Проходом по подотрезкам находим по ключу ответ на запрос
+// Обращается к базе данных для получения мета-информации о кэше.
 func getPageInfo(db *bolt.DB, requestHash []byte) (*Info, error) {
 	var result []byte = nil
 
@@ -86,6 +73,8 @@ func getPageInfo(db *bolt.DB, requestHash []byte) (*Info, error) {
 	return &info, nil
 }
 
+// Производит чтение страницы с диска
+// В случае успеха возвращает
 func readPageFromDisk(requestHash []byte) ([]byte, error) {
 	subhashLength := hashLength / subHashCount
 
@@ -102,4 +91,14 @@ func readPageFromDisk(requestHash []byte) ([]byte, error) {
 
 	bytes, err := os.ReadFile(path)
 	return bytes, err
+}
+
+// Универсальная функция получения бакета
+func getBucket(tx *bolt.Tx, key []byte) (*bolt.Bucket, error) {
+	bucket := tx.Bucket(key)
+	if bucket != nil {
+		return bucket, nil
+	}
+
+	return nil, errors.New("miss cache")
 }
