@@ -10,12 +10,13 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
-	"github.com/boltdb/bolt"
-	"github.com/pelageech/BDUTS/config"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/boltdb/bolt"
+	"github.com/pelageech/BDUTS/config"
 )
 
 const (
