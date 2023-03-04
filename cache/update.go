@@ -3,13 +3,14 @@ package cache
 import (
 	"encoding/json"
 	"errors"
-	"github.com/boltdb/bolt"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/boltdb/bolt"
 )
 
 // PutRecordInCache Помещает новую запись в кэш.
@@ -36,10 +37,10 @@ func PutRecordInCache(db *bolt.DB, req *http.Request, item *Item) error {
 
 	requestHash := hash([]byte(keyString))
 	err = putPageInfoIntoDB(db, requestHash, valueInfo)
-
 	if err != nil {
 		return err
 	}
+
 	err = writePageToDisk(requestHash, page)
 	return err
 }
