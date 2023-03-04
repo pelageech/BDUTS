@@ -14,10 +14,10 @@ type cacheController struct {
 	db          *bolt.DB
 	dbFile      *os.File
 	maxFileSize int64
-	frequency   time.Ticker
+	frequency   *time.Ticker
 }
 
-func New(db *bolt.DB, dbFile *os.File, maxFileSize int64, frequency time.Ticker) *cacheController {
+func New(db *bolt.DB, dbFile *os.File, maxFileSize int64, frequency *time.Ticker) *cacheController {
 	return &cacheController{
 		db:          db,
 		dbFile:      dbFile,
@@ -70,7 +70,10 @@ func (c *cacheController) deleteExpiredCache() {
 
 	// deleting expired data
 	for _, key := range expiredKeys {
-		cache.DeleteRecord(c.db, key)
+		err = cache.DeleteRecord(c.db, key)
+		if err != nil {
+			log.Printf("Error while deleting expired cache in cacheController: %v", err)
+		}
 	}
 }
 

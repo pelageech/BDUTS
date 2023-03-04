@@ -10,12 +10,14 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/pelageech/BDUTS/cache"
+	cacheController "github.com/pelageech/BDUTS/cache_control"
 	"github.com/pelageech/BDUTS/config"
 	"github.com/pelageech/BDUTS/timer"
 )
@@ -25,6 +27,9 @@ const (
 	lbConfigPath     = "resources/config.json"
 	serversCofigPath = "resources/servers.json"
 	cacheConfigPath  = "./resources/cache_config.json"
+
+	maxDBSize          = 100 * 1024 * 1024 // 100 MB
+	dbObserveFrequency = 10 * time.Second
 )
 
 type LoadBalancer struct {
@@ -380,6 +385,16 @@ func main() {
 		log.Fatalln("DB error: ", err)
 	}
 	defer cache.CloseDatabase(db)
+
+	dbFile, err := os.Open(dbPATH)
+	if err != nil {
+		log.Fatalln("DB error: ", err)
+	}
+
+	dbControllerTicker := time.NewTicker(dbObserveFrequency)
+	defer dbControllerTicker.Stop()
+	dbController := cacheController.New(db, dbFile, maxDBSize, dbControllerTicker)
+	go dbController.Observe()
 
 	cacheReader, err := config.NewCacheReader(cacheConfigPath)
 	if err != nil {
