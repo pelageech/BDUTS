@@ -94,34 +94,34 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 }
 
 // Удаляет запись из кэша
-//func deleteRecord(db *bolt.DB, key []byte) error {
-//	requestHash := hash(key)
-//	subhashLength := hashLength / subHashCount
-//
-//	var subHashes [][]byte
-//	for i := 0; i < subHashCount; i++ {
-//		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
-//	}
-//
-//	err := db.Update(func(tx *bolt.Tx) error {
-//		treeBucket := tx.Bucket(subHashes[0])
-//		if treeBucket == nil {
-//			return errors.New("miss cache")
-//		}
-//		for i := 1; i < subHashCount; i++ {
-//			treeBucket := treeBucket.Bucket(subHashes[i])
-//			if treeBucket == nil {
-//				return errors.New("miss cache")
-//			}
-//		}
-//
-//		err := treeBucket.Delete(key)
-//
-//		return err
-//	})
-//
-//	return err
-//}
+func DeleteRecord(db *bolt.DB, key []byte) error {
+	requestHash := hash(key)
+	subhashLength := hashLength / subHashCount
+
+	var subHashes [][]byte
+	for i := 0; i < subHashCount; i++ {
+		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
+	}
+
+	err := db.Update(func(tx *bolt.Tx) error {
+		treeBucket := tx.Bucket(subHashes[0])
+		if treeBucket == nil {
+			return errors.New("miss cache")
+		}
+		for i := 1; i < subHashCount; i++ {
+			treeBucket := treeBucket.Bucket(subHashes[i])
+			if treeBucket == nil {
+				return errors.New("miss cache")
+			}
+		}
+
+		err := treeBucket.Delete(key)
+
+		return err
+	})
+
+	return err
+}
 
 func createCacheInfo(req *http.Request, header http.Header) *Info {
 	var info Info

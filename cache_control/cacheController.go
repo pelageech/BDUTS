@@ -1,11 +1,13 @@
 package cacheController
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/pelageech/BDUTS/cache"
 )
 
 type cacheController struct {
@@ -43,5 +45,35 @@ func (c *cacheController) isSizeExceeded() bool {
 }
 
 func (c *cacheController) deleteExpiredCache() {
+	expiredKeys := make([][]byte, 0)
 
+	// iterating over all buckets and all keys in each buckets
+	// and collecting expired keys of expired data
+	err := c.db.View(func(tx *bolt.Tx) error {
+		err := tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+			err := b.ForEach(func(k, v []byte) error {
+				var info cache.Info
+				err := json.Unmarshal(v, &info)
+
+				if c.isExpired(info) {
+					expiredKeys = append(expiredKeys, k)
+				}
+				return err
+			})
+			return err
+		})
+		return err
+	})
+	if err != nil {
+		log.Printf("Error while viewing cache in cacheController: %v", err)
+	}
+
+	// deleting expired data
+	for _, key := range expiredKeys {
+		cache.DeleteRecord(c.db, key)
+	}
+}
+
+func (c *cacheController) isExpired(info cache.Info) bool {
+	return time.Now().After(info.DateOfDeath)
 }
