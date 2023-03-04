@@ -3,10 +3,11 @@ package cache
 import (
 	"encoding/json"
 	"errors"
-	"github.com/boltdb/bolt"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/boltdb/bolt"
 )
 
 // GetCacheIfExists Обращается к диску для нахождения ответа на запрос.
@@ -41,6 +42,9 @@ func GetCacheIfExists(db *bolt.DB, req *http.Request) (*Item, error) {
 	}
 
 	bytes, err := readPageFromDisk(requestHash)
+	if err != nil {
+		return nil, err
+	}
 
 	var item Item
 	err = json.Unmarshal(bytes, &item)
