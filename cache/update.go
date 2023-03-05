@@ -18,12 +18,12 @@ import (
 // Затем начинает транзакционную запись на диск.
 //
 // Сохраняется json-файл, хранящий Item - тело страницы и заголовок.
-func PutRecordInCache(db *bolt.DB, req *http.Request, item *Item) error {
+func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *Item) error {
 	if !isStorable(req) {
 		return errors.New("can't be stored in cache:(")
 	}
 
-	info := createCacheInfo(req, item.Header)
+	info := createCacheInfo(req, resp, item.Header)
 
 	valueInfo, err := json.Marshal(*info)
 	if err != nil {
@@ -44,7 +44,13 @@ func PutRecordInCache(db *bolt.DB, req *http.Request, item *Item) error {
 	}
 
 	err = writePageToDisk(requestHash, page)
-	return err
+	if err != nil {
+		return err
+	}
+
+	log.Println("Successfully saved, page's size = ", info.Size)
+
+	return nil
 }
 
 // Помещает в базу данных метаданные страницы, помещаемой в кэш
@@ -135,11 +141,12 @@ func RemovePageFromDisk(requestHash []byte) error {
 
 // Создаёт экземпляр структуры cache.Info, в которой хранится
 // информация о странице, помещаемой в кэш.
-func createCacheInfo(req *http.Request, header http.Header) *Info {
+func createCacheInfo(req *http.Request, resp *http.Response, header http.Header) *Info {
 	var info Info
 
 	info.RemoteAddr = req.RemoteAddr
 	info.IsPrivate = false
+	info.Size = resp.ContentLength
 
 	// check if we shouldn't store the page
 	cacheControlString := header.Get("cache-control")

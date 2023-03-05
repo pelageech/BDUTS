@@ -280,12 +280,11 @@ func (b *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 					Body:   byteArray,
 					Header: resp.Header,
 				}
-				err := cache.PutRecordInCache(db, req, cacheItem)
+				err := cache.PutRecordInCache(db, req, resp, cacheItem)
 				if err != nil {
 					log.Println("Unsuccessful operation: ", err)
 					return
 				}
-				log.Println("Successfully saved")
 			}()
 		}
 
