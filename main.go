@@ -20,6 +20,10 @@ import (
 	"github.com/pelageech/BDUTS/timer"
 )
 
+const (
+	key_start = iota
+)
+
 type LoadBalancer struct {
 	config LoadBalancerConfig
 	pool   ServerPool
@@ -194,7 +198,7 @@ func checkCache(rw http.ResponseWriter, req *http.Request) error {
 	}
 	log.Println("Transferred")
 
-	if start, ok := req.Context().Value("start").(time.Time); ok {
+	if start, ok := req.Context().Value(key_start).(time.Time); ok {
 		timer.SaveTimerDataGotFromCache(time.Since(start))
 	} else {
 		log.Println("Couldn't estimate transferring time")
@@ -229,7 +233,7 @@ func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Req
 	}
 
 	start := time.Now()
-	req = req.WithContext(context.WithValue(req.Context(), "start", start))
+	req = req.WithContext(context.WithValue(req.Context(), key_start, start))
 
 	// getting a response from cache
 	if err := checkCache(rw, req); err == nil {
