@@ -55,7 +55,7 @@ func putPageInfoIntoDB(db *bolt.DB, requestHash []byte, value []byte) error {
 			return err
 		}
 
-		err = treeBucket.Put([]byte("pageInfo"), value)
+		err = treeBucket.Put([]byte(info), value)
 		return err
 	})
 }
@@ -101,7 +101,7 @@ func DeleteRecord(db *bolt.DB, requestHash []byte) error {
 			return err
 		}
 
-		return treeBucket.Delete(requestHash[:])
+		return treeBucket.Delete([]byte(info))
 	})
 }
 

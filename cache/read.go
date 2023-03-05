@@ -54,7 +54,7 @@ func getPageInfo(db *bolt.DB, requestHash []byte) (*Info, error) {
 			return err
 		}
 
-		result = treeBucket.Get(requestHash[:])
+		result = treeBucket.Get([]byte(info))
 		if result == nil {
 			return errors.New("no record in cache")
 		}

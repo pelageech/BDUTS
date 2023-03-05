@@ -18,12 +18,10 @@ import (
 )
 
 const (
-	/*reading = iota
-	writing
-	silent*/
 	hashLength   = sha1.Size * 2
 	subHashCount = 4 // Количество подотрезков хэша
 	root         = "./cache-data/"
+	info         = "info"
 )
 
 // Item структура, хранящая на диске страницу, которая
