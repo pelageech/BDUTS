@@ -85,9 +85,9 @@ func readPageFromDisk(requestHash []byte) ([]byte, error) {
 
 	path := root
 	for _, v := range subHashes {
-		path += string(v) + "/"
+		path += "/" + string(v)
 	}
-	path += string(requestHash[:])
+	path += "/" + string(requestHash[:])
 
 	bytes, err := os.ReadFile(path)
 	return bytes, err

@@ -70,7 +70,7 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 
 	path := root
 	for _, v := range subHashes {
-		path += string(v) + "/"
+		path += "/" + string(v)
 	}
 
 	err := os.MkdirAll(path, 0770)
@@ -78,7 +78,7 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 		return err
 	}
 
-	file, err := os.Create(path + string(requestHash[:]))
+	file, err := os.Create(path + "/" + string(requestHash[:]))
 	if err != nil {
 		return err
 	}
@@ -103,6 +103,34 @@ func DeleteRecord(db *bolt.DB, requestHash []byte) error {
 
 		return treeBucket.Delete([]byte(info))
 	})
+}
+
+func RemovePageFromDisk(requestHash []byte) error {
+	subhashLength := hashLength / subHashCount
+
+	var subHashes [][]byte
+	for i := 0; i < subHashCount; i++ {
+		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
+	}
+
+	path := root
+	for _, v := range subHashes {
+		path += "/" + string(v)
+	}
+
+	err := os.Remove(path + "/" + string(requestHash))
+	if err != nil {
+		return err
+	}
+
+	for path != root {
+		err := os.Remove(path)
+		if err != nil {
+			return err
+		}
+		path = path[:strings.LastIndexByte(path, '/')]
+	}
+	return nil
 }
 
 // Создаёт экземпляр структуры cache.Info, в которой хранится
