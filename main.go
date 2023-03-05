@@ -32,7 +32,7 @@ func NewLoadBalancer(config LoadBalancerConfig) *LoadBalancer {
 	}
 }
 
-func (b *LoadBalancer) configureServerPool(servers []config.ServerConfig) {
+func (balancer *LoadBalancer) configureServerPool(servers []config.ServerConfig) {
 	for _, server := range servers {
 		log.Printf("%v", server)
 
@@ -51,7 +51,7 @@ func (b *LoadBalancer) configureServerPool(servers []config.ServerConfig) {
 		backend.currentRequests = 0
 		backend.maximalRequests = server.MaximalRequests
 
-		b.pool.servers = append(b.pool.servers, &backend)
+		balancer.pool.servers = append(balancer.pool.servers, &backend)
 	}
 }
 
@@ -223,7 +223,7 @@ func saveToCache(req *http.Request, resp *http.Response, byteArray []byte) {
 	}()
 }
 
-func (b *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
+func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	if !isHTTPVersionSupported(req) {
 		http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
 	}
@@ -244,7 +244,7 @@ func (b *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 
 	for {
 		// get next server to send a request
-		server, err := b.pool.getNextPeer()
+		server, err := balancer.pool.getNextPeer()
 		if err != nil {
 			log.Println(err)
 			http.Error(rw, "Service not available", http.StatusServiceUnavailable)
@@ -295,19 +295,19 @@ func (b *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (b *LoadBalancer) healthChecker() {
-	ticker := time.NewTicker(b.config.healthCheckPeriod)
+func (balancer *LoadBalancer) healthChecker() {
+	ticker := time.NewTicker(balancer.config.healthCheckPeriod)
 
 	for {
 		<-ticker.C
 		log.Println("Health Check has been started!")
-		b.healthCheck()
+		balancer.healthCheck()
 		log.Println("All the checks has been completed!")
 	}
 }
 
-func (b *LoadBalancer) healthCheck() {
-	for _, server := range b.pool.servers {
+func (balancer *LoadBalancer) healthCheck() {
+	for _, server := range balancer.pool.servers {
 		alive := server.isAlive()
 		server.setAlive(alive)
 		if alive {
