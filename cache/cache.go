@@ -21,7 +21,7 @@ const (
 	hashLength   = sha1.Size * 2
 	subHashCount = 4 // Количество подотрезков хэша
 	root         = "./cache-data"
-	info         = "info"
+	pageInfo     = "pageInfo"
 )
 
 // Item структура, хранящая на диске страницу, которая
@@ -33,6 +33,7 @@ type Item struct {
 
 // Info - метаданные страницы, хранящейся в базе данных
 type Info struct {
+	Size        int64
 	DateOfDeath time.Time // nil if undying
 	RemoteAddr  string
 	IsPrivate   bool
