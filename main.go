@@ -392,8 +392,8 @@ func main() {
 
 	dbControllerTicker := time.NewTicker(dbObserveFrequency)
 	defer dbControllerTicker.Stop()
-	cacheController := cacheController.New(db, dbFile, maxDBSize, dbControllerTicker)
-	go cacheController.Observe()
+	controller := cacheController.New(db, dbFile, maxDBSize, dbControllerTicker)
+	go controller.Observe()
 	log.Println("Cache controller has been started!")
 
 	cacheReader, err := config.NewCacheReader(cacheConfigPath)
