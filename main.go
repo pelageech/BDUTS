@@ -170,41 +170,55 @@ func isHTTPVersionSupported(req *http.Request) bool {
 	return err
 } */
 
+func checkCache(rw http.ResponseWriter, req *http.Request) error {
+	log.Println("Try to get a response from cache...")
+
+	cacheItem, err := cache.GetCacheIfExists(db, req)
+	if err != nil {
+		return err
+	}
+	log.Println("Successfully got a response")
+
+	for key, values := range cacheItem.Header {
+		for _, value := range values {
+			rw.Header().Add(key, value)
+		}
+	}
+
+	_, err = rw.Write(cacheItem.Body)
+	if err != nil {
+		return err
+	}
+	log.Println("Transferred")
+
+	if start, ok := req.Context().Value("start").(time.Time); ok {
+		timer.SaveTimerDataGotFromCache(time.Since(start))
+	} else {
+		log.Println("Couldn't estimate transferring time")
+	}
+
+	return nil
+}
+
 func (b *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	if !isHTTPVersionSupported(req) {
 		http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
 	}
 
 	start := time.Now()
-
-	var backendTime *time.Duration
-	req, backendTime = timer.MakeRequestTimeTracker(req)
+	req = req.WithContext(context.WithValue(req.Context(), "start", start))
 
 	// getting a response from cache
-	log.Println("Try to get a response from cache...")
-	cacheItem, err := cache.GetCacheIfExists(db, req)
-	if err != nil {
-		log.Println(err)
+	if err := checkCache(rw, req); err == nil {
+		return
 	} else {
-		log.Println("Successfully got a response")
-
-		for key, values := range cacheItem.Header {
-			for _, value := range values {
-				rw.Header().Add(key, value)
-			}
-		}
-
-		_, err := rw.Write(cacheItem.Body)
-
-		if err == nil {
-			log.Println("Transferred")
-			timer.SaveTimerDataGotFromCache(time.Since(start))
-			return
-		}
-		log.Println(err)
+		log.Println("Checking cache unsuccessful: ", err)
 	}
 
 	// on cache miss make request to backend
+	var backendTime *time.Duration
+	req, backendTime = timer.MakeRequestTimeTracker(req)
+
 	for {
 		// get next server to send a request
 		var server *Backend

@@ -29,7 +29,7 @@ func MakeRequestTimeTracker(req *http.Request) (*http.Request, *time.Duration) {
 }
 
 func SaveTimerDataGotFromCache(cacheTime time.Duration) {
-	log.Println("Full round trip time: ", cacheTime)
+	log.Println("Full transferring time: ", cacheTime)
 }
 
 func SaveTimeDataBackend(backendTime time.Duration, fullTime time.Duration) {
