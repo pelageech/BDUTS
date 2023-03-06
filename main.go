@@ -20,6 +20,12 @@ import (
 	"github.com/pelageech/BDUTS/timer"
 )
 
+type myKey int
+
+const (
+	keyStart = myKey(iota)
+)
+
 type LoadBalancer struct {
 	config LoadBalancerConfig
 	pool   ServerPool
@@ -32,7 +38,7 @@ func NewLoadBalancer(config LoadBalancerConfig) *LoadBalancer {
 	}
 }
 
-func (b *LoadBalancer) configureServerPool(servers []config.ServerConfig) {
+func (balancer *LoadBalancer) configureServerPool(servers []config.ServerConfig) {
 	for _, server := range servers {
 		log.Printf("%v", server)
 
@@ -51,7 +57,7 @@ func (b *LoadBalancer) configureServerPool(servers []config.ServerConfig) {
 		backend.currentRequests = 0
 		backend.maximalRequests = server.MaximalRequests
 
-		b.pool.servers = append(b.pool.servers, &backend)
+		balancer.pool.servers = append(balancer.pool.servers, &backend)
 	}
 }
 
@@ -131,7 +137,7 @@ func (server *Backend) makeRequest(r *http.Request) (*http.Response, *ResponseEr
 	return originServerResponse, nil
 }
 
-func (serverPool *ServerPool) getNextPeer() (*Backend, error) {
+func chooseNextPeer(serverPool *ServerPool) (*Backend, error) {
 	serverList := serverPool.servers
 
 	serverPool.mux.Lock()
@@ -150,6 +156,20 @@ func (serverPool *ServerPool) getNextPeer() (*Backend, error) {
 	return nil, errors.New("all backends are turned down")
 }
 
+func (serverPool *ServerPool) getNextPeer() (*Backend, error) {
+	for {
+		server, err := chooseNextPeer(serverPool)
+		if err != nil {
+			return nil, err
+		}
+
+		if server.currentRequests+1 <= server.maximalRequests { // Опасно, неатомарная операция
+			atomic.AddInt32(&server.currentRequests, int32(1))
+			return server, nil
+		}
+	}
+}
+
 func isHTTPVersionSupported(req *http.Request) bool {
 	if maj, min, ok := http.ParseHTTPVersion(req.Proto); ok {
 		if maj == 1 && min == 1 {
@@ -159,74 +179,86 @@ func isHTTPVersionSupported(req *http.Request) bool {
 	return false
 }
 
-/* func sendResponseToClient(rw http.ResponseWriter, resp *http.Response) error {
-	for key, values := range resp.Header {
+func checkCache(rw http.ResponseWriter, req *http.Request) error {
+	log.Println("Try to get a response from cache...")
+
+	cacheItem, err := cache.GetCacheIfExists(db, req)
+	if err != nil {
+		return err
+	}
+	log.Println("Successfully got a response")
+
+	for key, values := range cacheItem.Header {
 		for _, value := range values {
 			rw.Header().Add(key, value)
 		}
 	}
 
-	_, err := io.Copy(rw, resp.Body)
-	return err
-} */
+	_, err = rw.Write(cacheItem.Body)
+	if err != nil {
+		return err
+	}
+	log.Println("Transferred")
 
-func (b *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
+	if start, ok := req.Context().Value(keyStart).(time.Time); ok {
+		timer.SaveTimerDataGotFromCache(time.Since(start))
+	} else {
+		log.Println("Couldn't estimate transferring time")
+	}
+
+	return nil
+}
+
+func saveToCache(req *http.Request, resp *http.Response, byteArray []byte) {
+	if !(resp.StatusCode >= 200 && resp.StatusCode < 400) {
+		return
+	}
+	log.Println("Saving response in cache")
+
+	go func() {
+		cacheItem := &cache.Item{
+			Body:   byteArray,
+			Header: resp.Header,
+		}
+		err := cache.PutRecordInCache(db, req, cacheItem)
+		if err != nil {
+			log.Println("Unsuccessful operation: ", err)
+			return
+		}
+		log.Println("Successfully saved")
+	}()
+}
+
+func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	if !isHTTPVersionSupported(req) {
 		http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
 	}
 
 	start := time.Now()
-
-	var backendTime *time.Duration
-	req, backendTime = timer.MakeRequestTimeTracker(req)
+	req = req.WithContext(context.WithValue(req.Context(), keyStart, start))
 
 	// getting a response from cache
-	log.Println("Try to get a response from cache...")
-	cacheItem, err := cache.GetCacheIfExists(db, req)
-	if err != nil {
-		log.Println(err)
+	if err := checkCache(rw, req); err == nil {
+		return
 	} else {
-		log.Println("Successfully got a response")
-
-		for key, values := range cacheItem.Header {
-			for _, value := range values {
-				rw.Header().Add(key, value)
-			}
-		}
-
-		_, err := rw.Write(cacheItem.Body)
-
-		if err == nil {
-			log.Println("Transferred")
-			timer.SaveTimerDataGotFromCache(time.Since(start))
-			return
-		}
-		log.Println(err)
+		log.Println("Checking cache unsuccessful: ", err)
 	}
 
 	// on cache miss make request to backend
+	var backendTime *time.Duration
+	req, backendTime = timer.MakeRequestTimeTracker(req)
+
 	for {
 		// get next server to send a request
-		var server *Backend
-		var err error
-		for {
-			server, err = b.pool.getNextPeer()
-			if err != nil {
-				http.Error(rw, "Service not available", http.StatusServiceUnavailable)
-				log.Println(err.Error())
-				return
-			}
-
-			if server.currentRequests+1 <= server.maximalRequests { // Опасно, неатомарная операция
-				atomic.AddInt32(&server.currentRequests, int32(1))
-				break
-			}
+		server, err := balancer.pool.getNextPeer()
+		if err != nil {
+			log.Println(err)
+			http.Error(rw, "Service not available", http.StatusServiceUnavailable)
 		}
+		log.Printf("[%s] received a request\n", server.URL)
 
 		// send it to the backend
-		log.Printf("[%s] received a request\n", server.URL)
 		resp, respError := server.makeRequest(req)
-
 		if respError != nil {
 			// on cancellation
 			if respError.err == context.Canceled {
@@ -240,8 +272,8 @@ func (b *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 			continue
 		}
 
-		// if resp != nil
 		log.Printf("[%s] returned %s\n", server.URL, resp.Status)
+
 		for key, values := range resp.Header {
 			for _, value := range values {
 				rw.Header().Add(key, value)
@@ -261,21 +293,7 @@ func (b *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 		}
 
 		// caching
-		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
-			log.Println("Saving response in cache")
-			go func() {
-				cacheItem := &cache.Item{
-					Body:   byteArray,
-					Header: resp.Header,
-				}
-				err := cache.PutRecordInCache(db, req, cacheItem)
-				if err != nil {
-					log.Println("Unsuccessful operation: ", err)
-					return
-				}
-				log.Println("Successfully saved")
-			}()
-		}
+		saveToCache(req, resp, byteArray)
 
 		atomic.AddInt32(&server.currentRequests, int32(-1))
 		timer.SaveTimeDataBackend(*backendTime, time.Since(start))
@@ -283,19 +301,19 @@ func (b *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (b *LoadBalancer) healthChecker() {
-	ticker := time.NewTicker(b.config.healthCheckPeriod)
+func (balancer *LoadBalancer) healthChecker() {
+	ticker := time.NewTicker(balancer.config.healthCheckPeriod)
 
 	for {
 		<-ticker.C
 		log.Println("Health Check has been started!")
-		b.healthCheck()
+		balancer.healthCheck()
 		log.Println("All the checks has been completed!")
 	}
 }
 
-func (b *LoadBalancer) healthCheck() {
-	for _, server := range b.pool.servers {
+func (balancer *LoadBalancer) healthCheck() {
+	for _, server := range balancer.pool.servers {
 		alive := server.isAlive()
 		server.setAlive(alive)
 		if alive {
