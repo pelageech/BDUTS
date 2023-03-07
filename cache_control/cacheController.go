@@ -10,23 +10,25 @@ import (
 	"github.com/pelageech/BDUTS/cache"
 )
 
-type CacheController struct {
+type cacheController struct {
 	db          *bolt.DB
 	dbFile      *os.File
 	maxFileSize int64
+	fillFactor  float64
 	frequency   *time.Ticker
 }
 
-func New(db *bolt.DB, dbFile *os.File, maxFileSize int64, frequency *time.Ticker) *CacheController {
-	return &CacheController{
+func New(db *bolt.DB, dbFile *os.File, maxFileSize int64, fillFactor float64, frequency *time.Ticker) *cacheController {
+	return &cacheController{
 		db:          db,
 		dbFile:      dbFile,
 		maxFileSize: maxFileSize,
+		fillFactor:  fillFactor,
 		frequency:   frequency,
 	}
 }
 
-func (c *CacheController) Observe() {
+func (c *cacheController) Observe() {
 	for {
 		<-c.frequency.C
 		if c.isSizeExceeded() {
@@ -35,16 +37,16 @@ func (c *CacheController) Observe() {
 	}
 }
 
-func (c *CacheController) isSizeExceeded() bool {
+func (c *cacheController) isSizeExceeded() bool {
 	fileInfo, err := c.dbFile.Stat()
 	if err != nil {
 		log.Printf("Error getting file info in cacheController: %v", err) //todo: how to handle this error properly?
 	}
 
-	return fileInfo.Size() > c.maxFileSize
+	return float64(fileInfo.Size()) > float64(c.maxFileSize)*c.fillFactor
 }
 
-func (c *CacheController) deleteExpiredCache() {
+func (c *cacheController) deleteExpiredCache() {
 	expiredKeys := make([][]byte, 0)
 
 	addExpiredKeys := func(k, v []byte) error {
@@ -83,6 +85,6 @@ func (c *CacheController) deleteExpiredCache() {
 	}
 }
 
-func (c *CacheController) isExpired(info cache.Info) bool {
+func (c *cacheController) isExpired(info cache.Info) bool {
 	return time.Now().After(info.DateOfDeath)
 }

@@ -30,6 +30,7 @@ const (
 	cacheConfigPath  = "./resources/cache_config.json"
 
 	maxDBSize          = 100 * 1024 * 1024 // 100 MB
+	DBFillFactor       = 0.9
 	dbObserveFrequency = 10 * time.Second
 )
 
@@ -393,7 +394,7 @@ func main() {
 
 	dbControllerTicker := time.NewTicker(dbObserveFrequency)
 	defer dbControllerTicker.Stop()
-	controller := cacheController.New(db, dbDir, maxDBSize, dbControllerTicker)
+	controller := cacheController.New(db, dbDir, maxDBSize, DBFillFactor, dbControllerTicker)
 	go controller.Observe()
 	log.Println("Cache controller has been started!")
 
