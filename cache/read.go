@@ -3,10 +3,11 @@ package cache
 import (
 	"encoding/json"
 	"errors"
-	"github.com/boltdb/bolt"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/boltdb/bolt"
 )
 
 // GetCacheIfExists Обращается к диску для нахождения ответа на запрос.
@@ -53,7 +54,7 @@ func getPageInfo(db *bolt.DB, requestHash []byte) (*Info, error) {
 			return err
 		}
 
-		result = treeBucket.Get(requestHash[:])
+		result = treeBucket.Get([]byte(pageInfo))
 		if result == nil {
 			return errors.New("no record in cache")
 		}
@@ -84,9 +85,9 @@ func readPageFromDisk(requestHash []byte) ([]byte, error) {
 
 	path := root
 	for _, v := range subHashes {
-		path += string(v) + "/"
+		path += "/" + string(v)
 	}
-	path += string(requestHash[:])
+	path += "/" + string(requestHash[:])
 
 	bytes, err := os.ReadFile(path)
 	return bytes, err

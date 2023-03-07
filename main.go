@@ -10,19 +10,30 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/pelageech/BDUTS/cache"
+	cacheController "github.com/pelageech/BDUTS/cache_control"
 	"github.com/pelageech/BDUTS/config"
 	"github.com/pelageech/BDUTS/timer"
 )
-
 type myKey int
 
 const (
+	dbPATH           = "./cache-data/database.db"
+	dbFiles          = "./cache-data/db"
+	lbConfigPath     = "resources/config.json"
+	serversCofigPath = "resources/servers.json"
+	cacheConfigPath  = "./resources/cache_config.json"
+
+	maxDBSize          = 100 * 1024 * 1024 // 100 MB
+	DBFillFactor       = 0.9
+	dbObserveFrequency = 10 * time.Second
+
 	keyStart = myKey(iota)
 )
 
@@ -137,7 +148,7 @@ func (server *Backend) makeRequest(r *http.Request) (*http.Response, *ResponseEr
 	return originServerResponse, nil
 }
 
-func chooseNextPeer(serverPool *ServerPool) (*Backend, error) {
+func (serverPool *ServerPool) getNextPeer() (*Backend, error) {
 	serverList := serverPool.servers
 
 	serverPool.mux.Lock()
@@ -154,20 +165,6 @@ func chooseNextPeer(serverPool *ServerPool) (*Backend, error) {
 	}
 
 	return nil, errors.New("all backends are turned down")
-}
-
-func (serverPool *ServerPool) getNextPeer() (*Backend, error) {
-	for {
-		server, err := chooseNextPeer(serverPool)
-		if err != nil {
-			return nil, err
-		}
-
-		if server.currentRequests+1 <= server.maximalRequests { // Опасно, неатомарная операция
-			atomic.AddInt32(&server.currentRequests, int32(1))
-			return server, nil
-		}
-	}
 }
 
 func isHTTPVersionSupported(req *http.Request) bool {
@@ -344,7 +341,7 @@ func (server *Backend) isAlive() bool {
 func main() {
 
 	// load balancer configuration
-	loadBalancerReader, err := config.NewLoadBalancerReader("resources/config.json")
+	loadBalancerReader, err := config.NewLoadBalancerReader(lbConfigPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -366,7 +363,7 @@ func main() {
 	})
 
 	// backends configuration
-	serversReader, err := config.NewServersReader("resources/servers.json")
+	serversReader, err := config.NewServersReader(serversCofigPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -386,13 +383,24 @@ func main() {
 
 	// cache configuration
 	log.Println("Opening cache database")
-	db, err = cache.OpenDatabase("./cache-data/database.db")
+	db, err = cache.OpenDatabase(dbPATH)
 	if err != nil {
 		log.Fatalln("DB error: ", err)
 	}
 	defer cache.CloseDatabase(db)
 
-	cacheReader, err := config.NewCacheReader("./resources/cache_config.json")
+	dbDir, err := os.OpenFile(dbFiles, os.O_RDWR|os.O_CREATE, 0666) // todo: what kind of the file permissions do we really need?
+	if err != nil {
+		log.Fatalln("DB files opening error: ", err)
+	}
+
+	dbControllerTicker := time.NewTicker(dbObserveFrequency)
+	defer dbControllerTicker.Stop()
+	controller := cacheController.New(db, dbDir, maxDBSize, DBFillFactor, dbControllerTicker)
+	go controller.Observe()
+	log.Println("Cache controller has been started!")
+
+	cacheReader, err := config.NewCacheReader(cacheConfigPath)
 	if err != nil {
 		log.Fatal(err)
 	}

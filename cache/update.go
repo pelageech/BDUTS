@@ -3,13 +3,14 @@ package cache
 import (
 	"encoding/json"
 	"errors"
-	"github.com/boltdb/bolt"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/boltdb/bolt"
 )
 
 // PutRecordInCache Помещает новую страницу в кэш или перезаписывает её.
@@ -17,12 +18,12 @@ import (
 // Затем начинает транзакционную запись на диск.
 //
 // Сохраняется json-файл, хранящий Item - тело страницы и заголовок.
-func PutRecordInCache(db *bolt.DB, req *http.Request, item *Item) error {
+func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *Item) error {
 	if !isStorable(req) {
 		return errors.New("can't be stored in cache:(")
 	}
 
-	info := createCacheInfo(req, item.Header)
+	info := createCacheInfo(req, resp, item.Header)
 
 	valueInfo, err := json.Marshal(*info)
 	if err != nil {
@@ -38,12 +39,18 @@ func PutRecordInCache(db *bolt.DB, req *http.Request, item *Item) error {
 
 	requestHash := hash([]byte(keyString))
 	err = putPageInfoIntoDB(db, requestHash, valueInfo)
-
 	if err != nil {
 		return err
 	}
+
 	err = writePageToDisk(requestHash, page)
-	return err
+	if err != nil {
+		return err
+	}
+
+	log.Println("Successfully saved, page's size = ", info.Size)
+
+	return nil
 }
 
 // Помещает в базу данных метаданные страницы, помещаемой в кэш
@@ -54,7 +61,7 @@ func putPageInfoIntoDB(db *bolt.DB, requestHash []byte, value []byte) error {
 			return err
 		}
 
-		err = treeBucket.Put([]byte("pageInfo"), value)
+		err = treeBucket.Put([]byte(pageInfo), value)
 		return err
 	})
 }
@@ -67,9 +74,9 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
 	}
 
-	path := root
+	path := dbFiles
 	for _, v := range subHashes {
-		path += string(v) + "/"
+		path += "/" + string(v)
 	}
 
 	err := os.MkdirAll(path, 0770)
@@ -77,7 +84,7 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 		return err
 	}
 
-	file, err := os.Create(path + string(requestHash[:]))
+	file, err := os.Create(path + "/" + string(requestHash[:]))
 	if err != nil {
 		return err
 	}
@@ -92,46 +99,54 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 	return err
 }
 
-/*
-	НЕ ИСПОЛЬЗОВАТЬ!!! ТРЕБУЕТ ИСПРАВЛЕНИЯ!!!
-*/
-// Удаляет запись из кэша
-//func deleteRecord(db *bolt.DB, key []byte) error {
-//	requestHash := hash(key)
-//	subhashLength := hashLength / subHashCount
-//
-//	var subHashes [][]byte
-//	for i := 0; i < subHashCount; i++ {
-//		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
-//	}
-//
-//	err := db.Update(func(tx *bolt.Tx) error {
-//		treeBucket := tx.Bucket(subHashes[0])
-//		if treeBucket == nil {
-//			return errors.New("miss cache")
-//		}
-//		for i := 1; i < subHashCount; i++ {
-//			treeBucket := treeBucket.Bucket(subHashes[i])
-//			if treeBucket == nil {
-//				return errors.New("miss cache")
-//			}
-//		}
-//
-//		err := treeBucket.Delete(key)
-//
-//		return err
-//	})
-//
-//	return err
-//}
+// DeleteRecord удаляет cache.Info запись из базы данных
+func DeleteRecord(db *bolt.DB, requestHash []byte) error {
+	return db.Update(func(tx *bolt.Tx) error {
+		treeBucket, err := getBucket(tx, requestHash)
+		if err != nil {
+			return err
+		}
+
+		return treeBucket.Delete([]byte(pageInfo))
+	})
+}
+
+func RemovePageFromDisk(requestHash []byte) error {
+	subhashLength := hashLength / subHashCount
+
+	var subHashes [][]byte
+	for i := 0; i < subHashCount; i++ {
+		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
+	}
+
+	path := dbFiles
+	for _, v := range subHashes {
+		path += "/" + string(v)
+	}
+
+	err := os.Remove(path + "/" + string(requestHash))
+	if err != nil {
+		return err
+	}
+
+	for path != dbFiles {
+		err := os.Remove(path)
+		if err != nil {
+			return err
+		}
+		path = path[:strings.LastIndexByte(path, '/')]
+	}
+	return nil
+}
 
 // Создаёт экземпляр структуры cache.Info, в которой хранится
 // информация о странице, помещаемой в кэш.
-func createCacheInfo(req *http.Request, header http.Header) *Info {
+func createCacheInfo(req *http.Request, resp *http.Response, header http.Header) *Info {
 	var info Info
 
 	info.RemoteAddr = req.RemoteAddr
 	info.IsPrivate = false
+	info.Size = resp.ContentLength
 
 	// check if we shouldn't store the page
 	cacheControlString := header.Get("cache-control")

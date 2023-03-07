@@ -9,20 +9,20 @@ package cache
 import (
 	"crypto/sha1"
 	"encoding/hex"
-	"github.com/boltdb/bolt"
-	"github.com/pelageech/BDUTS/config"
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/boltdb/bolt"
+	"github.com/pelageech/BDUTS/config"
 )
 
 const (
-	/*reading = iota
-	writing
-	silent*/
 	hashLength   = sha1.Size * 2
 	subHashCount = 4 // Количество подотрезков хэша
-	root         = "./cache-data/"
+	root         = "./cache-data"
+	dbFiles      = "./cache-data/db"
+	pageInfo     = "pageInfo"
 )
 
 // Item структура, хранящая на диске страницу, которая
@@ -34,6 +34,7 @@ type Item struct {
 
 // Info - метаданные страницы, хранящейся в базе данных
 type Info struct {
+	Size        int64
 	DateOfDeath time.Time // nil if undying
 	RemoteAddr  string
 	IsPrivate   bool
