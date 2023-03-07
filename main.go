@@ -21,6 +21,7 @@ import (
 	"github.com/pelageech/BDUTS/config"
 	"github.com/pelageech/BDUTS/timer"
 )
+
 type myKey int
 
 const (
@@ -217,7 +218,7 @@ func saveToCache(req *http.Request, resp *http.Response, byteArray []byte) {
 			Body:   byteArray,
 			Header: resp.Header,
 		}
-		err := cache.PutRecordInCache(db, req, cacheItem)
+		err := cache.PutRecordInCache(db, req, resp, cacheItem)
 		if err != nil {
 			log.Println("Unsuccessful operation: ", err)
 			return
