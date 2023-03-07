@@ -387,9 +387,9 @@ func main() {
 	}
 	defer cache.CloseDatabase(db)
 
-	dbDir, err := os.Open(dbFiles)
+	dbDir, err := os.OpenFile(dbFiles, os.O_RDWR|os.O_CREATE, 0666) // todo: what kind of the file permissions do we really need?
 	if err != nil {
-		log.Fatalln("DB error: ", err)
+		log.Fatalln("DB files opening error: ", err)
 	}
 
 	dbControllerTicker := time.NewTicker(dbObserveFrequency)
