@@ -24,6 +24,7 @@ import (
 
 const (
 	dbPATH           = "./cache-data/database.db"
+	dbFiles          = "./cache-data/db"
 	lbConfigPath     = "resources/config.json"
 	serversCofigPath = "resources/servers.json"
 	cacheConfigPath  = "./resources/cache_config.json"
@@ -385,14 +386,14 @@ func main() {
 	}
 	defer cache.CloseDatabase(db)
 
-	dbFile, err := os.Open(dbPATH)
+	dbDir, err := os.Open(dbFiles)
 	if err != nil {
 		log.Fatalln("DB error: ", err)
 	}
 
 	dbControllerTicker := time.NewTicker(dbObserveFrequency)
 	defer dbControllerTicker.Stop()
-	controller := cacheController.New(db, dbFile, maxDBSize, dbControllerTicker)
+	controller := cacheController.New(db, dbDir, maxDBSize, dbControllerTicker)
 	go controller.Observe()
 	log.Println("Cache controller has been started!")
 

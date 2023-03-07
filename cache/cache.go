@@ -21,6 +21,7 @@ const (
 	hashLength   = sha1.Size * 2
 	subHashCount = 4 // Количество подотрезков хэша
 	root         = "./cache-data"
+	dbFiles      = "./cache-data/db"
 	pageInfo     = "pageInfo"
 )
 
