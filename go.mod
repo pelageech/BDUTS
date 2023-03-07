@@ -1,6 +1,6 @@
 module github.com/pelageech/BDUTS
 
-go 1.19
+go 1.20
 
 require github.com/boltdb/bolt v1.3.1
 

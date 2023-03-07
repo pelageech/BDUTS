@@ -7,47 +7,37 @@ package cache
 // http 1.1 ranch
 
 import (
-	"crypto/sha256"
-	"errors"
-	"github.com/boltdb/bolt"
+	"crypto/sha1"
+	"encoding/hex"
 	"log"
 	"net/http"
-	"os"
+	"time"
+
+	"github.com/boltdb/bolt"
+	"github.com/pelageech/BDUTS/config"
 )
 
 const (
-	hashLength   = sha256.Size
-	subHashCount = 8 // Количество подотрезков хэша
+	hashLength   = sha1.Size * 2
+	subHashCount = 4 // Количество подотрезков хэша
+	root         = "./cache-data"
+	dbFiles      = "./cache-data/db"
+	pageInfo     = "pageInfo"
 )
 
-// GetCacheIfExists Обращается к диску для нахождения ответа на запрос.
-// Если таковой имеется - он возвращается, в противном случае выдаётся ошибка
-func GetCacheIfExists(db *bolt.DB, req *http.Request) ([]byte, error) {
-	keyString := req.Proto + req.Method + req.URL.Path
-	keyByteArray := []byte(keyString)
-
-	responseByteArray, err := getRecord(db, keyByteArray)
-	if err != nil {
-		return nil, err
-	}
-
-	return responseByteArray, nil
+// Item структура, хранящая на диске страницу, которая
+// возвращается клиенту из кэша.
+type Item struct {
+	Body   []byte
+	Header http.Header
 }
 
-// PutRecordInCache Помещает новую запись в кэш.
-// Считает хэш аттрибутов запроса, по нему проходит вниз по дереву
-// и записывает как лист новую запись.
-func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, responseByteArray []byte) error {
-	keyString := req.Proto + req.Method + req.URL.Path
-	keyByteArray := []byte(keyString)
-
-	// responseByteArray, err := io.ReadAll(resp.Body)
-	//if err != nil {
-	//	return err
-	//}
-
-	err := addNewRecord(db, keyByteArray, responseByteArray)
-	return err
+// Info - метаданные страницы, хранящейся в базе данных
+type Info struct {
+	Size        int64
+	DateOfDeath time.Time // nil if undying
+	RemoteAddr  string
+	IsPrivate   bool
 }
 
 // OpenDatabase Открывает базу данных для дальнейшего использования
@@ -67,105 +57,8 @@ func CloseDatabase(db *bolt.DB) {
 	}
 }
 
-// Добавляет новую запись в кэш.
-func addNewRecord(db *bolt.DB, key, value []byte) error {
-	requestHash := hash(key)
-	subhashLength := hashLength / subHashCount
-
-	var subHashes [][]byte
-	for i := 0; i < subHashCount; i++ {
-		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
-	}
-
-	err := db.Update(func(tx *bolt.Tx) error {
-		treeBucket, err := tx.CreateBucketIfNotExists(subHashes[0])
-		if err != nil {
-			return err
-		}
-
-		for i := 1; i < subHashCount; i++ {
-			treeBucket, err = treeBucket.CreateBucketIfNotExists(subHashes[i])
-			if err != nil {
-				return err
-			}
-		}
-
-		err = treeBucket.Put(key, value)
-		return err
-	})
-
-	return err
-}
-
-// Найти элемент по ключу
-// Ключ переводится в хэш, тот разбивается на подотрезки - названия бакетов
-// Проходом по подотрезкам находим по ключу ответ на запрос
-func getRecord(db *bolt.DB, key []byte) ([]byte, error) {
-	var result []byte = nil
-
-	requestHash := hash(key)
-	subhashLength := hashLength / subHashCount
-
-	var subHashes [][]byte
-	for i := 0; i < subHashCount; i++ {
-		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
-	}
-
-	err := db.View(func(tx *bolt.Tx) error {
-		treeBucket := tx.Bucket(subHashes[0])
-		if treeBucket == nil {
-			return errors.New("miss cache")
-		}
-		for i := 1; i < subHashCount; i++ {
-			treeBucket = treeBucket.Bucket(subHashes[i])
-			if treeBucket == nil {
-				return errors.New("miss cache")
-			}
-		}
-
-		result = treeBucket.Get(key)
-		if result == nil {
-			return errors.New("no record in cache")
-		}
-
-		return nil
-	})
-
-	return result, err
-}
-
-// Удаляет запись из кэша
-func deleteRecord(db *bolt.DB, key []byte) error {
-	requestHash := hash(key)
-	subhashLength := hashLength / subHashCount
-
-	var subHashes [][]byte
-	for i := 0; i < subHashCount; i++ {
-		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
-	}
-
-	err := db.Update(func(tx *bolt.Tx) error {
-		treeBucket := tx.Bucket(subHashes[0])
-		if treeBucket == nil {
-			return errors.New("miss cache")
-		}
-		for i := 1; i < subHashCount; i++ {
-			treeBucket := treeBucket.Bucket(subHashes[i])
-			if treeBucket == nil {
-				return errors.New("miss cache")
-			}
-		}
-
-		err := treeBucket.Delete(key)
-
-		return err
-	})
-
-	return err
-}
-
 // Сохраняет копию базы данных в файл
-func makeSnapshot(db *bolt.DB, filename string) error {
+/*func makeSnapshot(db *bolt.DB, filename string) error {
 	f, err := os.Open(filename)
 	if err != nil {
 		return err
@@ -177,10 +70,21 @@ func makeSnapshot(db *bolt.DB, filename string) error {
 	})
 
 	return err
+}*/
+
+// Возвращает хэш-encode от набора байт
+func hash(value []byte) []byte {
+	bytes := sha1.Sum(value)
+	return []byte(hex.EncodeToString(bytes[:]))
 }
 
-// Возвращает хэш от набора байт
-func hash(value []byte) [hashLength]byte {
-	hash := sha256.Sum256(value)
-	return hash
+// constructKeyFromRequest использует массив config.RequestKey
+// для того, чтобы составить строку-ключ, по которому будет сохраняться
+// страница в кэше и её метаданные в БД.
+func constructKeyFromRequest(req *http.Request) string {
+	result := ""
+	for _, addStringKey := range config.RequestKey {
+		result += addStringKey(req)
+	}
+	return result
 }
