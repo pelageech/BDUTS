@@ -3,9 +3,10 @@ package cache
 import (
 	"encoding/json"
 	"errors"
-	"github.com/boltdb/bolt"
 	"net/http"
 	"os"
+
+	"github.com/boltdb/bolt"
 )
 
 // GetCacheIfExists Обращается к диску для нахождения ответа на запрос.
@@ -81,7 +82,7 @@ func readPageFromDisk(requestHash []byte) ([]byte, error) {
 		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
 	}
 
-	path := cachePath
+	path := CachePath
 	for _, v := range subHashes {
 		path += "/" + string(v)
 	}

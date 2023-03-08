@@ -25,7 +25,6 @@ type myKey int
 
 const (
 	dbPATH            = "./cache-data/database.db"
-	dbFiles           = "./cache-data/db"
 	lbConfigPath      = "resources/config.json"
 	serversConfigPath = "resources/servers.json"
 	cacheConfigPath   = "./resources/cache_config.json"
@@ -389,7 +388,14 @@ func main() {
 	}
 	defer cache.CloseDatabase(db)
 
-	dbDir, err := os.OpenFile(dbFiles, os.O_RDWR|os.O_CREATE, 0666) // todo: what kind of the file permissions do we really need?
+	// create directory for cache files
+	err = os.Mkdir(cache.CachePath, 0777)
+	if err != nil && !os.IsExist(err) {
+		log.Fatalln("DB files directory creation error: ", err)
+	}
+
+	// open directory with cache files
+	dbDir, err := os.Open(cache.CachePath)
 	if err != nil {
 		log.Fatalln("DB files opening error: ", err)
 	}

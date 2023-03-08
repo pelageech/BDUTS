@@ -78,7 +78,7 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
 	}
 
-	path := cachePath
+	path := CachePath
 	for _, v := range subHashes {
 		path += "/" + string(v)
 	}
@@ -123,7 +123,7 @@ func RemovePageFromDisk(requestHash []byte) error {
 		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
 	}
 
-	path := cachePath
+	path := CachePath
 	for _, v := range subHashes {
 		path += "/" + string(v)
 	}
@@ -133,7 +133,7 @@ func RemovePageFromDisk(requestHash []byte) error {
 		return err
 	}
 
-	for path != cachePath {
+	for path != CachePath {
 		err := os.Remove(path)
 		if err != nil {
 			return err
