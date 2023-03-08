@@ -13,13 +13,17 @@ import (
 	"github.com/boltdb/bolt"
 )
 
+var (
+	infinityTime = time.Unix(0, 0).AddDate(7999, 12, 31)
+)
+
 // PutRecordInCache Помещает новую страницу в кэш или перезаписывает её.
 // Сначала добавляет в базу данных метаданные о странице, хранимой в cache.Info.
 // Затем начинает транзакционную запись на диск.
 //
 // Сохраняется json-файл, хранящий Item - тело страницы и заголовок.
 func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *Item) error {
-	if !isStorable(req) {
+	if !isStorable(&item.Header) {
 		return errors.New("can't be stored in cache:(")
 	}
 
@@ -142,11 +146,12 @@ func RemovePageFromDisk(requestHash []byte) error {
 // Создаёт экземпляр структуры cache.Info, в которой хранится
 // информация о странице, помещаемой в кэш.
 func createCacheInfo(req *http.Request, resp *http.Response, header http.Header) *Info {
-	var info Info
-
-	info.RemoteAddr = req.RemoteAddr
-	info.IsPrivate = false
-	info.Size = resp.ContentLength
+	info := &Info{
+		Size:        resp.ContentLength,
+		DateOfDeath: infinityTime,
+		RemoteAddr:  req.RemoteAddr,
+		IsPrivate:   false,
+	}
 
 	// check if we shouldn't store the page
 	cacheControlString := header.Get("cache-control")
@@ -166,13 +171,12 @@ func createCacheInfo(req *http.Request, resp *http.Response, header http.Header)
 		}
 	}
 
-	return &info
+	return info
 }
 
 // isStorable проверяет, можно ли поместить в кэш страницу,
 // по её директивам в Cache-Control.
-func isStorable(req *http.Request) bool {
-	header := req.Header
+func isStorable(header *http.Header) bool {
 	cacheControlString := header.Get("cache-control")
 
 	// check if we shouldn't store the page

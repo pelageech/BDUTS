@@ -1,4 +1,4 @@
-package cacheController
+package cache
 
 import (
 	"encoding/json"
@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/pelageech/BDUTS/cache"
 )
 
 type cacheController struct {
@@ -18,6 +17,7 @@ type cacheController struct {
 	frequency   *time.Ticker
 }
 
+//goland:noinspection GoExportedFuncWithUnexportedType
 func New(db *bolt.DB, dbFile *os.File, maxFileSize int64, fillFactor float64, frequency *time.Ticker) *cacheController {
 	return &cacheController{
 		db:          db,
@@ -50,10 +50,10 @@ func (c *cacheController) deleteExpiredCache() {
 	expiredKeys := make([][]byte, 0)
 
 	addExpiredKeys := func(k, v []byte) error {
-		var info cache.Info
+		var info Info
 		err := json.Unmarshal(v, &info)
 
-		if c.isExpired(info) {
+		if isExpired(&info) {
 			expiredKeys = append(expiredKeys, k)
 		}
 		return err
@@ -74,17 +74,13 @@ func (c *cacheController) deleteExpiredCache() {
 
 	// deleting expired data
 	for _, key := range expiredKeys {
-		err = cache.DeleteRecord(c.db, key)
+		err = DeleteRecord(c.db, key)
 		if err != nil {
 			log.Printf("Error while deleting expired info about page in cacheController: %v", err)
 		}
-		err = cache.RemovePageFromDisk(key)
+		err = RemovePageFromDisk(key)
 		if err != nil {
 			log.Printf("Error while removing expired page from disk in cacheController: %v", err)
 		}
 	}
-}
-
-func (c *cacheController) isExpired(info cache.Info) bool {
-	return time.Now().After(info.DateOfDeath)
 }

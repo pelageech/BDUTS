@@ -3,11 +3,9 @@ package cache
 import (
 	"encoding/json"
 	"errors"
+	"github.com/boltdb/bolt"
 	"net/http"
 	"os"
-	"time"
-
-	"github.com/boltdb/bolt"
 )
 
 // GetCacheIfExists Обращается к диску для нахождения ответа на запрос.
@@ -21,7 +19,7 @@ func GetCacheIfExists(db *bolt.DB, req *http.Request) (*Item, error) {
 		return nil, err
 	}
 
-	if time.Now().After(info.DateOfDeath) {
+	if isExpired(info) {
 		// delete
 		return nil, errors.New("not fresh")
 	}

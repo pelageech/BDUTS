@@ -17,7 +17,6 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/pelageech/BDUTS/cache"
-	cacheController "github.com/pelageech/BDUTS/cache_control"
 	"github.com/pelageech/BDUTS/config"
 	"github.com/pelageech/BDUTS/timer"
 )
@@ -25,11 +24,11 @@ import (
 type myKey int
 
 const (
-	dbPATH           = "./cache-data/database.db"
-	dbFiles          = "./cache-data/db"
-	lbConfigPath     = "resources/config.json"
-	serversCofigPath = "resources/servers.json"
-	cacheConfigPath  = "./resources/cache_config.json"
+	dbPATH            = "./cache-data/database.db"
+	dbFiles           = "./cache-data/db"
+	lbConfigPath      = "resources/config.json"
+	serversConfigPath = "resources/servers.json"
+	cacheConfigPath   = "./resources/cache_config.json"
 
 	maxDBSize          = 100 * 1024 * 1024 // 100 MB
 	DBFillFactor       = 0.9
@@ -364,7 +363,7 @@ func main() {
 	})
 
 	// backends configuration
-	serversReader, err := config.NewServersReader(serversCofigPath)
+	serversReader, err := config.NewServersReader(serversConfigPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -397,7 +396,7 @@ func main() {
 
 	dbControllerTicker := time.NewTicker(dbObserveFrequency)
 	defer dbControllerTicker.Stop()
-	controller := cacheController.New(db, dbDir, maxDBSize, DBFillFactor, dbControllerTicker)
+	controller := cache.New(db, dbDir, maxDBSize, DBFillFactor, dbControllerTicker)
 	go controller.Observe()
 	log.Println("Cache controller has been started!")
 
