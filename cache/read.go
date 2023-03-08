@@ -83,7 +83,7 @@ func readPageFromDisk(requestHash []byte) ([]byte, error) {
 		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
 	}
 
-	path := root
+	path := cachePath
 	for _, v := range subHashes {
 		path += "/" + string(v)
 	}
