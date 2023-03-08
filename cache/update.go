@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	infinityTime = time.Now().AddDate(9999, 1, 1)
+	infinityTime = time.Unix(0, 0).AddDate(7999, 12, 31)
 )
 
 // PutRecordInCache Помещает новую страницу в кэш или перезаписывает её.
@@ -23,7 +23,7 @@ var (
 //
 // Сохраняется json-файл, хранящий Item - тело страницы и заголовок.
 func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *Item) error {
-	if !isStorable(req) {
+	if !isStorable(&item.Header) {
 		return errors.New("can't be stored in cache:(")
 	}
 
@@ -176,8 +176,7 @@ func createCacheInfo(req *http.Request, resp *http.Response, header http.Header)
 
 // isStorable проверяет, можно ли поместить в кэш страницу,
 // по её директивам в Cache-Control.
-func isStorable(req *http.Request) bool {
-	header := req.Header
+func isStorable(header *http.Header) bool {
 	cacheControlString := header.Get("cache-control")
 
 	// check if we shouldn't store the page
