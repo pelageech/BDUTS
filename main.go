@@ -17,7 +17,6 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/pelageech/BDUTS/cache"
-	cacheController "github.com/pelageech/BDUTS/cache_control"
 	"github.com/pelageech/BDUTS/config"
 	"github.com/pelageech/BDUTS/timer"
 )
@@ -397,7 +396,7 @@ func main() {
 
 	dbControllerTicker := time.NewTicker(dbObserveFrequency)
 	defer dbControllerTicker.Stop()
-	controller := cacheController.New(db, dbDir, maxDBSize, DBFillFactor, dbControllerTicker)
+	controller := cache.New(db, dbDir, maxDBSize, DBFillFactor, dbControllerTicker)
 	go controller.Observe()
 	log.Println("Cache controller has been started!")
 

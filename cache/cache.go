@@ -87,3 +87,7 @@ func constructKeyFromRequest(req *http.Request) string {
 	}
 	return result
 }
+
+func isExpired(info *Info) bool {
+	return time.Now().After(info.DateOfDeath)
+}
