@@ -13,6 +13,10 @@ import (
 	"github.com/boltdb/bolt"
 )
 
+var (
+	infinityTime = time.Now().AddDate(9999, 1, 1)
+)
+
 // PutRecordInCache Помещает новую страницу в кэш или перезаписывает её.
 // Сначала добавляет в базу данных метаданные о странице, хранимой в cache.Info.
 // Затем начинает транзакционную запись на диск.
@@ -142,11 +146,12 @@ func RemovePageFromDisk(requestHash []byte) error {
 // Создаёт экземпляр структуры cache.Info, в которой хранится
 // информация о странице, помещаемой в кэш.
 func createCacheInfo(req *http.Request, resp *http.Response, header http.Header) *Info {
-	var info Info
-
-	info.RemoteAddr = req.RemoteAddr
-	info.IsPrivate = false
-	info.Size = resp.ContentLength
+	info := &Info{
+		Size:        resp.ContentLength,
+		DateOfDeath: infinityTime,
+		RemoteAddr:  req.RemoteAddr,
+		IsPrivate:   false,
+	}
 
 	// check if we shouldn't store the page
 	cacheControlString := header.Get("cache-control")
@@ -166,7 +171,7 @@ func createCacheInfo(req *http.Request, resp *http.Response, header http.Header)
 		}
 	}
 
-	return &info
+	return info
 }
 
 // isStorable проверяет, можно ли поместить в кэш страницу,
