@@ -4,5 +4,8 @@ COPY . .
 
 RUN go build -o /app/lb
 
+FROM alpine:3.17.2
+WORKDIR /app
+COPY --from=build /app/lb .
+COPY --from=build /app/resources resources
 CMD ["./lb"]
-
