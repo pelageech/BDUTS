@@ -13,10 +13,10 @@ func main() {
 		http.ServeFile(w, r, "./content.mp4")
 	})
 
+	log.Println("Server listening on port 3037")
 	// Start the server.
 	err := http.ListenAndServe(":3037", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Server listening on port 3037")
 }
