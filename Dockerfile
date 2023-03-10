@@ -8,4 +8,5 @@ FROM alpine:3.17.2
 WORKDIR /app
 COPY --from=build /app/lb .
 COPY --from=build /app/resources resources
+COPY --from=build /app/MyCertificate.crt /app/MyKey.key .
 CMD ["./lb"]

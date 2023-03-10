@@ -1,0 +1,20 @@
+services:
+  lb:
+    build: .
+    ports:
+      - "8080:8080"
+  dynamic_serv:
+    build:
+      context: ./backends/dynamic_serv
+    ports: 
+      - "3035:3035"
+  static_private_serv:
+    build:
+      context: ./backends/static_private_serv
+    ports:
+      - "3037:3037"
+  static_public_serv:
+    build:
+      context: ./backends/static_public_serv
+    ports:
+      - "3036:3036"
