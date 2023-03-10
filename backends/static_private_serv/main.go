@@ -18,4 +18,5 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println("Server listening on port 3037")
 }
