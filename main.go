@@ -282,6 +282,7 @@ func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Req
 			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
 			log.Println(err)
 		}
+		resp.Body.Close()
 
 		_, err = rw.Write(byteArray)
 		if err != nil {
