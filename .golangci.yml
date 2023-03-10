@@ -12,3 +12,11 @@ linters:
     - asciicheck
     - bidichk
     - bodyclose
+    - containedctx
+    - contextcheck
+    - cyclop
+    - decorder
+    - dogsled
+    - dupl
+    - dupword
+    - durationcheck
