@@ -106,12 +106,7 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 // DeleteRecord удаляет cache.Info запись из базы данных
 func DeleteRecord(db *bolt.DB, requestHash []byte) error {
 	return db.Update(func(tx *bolt.Tx) error {
-		treeBucket, err := getBucket(tx, requestHash)
-		if err != nil {
-			return err
-		}
-
-		return treeBucket.Delete([]byte(pageInfo))
+		return tx.DeleteBucket(requestHash)
 	})
 }
 
