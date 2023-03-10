@@ -360,7 +360,7 @@ func main() {
 
 	loadBalancer := NewLoadBalancer(LoadBalancerConfig{
 		port:              lbConfig.Port,
-		healthCheckPeriod: lbConfig.HealthCheckPeriod * time.Second,
+		healthCheckPeriod: time.Duration(lbConfig.HealthCheckPeriod) * time.Second,
 	})
 
 	// backends configuration
