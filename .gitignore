@@ -3,3 +3,4 @@ nginx_server/logs
 nginx_server/data/cache
 cache-data/database.db
 .idea
+.DS_Store
