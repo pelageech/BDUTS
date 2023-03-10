@@ -3,18 +3,37 @@ services:
     build: .
     ports:
       - "8080:8080"
+    networks:
+      mynetwork:
+        ipv4_address: 192.168.0.2
   dynamic_serv:
     build:
       context: ./backends/dynamic_serv
     ports: 
       - "3035:3035"
+    networks:
+      mynetwork:
+        ipv4_address: 192.168.0.3
   static_private_serv:
     build:
       context: ./backends/static_private_serv
     ports:
       - "3037:3037"
+    networks:
+      mynetwork:
+        ipv4_address: 192.168.0.4
   static_public_serv:
     build:
       context: ./backends/static_public_serv
     ports:
       - "3036:3036"
+    networks:
+      mynetwork:
+        ipv4_address: 192.168.0.5
+
+networks:
+  mynetwork:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.0.0/8
