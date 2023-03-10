@@ -447,6 +447,9 @@ func main() {
 	http.HandleFunc("/", loadBalancer.loadBalancer)
 	http.HandleFunc("/favicon.ico", http.NotFound)
 
+	// wait while other containers will be ready
+	time.Sleep(5 * time.Second)
+
 	// Firstly, identify the working servers
 	log.Println("Configured! Now setting up the first health check...")
 	loadBalancer.healthCheck()
