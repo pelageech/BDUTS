@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"time"
 )
 
 type ServersReader struct {
@@ -13,7 +12,7 @@ type ServersReader struct {
 
 type ServerConfig struct {
 	URL                   string
-	HealthCheckTcpTimeout time.Duration
+	HealthCheckTcpTimeout int64
 	MaximalRequests       int32
 }
 

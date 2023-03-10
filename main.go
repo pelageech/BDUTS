@@ -62,7 +62,7 @@ func (balancer *LoadBalancer) configureServerPool(servers []config.ServerConfig)
 			continue
 		}
 
-		backend.healthCheckTcpTimeout = server.HealthCheckTcpTimeout * time.Millisecond
+		backend.healthCheckTcpTimeout = time.Duration(server.HealthCheckTcpTimeout) * time.Millisecond
 		backend.alive = false
 
 		backend.currentRequests = 0
