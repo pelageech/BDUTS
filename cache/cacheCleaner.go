@@ -47,14 +47,18 @@ func (c *cacheController) isSizeExceeded() bool {
 }
 
 func (c *cacheController) deleteExpiredCache() {
+	sizeReleased := int64(0)
 	expiredKeys := make([][]byte, 0)
 
-	addExpiredKeys := func(k, v []byte) error {
+	addExpiredKeys := func(name []byte, b *bolt.Bucket) error {
+		v := b.Get([]byte(pageInfo))
+
 		var info Info
 		err := json.Unmarshal(v, &info)
 
 		if isExpired(&info) {
-			expiredKeys = append(expiredKeys, k)
+			expiredKeys = append(expiredKeys, name)
+			sizeReleased += info.Size
 		}
 		return err
 	}
@@ -62,16 +66,16 @@ func (c *cacheController) deleteExpiredCache() {
 	// iterating over all buckets and all keys in each buckets
 	// and collecting expired keys of expired data
 	err := c.db.View(func(tx *bolt.Tx) error {
-		err := tx.ForEach(func(name []byte, b *bolt.Bucket) error {
-			err := b.ForEach(addExpiredKeys)
-			return err
-		})
+		err := tx.ForEach(addExpiredKeys)
 		return err
 	})
 	if err != nil {
 		log.Printf("Error while viewing cache in cacheController: %v", err)
 	}
 
+	if sizeReleased > 0 {
+		log.Printf("Anticipating to be released %d byte from disk...", sizeReleased)
+	}
 	// deleting expired data
 	for _, key := range expiredKeys {
 		err = DeleteRecord(c.db, key)
