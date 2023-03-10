@@ -24,9 +24,10 @@ import (
 type myKey int
 
 const (
-	dbPATH            = "./cache-data/database.db"
-	lbConfigPath      = "resources/config.json"
-	serversConfigPath = "resources/servers.json"
+	dbDirectory       = "./cache-data"
+	dbName            = "database.db"
+	lbConfigPath      = "./resources/config.json"
+	serversConfigPath = "./resources/servers.json"
 	cacheConfigPath   = "./resources/cache_config.json"
 
 	maxDBSize          = 100 * 1024 * 1024 // 100 MB
@@ -380,9 +381,14 @@ func main() {
 
 	loadBalancer.configureServerPool(serversConfig)
 
+	err = os.Mkdir(dbDirectory, 0777)
+	if err != nil && !os.IsExist(err) {
+		log.Fatalln("Cache files directory creation error: ", err)
+	}
+
 	// cache configuration
 	log.Println("Opening cache database")
-	db, err = cache.OpenDatabase(dbPATH)
+	db, err = cache.OpenDatabase(dbDirectory + "/" + dbName)
 	if err != nil {
 		log.Fatalln("DB error: ", err)
 	}
