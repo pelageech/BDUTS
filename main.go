@@ -198,7 +198,8 @@ func checkCache(rw http.ResponseWriter, req *http.Request) error {
 	log.Println("Transferred")
 
 	if start, ok := req.Context().Value(keyStart).(time.Time); ok {
-		timer.SaveTimerDataGotFromCache(time.Since(start))
+		finish := time.Since(start)
+		timer.SaveTimerDataGotFromCache(&finish)
 	} else {
 		log.Println("Couldn't estimate transferring time")
 	}
@@ -246,17 +247,22 @@ func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Req
 	for {
 		// get next server to send a request
 		server, err := balancer.pool.getNextPeer()
-		defer atomic.AddInt32(&server.currentRequests, int32(-1))
 
 		if err != nil {
 			log.Println(err)
 			http.Error(rw, "Service not available", http.StatusServiceUnavailable)
 			return
 		}
+		defer atomic.AddInt32(&server.currentRequests, int32(-1))
+
 		log.Printf("[%s] received a request\n", server.URL)
 
 		var backendTime *time.Duration
 		req, backendTime = timer.MakeRequestTimeTracker(req)
+		defer func() {
+			finishRoundTrip := time.Since(start)
+			timer.SaveTimeDataBackend(backendTime, &finishRoundTrip)
+		}()
 
 		// send it to the backend
 		resp, respError := server.makeRequest(req)
@@ -297,7 +303,6 @@ func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Req
 		// caching
 		saveToCache(req, resp, byteArray)
 
-		timer.SaveTimeDataBackend(*backendTime, time.Since(start))
 		return
 	}
 }
