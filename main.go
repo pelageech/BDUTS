@@ -242,17 +242,21 @@ func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Req
 	}
 
 	// on cache miss make request to backend
-	var backendTime *time.Duration
-	req, backendTime = timer.MakeRequestTimeTracker(req)
 
 	for {
 		// get next server to send a request
 		server, err := balancer.pool.getNextPeer()
+		defer atomic.AddInt32(&server.currentRequests, int32(-1))
+
 		if err != nil {
 			log.Println(err)
 			http.Error(rw, "Service not available", http.StatusServiceUnavailable)
+			return
 		}
 		log.Printf("[%s] received a request\n", server.URL)
+
+		var backendTime *time.Duration
+		req, backendTime = timer.MakeRequestTimeTracker(req)
 
 		// send it to the backend
 		resp, respError := server.makeRequest(req)
@@ -293,7 +297,6 @@ func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Req
 		// caching
 		saveToCache(req, resp, byteArray)
 
-		atomic.AddInt32(&server.currentRequests, int32(-1))
 		timer.SaveTimeDataBackend(*backendTime, time.Since(start))
 		return
 	}
