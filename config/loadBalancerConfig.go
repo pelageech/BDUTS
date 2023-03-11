@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"time"
 )
 
 type LoadBalancerReader struct {
@@ -13,7 +12,7 @@ type LoadBalancerReader struct {
 
 type LoadBalancerConfig struct {
 	Port              int
-	HealthCheckPeriod time.Duration
+	HealthCheckPeriod int64
 }
 
 func NewLoadBalancerReader(configPath string) (*LoadBalancerReader, error) {

@@ -24,9 +24,10 @@ import (
 type myKey int
 
 const (
-	dbPATH            = "./cache-data/database.db"
-	lbConfigPath      = "resources/config.json"
-	serversConfigPath = "resources/servers.json"
+	dbDirectory       = "./cache-data"
+	dbName            = "database.db"
+	lbConfigPath      = "./resources/config.json"
+	serversConfigPath = "./resources/servers.json"
 	cacheConfigPath   = "./resources/cache_config.json"
 
 	maxDBSize          = 100 * 1024 * 1024 // 100 MB
@@ -61,7 +62,7 @@ func (balancer *LoadBalancer) configureServerPool(servers []config.ServerConfig)
 			continue
 		}
 
-		backend.healthCheckTcpTimeout = server.HealthCheckTcpTimeout * time.Millisecond
+		backend.healthCheckTcpTimeout = time.Duration(server.HealthCheckTcpTimeout) * time.Millisecond
 		backend.alive = false
 
 		backend.currentRequests = 0
@@ -197,7 +198,8 @@ func checkCache(rw http.ResponseWriter, req *http.Request) error {
 	log.Println("Transferred")
 
 	if start, ok := req.Context().Value(keyStart).(time.Time); ok {
-		timer.SaveTimerDataGotFromCache(time.Since(start))
+		finish := time.Since(start)
+		timer.SaveTimerDataGotFromCache(&finish)
 	} else {
 		log.Println("Couldn't estimate transferring time")
 	}
@@ -241,17 +243,26 @@ func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Req
 	}
 
 	// on cache miss make request to backend
-	var backendTime *time.Duration
-	req, backendTime = timer.MakeRequestTimeTracker(req)
 
 	for {
 		// get next server to send a request
 		server, err := balancer.pool.getNextPeer()
+
 		if err != nil {
 			log.Println(err)
 			http.Error(rw, "Service not available", http.StatusServiceUnavailable)
+			return
 		}
+		defer atomic.AddInt32(&server.currentRequests, int32(-1))
+
 		log.Printf("[%s] received a request\n", server.URL)
+
+		var backendTime *time.Duration
+		req, backendTime = timer.MakeRequestTimeTracker(req)
+		defer func() {
+			finishRoundTrip := time.Since(start)
+			timer.SaveTimeDataBackend(backendTime, &finishRoundTrip)
+		}()
 
 		// send it to the backend
 		resp, respError := server.makeRequest(req)
@@ -281,6 +292,7 @@ func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Req
 			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
 			log.Println(err)
 		}
+		resp.Body.Close()
 
 		_, err = rw.Write(byteArray)
 		if err != nil {
@@ -291,8 +303,6 @@ func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Req
 		// caching
 		saveToCache(req, resp, byteArray)
 
-		atomic.AddInt32(&server.currentRequests, int32(-1))
-		timer.SaveTimeDataBackend(*backendTime, time.Since(start))
 		return
 	}
 }
@@ -358,7 +368,7 @@ func main() {
 
 	loadBalancer := NewLoadBalancer(LoadBalancerConfig{
 		port:              lbConfig.Port,
-		healthCheckPeriod: lbConfig.HealthCheckPeriod * time.Second,
+		healthCheckPeriod: time.Duration(lbConfig.HealthCheckPeriod) * time.Second,
 	})
 
 	// backends configuration
@@ -380,9 +390,14 @@ func main() {
 
 	loadBalancer.configureServerPool(serversConfig)
 
+	err = os.Mkdir(dbDirectory, 0777)
+	if err != nil && !os.IsExist(err) {
+		log.Fatalln("Cache files directory creation error: ", err)
+	}
+
 	// cache configuration
 	log.Println("Opening cache database")
-	db, err = cache.OpenDatabase(dbPATH)
+	db, err = cache.OpenDatabase(dbDirectory + "/" + dbName)
 	if err != nil {
 		log.Fatalln("DB error: ", err)
 	}
@@ -439,6 +454,9 @@ func main() {
 	// Serving
 	http.HandleFunc("/", loadBalancer.loadBalancer)
 	http.HandleFunc("/favicon.ico", http.NotFound)
+
+	// wait while other containers will be ready
+	time.Sleep(5 * time.Second)
 
 	// Firstly, identify the working servers
 	log.Println("Configured! Now setting up the first health check...")

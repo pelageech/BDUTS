@@ -10,9 +10,10 @@ func main() {
 	cacheControl := "private, max-age=10"
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", cacheControl)
-		http.ServeFile(w, r, "./backends/static_private_serv/content.mp4")
+		http.ServeFile(w, r, "./content.mp4")
 	})
 
+	log.Println("Server listening on port 3037")
 	// Start the server.
 	err := http.ListenAndServe(":3037", nil)
 	if err != nil {
