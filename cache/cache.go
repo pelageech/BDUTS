@@ -35,7 +35,7 @@ type Item struct {
 //	MaxStale:     +
 //	MinFresh:     +
 //	NoCache:
-//	NoStore:
+//	NoStore:	  +
 //	NoTransform:
 //	OnlyIfCached:
 

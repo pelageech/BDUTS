@@ -27,9 +27,10 @@ func PutPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *I
 	var byteInfo, bytePage []byte
 	var err error
 
+	requestDirectives := loadRequestDirectives(req.Header)
 	responseDirectives := loadResponseDirectives(resp.Header)
 
-	if responseDirectives.NoStore {
+	if requestDirectives.NoStore || responseDirectives.NoStore {
 		return errors.New("can't be stored in cache")
 	}
 
@@ -112,21 +113,6 @@ func createCacheInfo(resp *http.Response) *Info {
 	}
 
 	return info
-}
-
-// isStorable проверяет, можно ли поместить в кэш страницу,
-// по её директивам в Cache-Control.
-func isStorable(header *http.Header) bool {
-	cacheControlString := header.Get("cache-control")
-
-	// check if we shouldn't store the page
-	cacheControl := strings.Split(cacheControlString, ";")
-	for _, v := range cacheControl {
-		if v == "no-store" {
-			return false
-		}
-	}
-	return true
 }
 
 func loadResponseDirectives(header http.Header) *ResponseDirectives {
