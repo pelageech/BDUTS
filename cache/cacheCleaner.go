@@ -65,7 +65,7 @@ func (c *cacheController) deleteExpiredCache() {
 		return nil
 	}
 
-	// iterating over all buckets and all keys in each buckets
+	// iterating over all buckets and all keys in each bucket
 	// and collecting expired keys of expired data
 	err := c.db.View(func(tx *bolt.Tx) error {
 		return tx.ForEach(addExpiredKeys)

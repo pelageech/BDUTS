@@ -5,8 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"os"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -112,44 +110,4 @@ func getBucket(tx *bolt.Tx, key []byte) (*bolt.Bucket, error) {
 	}
 
 	return nil, errors.New("miss cache")
-}
-
-func loadRequestDirectives(header http.Header) *RequestDirectives {
-	result := &RequestDirectives{
-		MaxAge:       nullTime,
-		MaxStale:     0,
-		MinFresh:     nullTime,
-		NoCache:      false,
-		NoStore:      false,
-		NoTransform:  false,
-		OnlyIfCached: false,
-	}
-
-	cacheControlString := header.Get("cache-control")
-	cacheControl := strings.Split(cacheControlString, ";")
-	for _, v := range cacheControl {
-		if v == "only-if-cached" {
-			result.OnlyIfCached = true
-		} else if v == "no-cache" {
-			result.NoCache = true
-		} else if v == "no-store" {
-			result.NoStore = true
-		} else if v == "no-transform" {
-			result.NoTransform = true
-		} else if strings.Contains(v, "max-age") {
-			_, t, _ := strings.Cut(v, "=")
-			age, _ := strconv.Atoi(t)
-			result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
-		} else if strings.Contains(v, "max-stale") {
-			_, t, _ := strings.Cut(v, "=")
-			age, _ := strconv.Atoi(t)
-			result.MaxStale = int64(age)
-		} else if strings.Contains(v, "min-fresh") {
-			_, t, _ := strings.Cut(v, "=")
-			age, _ := strconv.Atoi(t)
-			result.MinFresh = time.Now().Add(time.Duration(age) * time.Second)
-		}
-	}
-
-	return result
 }

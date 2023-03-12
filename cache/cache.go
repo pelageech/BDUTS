@@ -11,6 +11,8 @@ import (
 	"encoding/hex"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -126,4 +128,85 @@ func constructKeyFromRequest(req *http.Request) string {
 
 func isExpired(info *Info, afterDeath time.Duration) bool {
 	return time.Now().After(info.ResponseDirectives.MaxAge.Add(afterDeath))
+}
+
+func loadRequestDirectives(header http.Header) *RequestDirectives {
+	result := &RequestDirectives{
+		MaxAge:       nullTime,
+		MaxStale:     0,
+		MinFresh:     nullTime,
+		NoCache:      false,
+		NoStore:      false,
+		NoTransform:  false,
+		OnlyIfCached: false,
+	}
+
+	cacheControlString := header.Get("cache-control")
+	cacheControl := strings.Split(cacheControlString, ";")
+	for _, v := range cacheControl {
+		if v == "only-if-cached" {
+			result.OnlyIfCached = true
+		} else if v == "no-cache" {
+			result.NoCache = true
+		} else if v == "no-store" {
+			result.NoStore = true
+		} else if v == "no-transform" {
+			result.NoTransform = true
+		} else if strings.Contains(v, "max-age") {
+			_, t, _ := strings.Cut(v, "=")
+			age, _ := strconv.Atoi(t)
+			result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
+		} else if strings.Contains(v, "max-stale") {
+			_, t, _ := strings.Cut(v, "=")
+			age, _ := strconv.Atoi(t)
+			result.MaxStale = int64(age)
+		} else if strings.Contains(v, "min-fresh") {
+			_, t, _ := strings.Cut(v, "=")
+			age, _ := strconv.Atoi(t)
+			result.MinFresh = time.Now().Add(time.Duration(age) * time.Second)
+		}
+	}
+
+	return result
+}
+
+func loadResponseDirectives(header http.Header) *ResponseDirectives {
+	result := &ResponseDirectives{
+		MustRevalidate:  false,
+		NoCache:         false,
+		NoStore:         false,
+		NoTransform:     false,
+		Private:         false,
+		ProxyRevalidate: false,
+		MaxAge:          infinityTime,
+		SMaxAge:         nullTime,
+	}
+
+	cacheControlString := header.Get("cache-control")
+	cacheControl := strings.Split(cacheControlString, ";")
+	for _, v := range cacheControl {
+		if v == "must-revalidate" {
+			result.MustRevalidate = true
+		} else if v == "no-cache" {
+			result.NoCache = true
+		} else if v == "no-store" {
+			result.NoStore = true
+		} else if v == "no-transform" {
+			result.NoTransform = true
+		} else if v == "private" {
+			result.Private = true
+		} else if v == "proxy-revalidate" {
+			result.ProxyRevalidate = true
+		} else if strings.Contains(v, "max-age") {
+			_, t, _ := strings.Cut(v, "=")
+			age, _ := strconv.Atoi(t)
+			result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
+		} else if strings.Contains(v, "s-maxage") {
+			_, t, _ := strings.Cut(v, "=")
+			age, _ := strconv.Atoi(t)
+			result.SMaxAge = time.Now().Add(time.Duration(age) * time.Second)
+		}
+	}
+
+	return result
 }
