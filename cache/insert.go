@@ -23,32 +23,30 @@ var (
 //
 // Сохраняется json-файл, хранящий Item - тело страницы и заголовок.
 func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *Item) error {
+	var byteInfo, bytePage []byte
+	var err error
+
 	if !isStorable(&item.Header) {
 		return errors.New("can't be stored in cache:(")
 	}
 
 	info := createCacheInfo(req, resp, item.Header)
-
-	valueInfo, err := json.Marshal(*info)
-	if err != nil {
+	if byteInfo, err = json.Marshal(*info); err != nil {
 		return err
 	}
 
-	page, err := json.Marshal(*item)
-	if err != nil {
+	if bytePage, err = json.Marshal(*item); err != nil {
 		return err
 	}
 
 	keyString := constructKeyFromRequest(req)
-
 	requestHash := hash([]byte(keyString))
-	err = putPageInfoIntoDB(db, requestHash, valueInfo)
-	if err != nil {
+
+	if err = putRecord(db, requestHash, byteInfo); err != nil {
 		return err
 	}
 
-	err = writePageToDisk(requestHash, page)
-	if err != nil {
+	if err = writePageToDisk(requestHash, bytePage); err != nil {
 		return err
 	}
 
@@ -57,8 +55,8 @@ func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, item 
 	return nil
 }
 
-// Помещает в базу данных метаданные страницы, помещаемой в кэш
-func putPageInfoIntoDB(db *bolt.DB, requestHash []byte, value []byte) error {
+// putRecord Помещает в базу данных метаданные страницы, помещаемой в кэш
+func putRecord(db *bolt.DB, requestHash []byte, value []byte) error {
 	return db.Update(func(tx *bolt.Tx) error {
 		treeBucket, err := tx.CreateBucketIfNotExists(requestHash)
 		if err != nil {
@@ -101,41 +99,6 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 
 	_, err = file.Write(value)
 	return err
-}
-
-// DeleteRecord удаляет cache.Info запись из базы данных
-func DeleteRecord(db *bolt.DB, requestHash []byte) error {
-	return db.Update(func(tx *bolt.Tx) error {
-		return tx.DeleteBucket(requestHash)
-	})
-}
-
-func RemovePageFromDisk(requestHash []byte) error {
-	subhashLength := hashLength / subHashCount
-
-	var subHashes [][]byte
-	for i := 0; i < subHashCount; i++ {
-		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
-	}
-
-	path := CachePath
-	for _, v := range subHashes {
-		path += "/" + string(v)
-	}
-
-	err := os.Remove(path + "/" + string(requestHash))
-	if err != nil {
-		return err
-	}
-
-	for path != CachePath {
-		err := os.Remove(path)
-		if err != nil {
-			return err
-		}
-		path = path[:strings.LastIndexByte(path, '/')]
-	}
-	return nil
 }
 
 // Создаёт экземпляр структуры cache.Info, в которой хранится

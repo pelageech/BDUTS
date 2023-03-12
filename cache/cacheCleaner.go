@@ -78,13 +78,8 @@ func (c *cacheController) deleteExpiredCache() {
 	}
 	// deleting expired data
 	for _, key := range expiredKeys {
-		err = DeleteRecord(c.db, key)
-		if err != nil {
-			log.Printf("Error while deleting expired info about page in cacheController: %v", err)
-		}
-		err = RemovePageFromDisk(key)
-		if err != nil {
-			log.Printf("Error while removing expired page from disk in cacheController: %v", err)
+		if err = RemovePageFromCache(c.db, key); err != nil {
+			log.Println(err)
 		}
 	}
 }

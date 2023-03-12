@@ -12,16 +12,18 @@ import (
 // GetCacheIfExists Обращается к диску для нахождения ответа на запрос.
 // Если таковой имеется - он возвращается, в противном случае выдаётся ошибка
 func GetCacheIfExists(db *bolt.DB, req *http.Request) (*Item, error) {
+	var info *Info
+	var item Item
+	var err error
+
 	keyString := constructKeyFromRequest(req)
 	requestHash := hash([]byte(keyString))
 
-	info, err := getPageInfo(db, requestHash)
-	if err != nil {
+	if info, err = getPageInfo(db, requestHash); err != nil {
 		return nil, err
 	}
 
 	if isExpired(info) {
-		// delete
 		return nil, errors.New("not fresh")
 	}
 
@@ -29,14 +31,12 @@ func GetCacheIfExists(db *bolt.DB, req *http.Request) (*Item, error) {
 		return nil, errors.New("private page: addresses are not equal")
 	}
 
-	bytes, err := readPageFromDisk(requestHash)
-	if err != nil {
+	var byteItem []byte
+	if byteItem, err = readPageFromDisk(requestHash); err != nil {
 		return nil, err
 	}
 
-	var item Item
-	err = json.Unmarshal(bytes, &item)
-	if err != nil {
+	if err = json.Unmarshal(byteItem, &item); err != nil {
 		return nil, err
 	}
 
