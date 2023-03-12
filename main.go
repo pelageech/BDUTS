@@ -179,7 +179,7 @@ func isHTTPVersionSupported(req *http.Request) bool {
 func checkCache(rw http.ResponseWriter, req *http.Request) error {
 	log.Println("Try to get a response from cache...")
 
-	cacheItem, err := cache.GetCacheIfExists(db, req)
+	cacheItem, err := cache.GetPageFromCache(db, req)
 	if err != nil {
 		return err
 	}
@@ -218,7 +218,7 @@ func saveToCache(req *http.Request, resp *http.Response, byteArray []byte) {
 			Body:   byteArray,
 			Header: resp.Header,
 		}
-		err := cache.PutRecordInCache(db, req, resp, cacheItem)
+		err := cache.PutPageInCache(db, req, resp, cacheItem)
 		if err != nil {
 			log.Println("Unsuccessful operation: ", err)
 			return

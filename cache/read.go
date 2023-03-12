@@ -9,9 +9,9 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-// GetCacheIfExists Обращается к диску для нахождения ответа на запрос.
+// GetPageFromCache Обращается к диску для нахождения ответа на запрос.
 // Если таковой имеется - он возвращается, в противном случае выдаётся ошибка
-func GetCacheIfExists(db *bolt.DB, req *http.Request) (*Item, error) {
+func GetPageFromCache(db *bolt.DB, req *http.Request) (*Item, error) {
 	var info *Info
 	var item Item
 	var err error

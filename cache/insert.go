@@ -17,12 +17,12 @@ var (
 	infinityTime = time.Unix(0, 0).AddDate(7999, 12, 31)
 )
 
-// PutRecordInCache Помещает новую страницу в кэш или перезаписывает её.
+// PutPageInCache Помещает новую страницу в кэш или перезаписывает её.
 // Сначала добавляет в базу данных метаданные о странице, хранимой в cache.Info.
 // Затем начинает транзакционную запись на диск.
 //
 // Сохраняется json-файл, хранящий Item - тело страницы и заголовок.
-func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *Item) error {
+func PutPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *Item) error {
 	var byteInfo, bytePage []byte
 	var err error
 
@@ -42,7 +42,7 @@ func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, item 
 	keyString := constructKeyFromRequest(req)
 	requestHash := hash([]byte(keyString))
 
-	if err = putRecord(db, requestHash, byteInfo); err != nil {
+	if err = putPageInfo(db, requestHash, byteInfo); err != nil {
 		return err
 	}
 
@@ -55,8 +55,8 @@ func PutRecordInCache(db *bolt.DB, req *http.Request, resp *http.Response, item 
 	return nil
 }
 
-// putRecord Помещает в базу данных метаданные страницы, помещаемой в кэш
-func putRecord(db *bolt.DB, requestHash []byte, value []byte) error {
+// putPageInfo Помещает в базу данных метаданные страницы, помещаемой в кэш
+func putPageInfo(db *bolt.DB, requestHash []byte, value []byte) error {
 	return db.Update(func(tx *bolt.Tx) error {
 		treeBucket, err := tx.CreateBucketIfNotExists(requestHash)
 		if err != nil {

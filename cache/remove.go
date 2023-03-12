@@ -7,19 +7,31 @@ import (
 	"strings"
 )
 
-// deleteRecord удаляет cache.Info запись из базы данных
-func deleteRecord(db *bolt.DB, requestHash []byte) error {
+func RemovePageFromCache(db *bolt.DB, key []byte) error {
+	if err := removePageInfo(db, key); err != nil {
+		return errors.New("Error while deleting record from db: " + err.Error())
+	}
+
+	if err := removePageFromDisk(key); err != nil {
+		return errors.New("Error while deleting page from disk: " + err.Error())
+	}
+
+	return nil
+}
+
+// removePageInfo удаляет cache.Info запись из базы данных
+func removePageInfo(db *bolt.DB, key []byte) error {
 	return db.Update(func(tx *bolt.Tx) error {
-		return tx.DeleteBucket(requestHash)
+		return tx.DeleteBucket(key)
 	})
 }
 
-func removePageFromDisk(requestHash []byte) error {
+func removePageFromDisk(key []byte) error {
 	subhashLength := hashLength / subHashCount
 
 	var subHashes [][]byte
 	for i := 0; i < subHashCount; i++ {
-		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
+		subHashes = append(subHashes, key[i*subhashLength:(i+1)*subhashLength])
 	}
 
 	path := CachePath
@@ -27,7 +39,7 @@ func removePageFromDisk(requestHash []byte) error {
 		path += "/" + string(v)
 	}
 
-	err := os.Remove(path + "/" + string(requestHash))
+	err := os.Remove(path + "/" + string(key))
 	if err != nil {
 		return err
 	}
@@ -39,18 +51,5 @@ func removePageFromDisk(requestHash []byte) error {
 		}
 		path = path[:strings.LastIndexByte(path, '/')]
 	}
-	return nil
-}
-
-func RemovePageFromCache(db *bolt.DB, key []byte) error {
-	requestHash := hash(key)
-	if err := deleteRecord(db, requestHash); err != nil {
-		return errors.New("Error while deleting record from db: " + err.Error())
-	}
-
-	if err := removePageFromDisk(requestHash); err != nil {
-		return errors.New("Error while deleting page from disk: " + err.Error())
-	}
-
 	return nil
 }
