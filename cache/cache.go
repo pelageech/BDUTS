@@ -31,13 +31,48 @@ type Item struct {
 	Header http.Header
 }
 
+//	MaxAge:       +
+//	MaxStale:     +
+//	MinFresh:     +
+//	NoCache:
+//	NoStore:
+//	NoTransform:
+//	OnlyIfCached:
+
+type RequestDirectives struct {
+	MaxAge       time.Time
+	MaxStale     int64
+	MinFresh     time.Time
+	NoCache      bool
+	NoStore      bool
+	NoTransform  bool
+	OnlyIfCached bool
+}
+
+//	MustRevalidate:  +
+//	NoCache:
+//	NoStore:	     +
+//	NoTransform:
+//	Private:
+//	ProxyRevalidate:
+//	MaxAge:          +
+//	SMaxAge:         +
+
+type ResponseDirectives struct {
+	MustRevalidate  bool
+	NoCache         bool
+	NoStore         bool
+	NoTransform     bool
+	Private         bool
+	ProxyRevalidate bool
+	MaxAge          time.Time
+	SMaxAge         time.Time
+}
+
 // Info - метаданные страницы, хранящейся в базе данных
 type Info struct {
-	Size           int64
-	DateOfDeath    time.Time // nil if undying
-	MustRevalidate bool
-	RemoteAddr     string
-	IsPrivate      bool
+	Size               int64
+	ResponseDirectives ResponseDirectives
 }
 
 // OpenDatabase Открывает базу данных для дальнейшего использования
@@ -90,5 +125,5 @@ func constructKeyFromRequest(req *http.Request) string {
 }
 
 func isExpired(info *Info, afterDeath time.Duration) bool {
-	return time.Now().After(info.DateOfDeath.Add(afterDeath))
+	return time.Now().After(info.ResponseDirectives.MaxAge.Add(afterDeath))
 }

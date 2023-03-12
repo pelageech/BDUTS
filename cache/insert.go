@@ -15,6 +15,7 @@ import (
 
 var (
 	infinityTime = time.Unix(0, 0).AddDate(7999, 12, 31)
+	nullTime     = time.Time{}
 )
 
 // PutPageInCache Помещает новую страницу в кэш или перезаписывает её.
@@ -26,11 +27,13 @@ func PutPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *I
 	var byteInfo, bytePage []byte
 	var err error
 
-	if !isStorable(&item.Header) {
-		return errors.New("can't be stored in cache:(")
+	responseDirectives := loadResponseDirectives(resp.Header)
+
+	if responseDirectives.NoStore {
+		return errors.New("can't be stored in cache")
 	}
 
-	info := createCacheInfo(req, resp, item.Header)
+	info := createCacheInfo(resp)
 	if byteInfo, err = json.Marshal(*info); err != nil {
 		return err
 	}
@@ -102,35 +105,10 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 
 // Создаёт экземпляр структуры cache.Info, в которой хранится
 // информация о странице, помещаемой в кэш.
-func createCacheInfo(req *http.Request, resp *http.Response, header http.Header) *Info {
+func createCacheInfo(resp *http.Response) *Info {
 	info := &Info{
-		Size:           resp.ContentLength,
-		DateOfDeath:    infinityTime,
-		MustRevalidate: false,
-		RemoteAddr:     req.RemoteAddr,
-		IsPrivate:      false,
-	}
-
-	// check if we shouldn't store the page
-	cacheControlString := header.Get("cache-control")
-	cacheControl := strings.Split(cacheControlString, ";")
-
-	for _, v := range cacheControl {
-		if strings.Contains(v, "max-age") {
-			_, t, _ := strings.Cut(v, "=")
-			age, _ := strconv.Atoi(t)
-			if age > 0 { // Create a point after that the page goes off
-				info.DateOfDeath = time.Now().Add(time.Duration(age) * time.Second)
-			}
-		}
-
-		if v == "must-revalidate" {
-			info.MustRevalidate = true
-		}
-
-		if v == "private" {
-			info.IsPrivate = true
-		}
+		Size:               resp.ContentLength,
+		ResponseDirectives: *loadResponseDirectives(resp.Header),
 	}
 
 	return info
@@ -149,4 +127,45 @@ func isStorable(header *http.Header) bool {
 		}
 	}
 	return true
+}
+
+func loadResponseDirectives(header http.Header) *ResponseDirectives {
+	result := &ResponseDirectives{
+		MustRevalidate:  false,
+		NoCache:         false,
+		NoStore:         false,
+		NoTransform:     false,
+		Private:         false,
+		ProxyRevalidate: false,
+		MaxAge:          infinityTime,
+		SMaxAge:         nullTime,
+	}
+
+	cacheControlString := header.Get("cache-control")
+	cacheControl := strings.Split(cacheControlString, ";")
+	for _, v := range cacheControl {
+		if v == "must-revalidate" {
+			result.MustRevalidate = true
+		} else if v == "no-cache" {
+			result.NoCache = true
+		} else if v == "no-store" {
+			result.NoStore = true
+		} else if v == "no-transform" {
+			result.NoTransform = true
+		} else if v == "private" {
+			result.Private = true
+		} else if v == "proxy-revalidate" {
+			result.ProxyRevalidate = true
+		} else if strings.Contains(v, "max-age") {
+			_, t, _ := strings.Cut(v, "=")
+			age, _ := strconv.Atoi(t)
+			result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
+		} else if strings.Contains(v, "s-maxage") {
+			_, t, _ := strings.Cut(v, "=")
+			age, _ := strconv.Atoi(t)
+			result.SMaxAge = time.Now().Add(time.Duration(age) * time.Second)
+		}
+	}
+
+	return result
 }

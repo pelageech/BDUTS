@@ -26,17 +26,23 @@ func GetPageFromCache(db *bolt.DB, req *http.Request) (*Item, error) {
 		return nil, err
 	}
 
-	afterDeath := time.Duration(0)
-	if !info.MustRevalidate {
-		afterDeath = getAfterDeath(req)
-	}
-	if time.Now().After(info.DateOfDeath.Add(afterDeath)) {
-		return nil, errors.New("not fresh")
+	requestDirectives := loadRequestDirectives(req.Header)
+
+	afterDeath := time.Duration(requestDirectives.MaxStale)
+
+	maxAge := info.ResponseDirectives.MaxAge
+	if !info.ResponseDirectives.SMaxAge.IsZero() {
+		maxAge = info.ResponseDirectives.SMaxAge
 	}
 
-	//if info.IsPrivate && req.RemoteAddr != info.RemoteAddr {
-	//	return nil, errors.New("private page: addresses are not equal")
-	//}
+	freshTime := requestDirectives.MinFresh
+
+	if info.ResponseDirectives.MustRevalidate {
+		afterDeath = time.Duration(0)
+	}
+	if time.Now().After(maxAge.Add(afterDeath)) || !time.Now().After(freshTime) {
+		return nil, errors.New("not fresh")
+	}
 
 	var byteItem []byte
 	if byteItem, err = readPageFromDisk(requestHash); err != nil {
@@ -108,17 +114,42 @@ func getBucket(tx *bolt.Tx, key []byte) (*bolt.Bucket, error) {
 	return nil, errors.New("miss cache")
 }
 
-func getAfterDeath(req *http.Request) time.Duration {
-	cacheControlString := req.Header.Get("cache-control")
+func loadRequestDirectives(header http.Header) *RequestDirectives {
+	result := &RequestDirectives{
+		MaxAge:       nullTime,
+		MaxStale:     0,
+		MinFresh:     nullTime,
+		NoCache:      false,
+		NoStore:      false,
+		NoTransform:  false,
+		OnlyIfCached: false,
+	}
 
+	cacheControlString := header.Get("cache-control")
 	cacheControl := strings.Split(cacheControlString, ";")
 	for _, v := range cacheControl {
-		if strings.Contains(v, "max-stale") {
+		if v == "only-if-cached" {
+			result.OnlyIfCached = true
+		} else if v == "no-cache" {
+			result.NoCache = true
+		} else if v == "no-store" {
+			result.NoStore = true
+		} else if v == "no-transform" {
+			result.NoTransform = true
+		} else if strings.Contains(v, "max-age") {
 			_, t, _ := strings.Cut(v, "=")
 			age, _ := strconv.Atoi(t)
-			return time.Duration(age)
+			result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
+		} else if strings.Contains(v, "max-stale") {
+			_, t, _ := strings.Cut(v, "=")
+			age, _ := strconv.Atoi(t)
+			result.MaxStale = int64(age)
+		} else if strings.Contains(v, "min-fresh") {
+			_, t, _ := strings.Cut(v, "=")
+			age, _ := strconv.Atoi(t)
+			result.MinFresh = time.Now().Add(time.Duration(age) * time.Second)
 		}
 	}
 
-	return time.Duration(0)
+	return result
 }
