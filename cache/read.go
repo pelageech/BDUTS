@@ -5,6 +5,9 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/boltdb/bolt"
 )
@@ -23,13 +26,17 @@ func GetPageFromCache(db *bolt.DB, req *http.Request) (*Item, error) {
 		return nil, err
 	}
 
-	if isExpired(info) {
+	afterDeath := time.Duration(0)
+	if !info.MustRevalidate {
+		afterDeath = getAfterDeath(req)
+	}
+	if time.Now().After(info.DateOfDeath.Add(afterDeath)) {
 		return nil, errors.New("not fresh")
 	}
 
-	if info.IsPrivate && req.RemoteAddr != info.RemoteAddr {
-		return nil, errors.New("private page: addresses are not equal")
-	}
+	//if info.IsPrivate && req.RemoteAddr != info.RemoteAddr {
+	//	return nil, errors.New("private page: addresses are not equal")
+	//}
 
 	var byteItem []byte
 	if byteItem, err = readPageFromDisk(requestHash); err != nil {
@@ -99,4 +106,19 @@ func getBucket(tx *bolt.Tx, key []byte) (*bolt.Bucket, error) {
 	}
 
 	return nil, errors.New("miss cache")
+}
+
+func getAfterDeath(req *http.Request) time.Duration {
+	cacheControlString := req.Header.Get("cache-control")
+
+	cacheControl := strings.Split(cacheControlString, ";")
+	for _, v := range cacheControl {
+		if strings.Contains(v, "max-stale") {
+			_, t, _ := strings.Cut(v, "=")
+			age, _ := strconv.Atoi(t)
+			return time.Duration(age)
+		}
+	}
+
+	return time.Duration(0)
 }

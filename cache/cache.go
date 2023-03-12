@@ -33,10 +33,11 @@ type Item struct {
 
 // Info - метаданные страницы, хранящейся в базе данных
 type Info struct {
-	Size        int64
-	DateOfDeath time.Time // nil if undying
-	RemoteAddr  string
-	IsPrivate   bool
+	Size           int64
+	DateOfDeath    time.Time // nil if undying
+	MustRevalidate bool
+	RemoteAddr     string
+	IsPrivate      bool
 }
 
 // OpenDatabase Открывает базу данных для дальнейшего использования
@@ -88,6 +89,6 @@ func constructKeyFromRequest(req *http.Request) string {
 	return result
 }
 
-func isExpired(info *Info) bool {
-	return time.Now().After(info.DateOfDeath)
+func isExpired(info *Info, afterDeath time.Duration) bool {
+	return time.Now().After(info.DateOfDeath.Add(afterDeath))
 }

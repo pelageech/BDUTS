@@ -58,7 +58,7 @@ func (c *cacheController) deleteExpiredCache() {
 			return err
 		}
 
-		if isExpired(&info) {
+		if isExpired(&info, time.Duration(0)) {
 			expiredKeys = append(expiredKeys, name)
 			sizeReleased += info.Size
 		}

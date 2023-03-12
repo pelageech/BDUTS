@@ -104,10 +104,11 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 // информация о странице, помещаемой в кэш.
 func createCacheInfo(req *http.Request, resp *http.Response, header http.Header) *Info {
 	info := &Info{
-		Size:        resp.ContentLength,
-		DateOfDeath: infinityTime,
-		RemoteAddr:  req.RemoteAddr,
-		IsPrivate:   false,
+		Size:           resp.ContentLength,
+		DateOfDeath:    infinityTime,
+		MustRevalidate: false,
+		RemoteAddr:     req.RemoteAddr,
+		IsPrivate:      false,
 	}
 
 	// check if we shouldn't store the page
@@ -123,7 +124,11 @@ func createCacheInfo(req *http.Request, resp *http.Response, header http.Header)
 			}
 		}
 
-		if strings.Contains(v, "private") {
+		if v == "must-revalidate" {
+			info.MustRevalidate = true
+		}
+
+		if v == "private" {
 			info.IsPrivate = true
 		}
 	}
