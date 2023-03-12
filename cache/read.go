@@ -65,10 +65,10 @@ func getPageInfo(db *bolt.DB, requestHash []byte) (*Info, error) {
 	}
 
 	var info Info
-	err = json.Unmarshal(result, &info)
-	if err != nil {
+	if err = json.Unmarshal(result, &info); err != nil {
 		return nil, err
 	}
+
 	return &info, nil
 }
 
@@ -94,8 +94,7 @@ func readPageFromDisk(requestHash []byte) ([]byte, error) {
 
 // Универсальная функция получения бакета
 func getBucket(tx *bolt.Tx, key []byte) (*bolt.Bucket, error) {
-	bucket := tx.Bucket(key)
-	if bucket != nil {
+	if bucket := tx.Bucket(key); bucket != nil {
 		return bucket, nil
 	}
 

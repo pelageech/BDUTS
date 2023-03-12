@@ -39,14 +39,12 @@ func removePageFromDisk(key []byte) error {
 		path += "/" + string(v)
 	}
 
-	err := os.Remove(path + "/" + string(key))
-	if err != nil {
+	if err := os.Remove(path + "/" + string(key)); err != nil {
 		return err
 	}
 
 	for path != CachePath {
-		err := os.Remove(path)
-		if err != nil {
+		if err := os.Remove(path); err != nil {
 			return err
 		}
 		path = path[:strings.LastIndexByte(path, '/')]

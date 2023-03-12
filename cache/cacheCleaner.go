@@ -54,20 +54,21 @@ func (c *cacheController) deleteExpiredCache() {
 		v := b.Get([]byte(pageInfo))
 
 		var info Info
-		err := json.Unmarshal(v, &info)
+		if err := json.Unmarshal(v, &info); err != nil {
+			return err
+		}
 
 		if isExpired(&info) {
 			expiredKeys = append(expiredKeys, name)
 			sizeReleased += info.Size
 		}
-		return err
+		return nil
 	}
 
 	// iterating over all buckets and all keys in each buckets
 	// and collecting expired keys of expired data
 	err := c.db.View(func(tx *bolt.Tx) error {
-		err := tx.ForEach(addExpiredKeys)
-		return err
+		return tx.ForEach(addExpiredKeys)
 	})
 	if err != nil {
 		log.Printf("Error while viewing cache in cacheController: %v", err)

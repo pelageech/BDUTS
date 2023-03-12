@@ -81,8 +81,7 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 		path += "/" + string(v)
 	}
 
-	err := os.MkdirAll(path, 0770)
-	if err != nil {
+	if err := os.MkdirAll(path, 0770); err != nil {
 		return err
 	}
 
