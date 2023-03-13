@@ -21,7 +21,7 @@ import (
 	"github.com/pelageech/BDUTS/timer"
 )
 
-type myKey int
+type MyKey int
 
 const (
 	lbConfigPath      = "./resources/config.json"
@@ -32,7 +32,7 @@ const (
 	DBFillFactor       = 0.9
 	dbObserveFrequency = 10 * time.Second
 
-	keyStart = myKey(iota)
+	keyStart = MyKey(iota)
 )
 
 type LoadBalancer struct {

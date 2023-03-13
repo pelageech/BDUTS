@@ -19,8 +19,10 @@ import (
 	"github.com/pelageech/BDUTS/config"
 )
 
+type Key int
+
 const (
-	OnlyIfCachedKey   = iota
+	OnlyIfCachedKey   = Key(iota)
 	OnlyIfCachedError = "HTTP 504 Unsatisfiable Request (only-if-cached)"
 )
 
