@@ -20,9 +20,16 @@ import (
 )
 
 const (
+	OnlyIfCachedKey   = iota
+	OnlyIfCachedError = "HTTP 504 Unsatisfiable Request (only-if-cached)"
+)
+
+const (
+	DbDirectory  = "./cache-data"
+	DbName       = "database.db"
+	PagesPath    = "./cache-data/db"
 	hashLength   = sha1.Size * 2
 	subHashCount = 4 // Количество подотрезков хэша
-	CachePath    = "./cache-data/db"
 	pageInfo     = "pageInfo"
 )
 
@@ -39,7 +46,7 @@ type Item struct {
 //	NoCache:
 //	NoStore:	  +
 //	NoTransform:
-//	OnlyIfCached:
+//	OnlyIfCached: +
 
 type RequestDirectives struct {
 	MaxAge       time.Time

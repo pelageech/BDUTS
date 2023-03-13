@@ -34,7 +34,7 @@ func removePageFromDisk(key []byte) error {
 		subHashes = append(subHashes, key[i*subhashLength:(i+1)*subhashLength])
 	}
 
-	path := CachePath
+	path := PagesPath
 	for _, v := range subHashes {
 		path += "/" + string(v)
 	}
@@ -43,7 +43,7 @@ func removePageFromDisk(key []byte) error {
 		return err
 	}
 
-	for path != CachePath {
+	for path != PagesPath {
 		if err := os.Remove(path); err != nil {
 			return err
 		}

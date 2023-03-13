@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -17,14 +18,16 @@ func GetPageFromCache(db *bolt.DB, req *http.Request) (*Item, error) {
 	var item Item
 	var err error
 
+	requestDirectives := loadRequestDirectives(req.Header)
+	// doesn't modify the request but adds a context key-value item
+	req = req.WithContext(context.WithValue(req.Context(), OnlyIfCachedKey, requestDirectives.OnlyIfCached))
+
 	keyString := constructKeyFromRequest(req)
 	requestHash := hash([]byte(keyString))
 
 	if info, err = getPageInfo(db, requestHash); err != nil {
 		return nil, err
 	}
-
-	requestDirectives := loadRequestDirectives(req.Header)
 
 	afterDeath := time.Duration(requestDirectives.MaxStale)
 
@@ -93,7 +96,7 @@ func readPageFromDisk(requestHash []byte) ([]byte, error) {
 		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
 	}
 
-	path := CachePath
+	path := PagesPath
 	for _, v := range subHashes {
 		path += "/" + string(v)
 	}

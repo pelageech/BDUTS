@@ -78,7 +78,7 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
 	}
 
-	path := CachePath
+	path := PagesPath
 	for _, v := range subHashes {
 		path += "/" + string(v)
 	}
