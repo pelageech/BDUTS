@@ -65,8 +65,7 @@ func (balancer *LoadBalancer) configureServerPool(servers []config.ServerConfig)
 		backend.healthCheckTcpTimeout = time.Duration(server.HealthCheckTcpTimeout) * time.Millisecond
 		backend.alive = false
 
-		backend.currentRequests = 0
-		backend.maximalRequests = server.MaximalRequests
+		backend.requestChan = make(chan bool, server.MaximalRequests)
 
 		balancer.pool.servers = append(balancer.pool.servers, &backend)
 	}
@@ -84,8 +83,7 @@ type Backend struct {
 	healthCheckTcpTimeout time.Duration
 	mux                   sync.Mutex
 	alive                 bool
-	currentRequests       int32
-	maximalRequests       int32
+	requestChan           chan bool
 }
 
 func (server *Backend) setAlive(b bool) {
