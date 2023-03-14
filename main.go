@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -243,15 +242,19 @@ func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Req
 	// on cache miss make request to backend
 
 	for {
-		// get next server to send a request
 		server, err := balancer.pool.getNextPeer()
+		select {
+		case server.requestChan <- true:
+		default:
+			continue
+		}
 
 		if err != nil {
 			log.Println(err)
 			http.Error(rw, "Service not available", http.StatusServiceUnavailable)
 			return
 		}
-		defer atomic.AddInt32(&server.currentRequests, int32(-1))
+		defer func() { <-server.requestChan }()
 
 		log.Printf("[%s] received a request\n", server.URL)
 
