@@ -20,11 +20,9 @@ import (
 	"github.com/pelageech/BDUTS/timer"
 )
 
-type myKey int
+type MyKey int
 
 const (
-	dbDirectory       = "./cache-data"
-	dbName            = "database.db"
 	lbConfigPath      = "./resources/config.json"
 	serversConfigPath = "./resources/servers.json"
 	cacheConfigPath   = "./resources/cache_config.json"
@@ -33,7 +31,7 @@ const (
 	DBFillFactor       = 0.9
 	dbObserveFrequency = 10 * time.Second
 
-	keyStart = myKey(iota)
+	keyStart = MyKey(iota)
 )
 
 type LoadBalancer struct {
@@ -176,7 +174,7 @@ func isHTTPVersionSupported(req *http.Request) bool {
 func checkCache(rw http.ResponseWriter, req *http.Request) error {
 	log.Println("Try to get a response from cache...")
 
-	cacheItem, err := cache.GetCacheIfExists(db, req)
+	cacheItem, err := cache.GetPageFromCache(db, req)
 	if err != nil {
 		return err
 	}
@@ -215,7 +213,7 @@ func saveToCache(req *http.Request, resp *http.Response, byteArray []byte) {
 			Body:   byteArray,
 			Header: resp.Header,
 		}
-		err := cache.PutRecordInCache(db, req, resp, cacheItem)
+		err := cache.PutPageInCache(db, req, resp, cacheItem)
 		if err != nil {
 			log.Println("Unsuccessful operation: ", err)
 			return
@@ -233,10 +231,15 @@ func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Req
 	req = req.WithContext(context.WithValue(req.Context(), keyStart, start))
 
 	// getting a response from cache
-	if err := checkCache(rw, req); err == nil {
+	err := checkCache(rw, req)
+	if err == nil {
 		return
 	} else {
 		log.Println("Checking cache unsuccessful: ", err)
+		if req.Context().Value(cache.OnlyIfCachedKey).(bool) {
+			http.Error(rw, cache.OnlyIfCachedError, http.StatusGatewayTimeout)
+			return
+		}
 	}
 
 	// on cache miss make request to backend
@@ -391,27 +394,27 @@ func main() {
 
 	loadBalancer.configureServerPool(serversConfig)
 
-	err = os.Mkdir(dbDirectory, 0777)
+	err = os.Mkdir(cache.DbDirectory, 0777)
 	if err != nil && !os.IsExist(err) {
 		log.Fatalln("Cache files directory creation error: ", err)
 	}
 
 	// cache configuration
 	log.Println("Opening cache database")
-	db, err = cache.OpenDatabase(dbDirectory + "/" + dbName)
+	db, err = cache.OpenDatabase(cache.DbDirectory + "/" + cache.DbName)
 	if err != nil {
 		log.Fatalln("DB error: ", err)
 	}
 	defer cache.CloseDatabase(db)
 
 	// create directory for cache files
-	err = os.Mkdir(cache.CachePath, 0777)
+	err = os.Mkdir(cache.PagesPath, 0777)
 	if err != nil && !os.IsExist(err) {
 		log.Fatalln("DB files directory creation error: ", err)
 	}
 
 	// open directory with cache files
-	dbDir, err := os.Open(cache.CachePath)
+	dbDir, err := os.Open(cache.PagesPath)
 	if err != nil {
 		log.Fatalln("DB files opening error: ", err)
 	}

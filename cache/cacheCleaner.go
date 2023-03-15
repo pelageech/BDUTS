@@ -54,20 +54,21 @@ func (c *cacheController) deleteExpiredCache() {
 		v := b.Get([]byte(pageInfo))
 
 		var info Info
-		err := json.Unmarshal(v, &info)
+		if err := json.Unmarshal(v, &info); err != nil {
+			return err
+		}
 
-		if isExpired(&info) {
+		if isExpired(&info, time.Duration(0)) {
 			expiredKeys = append(expiredKeys, name)
 			sizeReleased += info.Size
 		}
-		return err
+		return nil
 	}
 
-	// iterating over all buckets and all keys in each buckets
+	// iterating over all buckets and all keys in each bucket
 	// and collecting expired keys of expired data
 	err := c.db.View(func(tx *bolt.Tx) error {
-		err := tx.ForEach(addExpiredKeys)
-		return err
+		return tx.ForEach(addExpiredKeys)
 	})
 	if err != nil {
 		log.Printf("Error while viewing cache in cacheController: %v", err)
@@ -78,13 +79,8 @@ func (c *cacheController) deleteExpiredCache() {
 	}
 	// deleting expired data
 	for _, key := range expiredKeys {
-		err = DeleteRecord(c.db, key)
-		if err != nil {
-			log.Printf("Error while deleting expired info about page in cacheController: %v", err)
-		}
-		err = RemovePageFromDisk(key)
-		if err != nil {
-			log.Printf("Error while removing expired page from disk in cacheController: %v", err)
+		if err = RemovePageFromCache(c.db, key); err != nil {
+			log.Println(err)
 		}
 	}
 }

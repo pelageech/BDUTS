@@ -1,42 +1,56 @@
 package cache
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/boltdb/bolt"
 )
 
-// GetCacheIfExists Обращается к диску для нахождения ответа на запрос.
+// GetPageFromCache Обращается к диску для нахождения ответа на запрос.
 // Если таковой имеется - он возвращается, в противном случае выдаётся ошибка
-func GetCacheIfExists(db *bolt.DB, req *http.Request) (*Item, error) {
+func GetPageFromCache(db *bolt.DB, req *http.Request) (*Item, error) {
+	var info *Info
+	var item Item
+	var err error
+
+	requestDirectives := loadRequestDirectives(req.Header)
+	// doesn't modify the request but adds a context key-value item
+	req = req.WithContext(context.WithValue(req.Context(), OnlyIfCachedKey, requestDirectives.OnlyIfCached))
+
 	keyString := constructKeyFromRequest(req)
 	requestHash := hash([]byte(keyString))
 
-	info, err := getPageInfo(db, requestHash)
-	if err != nil {
+	if info, err = getPageInfo(db, requestHash); err != nil {
 		return nil, err
 	}
 
-	if isExpired(info) {
-		// delete
+	afterDeath := time.Duration(requestDirectives.MaxStale)
+
+	maxAge := info.ResponseDirectives.MaxAge
+	if !info.ResponseDirectives.SMaxAge.IsZero() {
+		maxAge = info.ResponseDirectives.SMaxAge
+	}
+
+	freshTime := requestDirectives.MinFresh
+
+	if info.ResponseDirectives.MustRevalidate {
+		afterDeath = time.Duration(0)
+	}
+	if time.Now().After(maxAge.Add(afterDeath)) || !time.Now().After(freshTime) {
 		return nil, errors.New("not fresh")
 	}
 
-	if info.IsPrivate && req.RemoteAddr != info.RemoteAddr {
-		return nil, errors.New("private page: addresses are not equal")
-	}
-
-	bytes, err := readPageFromDisk(requestHash)
-	if err != nil {
+	var byteItem []byte
+	if byteItem, err = readPageFromDisk(requestHash); err != nil {
 		return nil, err
 	}
 
-	var item Item
-	err = json.Unmarshal(bytes, &item)
-	if err != nil {
+	if err = json.Unmarshal(byteItem, &item); err != nil {
 		return nil, err
 	}
 
@@ -65,10 +79,10 @@ func getPageInfo(db *bolt.DB, requestHash []byte) (*Info, error) {
 	}
 
 	var info Info
-	err = json.Unmarshal(result, &info)
-	if err != nil {
+	if err = json.Unmarshal(result, &info); err != nil {
 		return nil, err
 	}
+
 	return &info, nil
 }
 
@@ -82,7 +96,7 @@ func readPageFromDisk(requestHash []byte) ([]byte, error) {
 		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
 	}
 
-	path := CachePath
+	path := PagesPath
 	for _, v := range subHashes {
 		path += "/" + string(v)
 	}
@@ -94,8 +108,7 @@ func readPageFromDisk(requestHash []byte) ([]byte, error) {
 
 // Универсальная функция получения бакета
 func getBucket(tx *bolt.Tx, key []byte) (*bolt.Bucket, error) {
-	bucket := tx.Bucket(key)
-	if bucket != nil {
+	if bucket := tx.Bucket(key); bucket != nil {
 		return bucket, nil
 	}
 

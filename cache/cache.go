@@ -11,16 +11,27 @@ import (
 	"encoding/hex"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/pelageech/BDUTS/config"
 )
 
+type Key int
+
 const (
+	OnlyIfCachedKey   = Key(iota)
+	OnlyIfCachedError = "HTTP 504 Unsatisfiable Request (only-if-cached)"
+)
+
+const (
+	DbDirectory  = "./cache-data"
+	DbName       = "database.db"
+	PagesPath    = "./cache-data/db"
 	hashLength   = sha1.Size * 2
 	subHashCount = 4 // Количество подотрезков хэша
-	CachePath    = "./cache-data/db"
 	pageInfo     = "pageInfo"
 )
 
@@ -31,12 +42,48 @@ type Item struct {
 	Header http.Header
 }
 
+//	MaxAge:       +
+//	MaxStale:     +
+//	MinFresh:     +
+//	NoCache:
+//	NoStore:	  +
+//	NoTransform:
+//	OnlyIfCached: +
+
+type RequestDirectives struct {
+	MaxAge       time.Time
+	MaxStale     int64
+	MinFresh     time.Time
+	NoCache      bool
+	NoStore      bool
+	NoTransform  bool
+	OnlyIfCached bool
+}
+
+//	MustRevalidate:  +
+//	NoCache:
+//	NoStore:	     +
+//	NoTransform:
+//	Private:
+//	ProxyRevalidate:
+//	MaxAge:          +
+//	SMaxAge:         +
+
+type ResponseDirectives struct {
+	MustRevalidate  bool
+	NoCache         bool
+	NoStore         bool
+	NoTransform     bool
+	Private         bool
+	ProxyRevalidate bool
+	MaxAge          time.Time
+	SMaxAge         time.Time
+}
+
 // Info - метаданные страницы, хранящейся в базе данных
 type Info struct {
-	Size        int64
-	DateOfDeath time.Time // nil if undying
-	RemoteAddr  string
-	IsPrivate   bool
+	Size               int64
+	ResponseDirectives ResponseDirectives
 }
 
 // OpenDatabase Открывает базу данных для дальнейшего использования
@@ -88,6 +135,87 @@ func constructKeyFromRequest(req *http.Request) string {
 	return result
 }
 
-func isExpired(info *Info) bool {
-	return time.Now().After(info.DateOfDeath)
+func isExpired(info *Info, afterDeath time.Duration) bool {
+	return time.Now().After(info.ResponseDirectives.MaxAge.Add(afterDeath))
+}
+
+func loadRequestDirectives(header http.Header) *RequestDirectives {
+	result := &RequestDirectives{
+		MaxAge:       nullTime,
+		MaxStale:     0,
+		MinFresh:     nullTime,
+		NoCache:      false,
+		NoStore:      false,
+		NoTransform:  false,
+		OnlyIfCached: false,
+	}
+
+	cacheControlString := header.Get("cache-control")
+	cacheControl := strings.Split(cacheControlString, ";")
+	for _, v := range cacheControl {
+		if v == "only-if-cached" {
+			result.OnlyIfCached = true
+		} else if v == "no-cache" {
+			result.NoCache = true
+		} else if v == "no-store" {
+			result.NoStore = true
+		} else if v == "no-transform" {
+			result.NoTransform = true
+		} else if strings.Contains(v, "max-age") {
+			_, t, _ := strings.Cut(v, "=")
+			age, _ := strconv.Atoi(t)
+			result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
+		} else if strings.Contains(v, "max-stale") {
+			_, t, _ := strings.Cut(v, "=")
+			age, _ := strconv.Atoi(t)
+			result.MaxStale = int64(age)
+		} else if strings.Contains(v, "min-fresh") {
+			_, t, _ := strings.Cut(v, "=")
+			age, _ := strconv.Atoi(t)
+			result.MinFresh = time.Now().Add(time.Duration(age) * time.Second)
+		}
+	}
+
+	return result
+}
+
+func loadResponseDirectives(header http.Header) *ResponseDirectives {
+	result := &ResponseDirectives{
+		MustRevalidate:  false,
+		NoCache:         false,
+		NoStore:         false,
+		NoTransform:     false,
+		Private:         false,
+		ProxyRevalidate: false,
+		MaxAge:          infinityTime,
+		SMaxAge:         nullTime,
+	}
+
+	cacheControlString := header.Get("cache-control")
+	cacheControl := strings.Split(cacheControlString, ";")
+	for _, v := range cacheControl {
+		if v == "must-revalidate" {
+			result.MustRevalidate = true
+		} else if v == "no-cache" {
+			result.NoCache = true
+		} else if v == "no-store" {
+			result.NoStore = true
+		} else if v == "no-transform" {
+			result.NoTransform = true
+		} else if v == "private" {
+			result.Private = true
+		} else if v == "proxy-revalidate" {
+			result.ProxyRevalidate = true
+		} else if strings.Contains(v, "max-age") {
+			_, t, _ := strings.Cut(v, "=")
+			age, _ := strconv.Atoi(t)
+			result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
+		} else if strings.Contains(v, "s-maxage") {
+			_, t, _ := strings.Cut(v, "=")
+			age, _ := strconv.Atoi(t)
+			result.SMaxAge = time.Now().Add(time.Duration(age) * time.Second)
+		}
+	}
+
+	return result
 }
