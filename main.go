@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -65,8 +64,7 @@ func (balancer *LoadBalancer) configureServerPool(servers []config.ServerConfig)
 		backend.healthCheckTcpTimeout = time.Duration(server.HealthCheckTcpTimeout) * time.Millisecond
 		backend.alive = false
 
-		backend.currentRequests = 0
-		backend.maximalRequests = server.MaximalRequests
+		backend.requestChan = make(chan bool, server.MaximalRequests)
 
 		balancer.pool.servers = append(balancer.pool.servers, &backend)
 	}
@@ -84,8 +82,7 @@ type Backend struct {
 	healthCheckTcpTimeout time.Duration
 	mux                   sync.Mutex
 	alive                 bool
-	currentRequests       int32
-	maximalRequests       int32
+	requestChan           chan bool
 }
 
 func (server *Backend) setAlive(b bool) {
@@ -245,15 +242,19 @@ func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Req
 	// on cache miss make request to backend
 
 	for {
-		// get next server to send a request
 		server, err := balancer.pool.getNextPeer()
+		select {
+		case server.requestChan <- true:
+		default:
+			continue
+		}
 
 		if err != nil {
 			log.Println(err)
 			http.Error(rw, "Service not available", http.StatusServiceUnavailable)
 			return
 		}
-		defer atomic.AddInt32(&server.currentRequests, int32(-1))
+		defer func() { <-server.requestChan }()
 
 		log.Printf("[%s] received a request\n", server.URL)
 
