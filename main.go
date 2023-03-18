@@ -152,7 +152,7 @@ ChooseServer:
 		return
 	}
 
-	backend.SaveToCache(db, req, resp, byteArray)
+	go backend.SaveToCache(db, req, resp, byteArray)
 
 	finishRoundTrip := time.Since(start)
 	timer.SaveTimeDataBackend(backendTime, &finishRoundTrip)
