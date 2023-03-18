@@ -272,16 +272,6 @@ func main() {
 	}
 	config.RequestKey = config.ParseRequestKey(cacheConfig.RequestKey)
 
-	// Config TLS: setting a pair crt-key
-	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
-	tlsConfig := &tls.Config{Certificates: []tls.Certificate{Crt}}
-
-	// Start listening
-	ln, err := tls.Listen("tcp", fmt.Sprintf(":%d", loadBalancer.config.port), tlsConfig)
-	if err != nil {
-		log.Fatal("There's problem with listening")
-	}
-
 	// current is -1, it's automatically will turn into 0
 	loadBalancer.pool.Current = -1
 
@@ -300,6 +290,16 @@ func main() {
 
 	// set up health check
 	go loadBalancer.HealthChecker()
+
+	// Config TLS: setting a pair crt-key
+	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
+	tlsConfig := &tls.Config{Certificates: []tls.Certificate{Crt}}
+
+	// Start listening
+	ln, err := tls.Listen("tcp", fmt.Sprintf(":%d", loadBalancer.config.port), tlsConfig)
+	if err != nil {
+		log.Fatal("There's problem with listening")
+	}
 
 	log.Printf("Load Balancer started at :%d\n", loadBalancer.config.port)
 	if err := http.Serve(ln, nil); err != nil {
