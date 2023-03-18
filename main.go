@@ -117,7 +117,7 @@ func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Req
 		return
 	} else {
 		log.Println("Checking cache unsuccessful: ", err)
-		if req.Context().Value(cache.OnlyIfCachedKey).(bool) {
+		if r := req.Context().Value(cache.OnlyIfCachedKey).(bool); r {
 			http.Error(rw, cache.OnlyIfCachedError, http.StatusGatewayTimeout)
 			return
 		}

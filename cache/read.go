@@ -20,7 +20,7 @@ func GetPageFromCache(db *bolt.DB, req *http.Request) (*Item, error) {
 
 	requestDirectives := loadRequestDirectives(req.Header)
 	// doesn't modify the request but adds a context key-value item
-	req = req.WithContext(context.WithValue(req.Context(), OnlyIfCachedKey, requestDirectives.OnlyIfCached))
+	*req = *req.WithContext(context.WithValue(req.Context(), OnlyIfCachedKey, requestDirectives.OnlyIfCached))
 
 	keyString := constructKeyFromRequest(req)
 	requestHash := hash([]byte(keyString))
