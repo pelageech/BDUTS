@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"github.com/pelageech/BDUTS/backend"
@@ -141,7 +142,9 @@ ChooseServer:
 	req, backendTime = timer.MakeRequestTimeTracker(req)
 
 	resp, err := server.SendRequestToBackend(rw, req)
-	if err != nil {
+	if err == context.Canceled {
+		return
+	} else if err != nil {
 		goto ChooseServer
 	}
 	defer resp.Body.Close()
