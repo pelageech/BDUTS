@@ -144,6 +144,7 @@ ChooseServer:
 	if err != nil {
 		goto ChooseServer
 	}
+	defer resp.Body.Close()
 
 	byteArray, err := backend.WriteBodyAndReturn(rw, resp)
 	if err != nil {
@@ -155,7 +156,6 @@ ChooseServer:
 
 	finishRoundTrip := time.Since(start)
 	timer.SaveTimeDataBackend(backendTime, &finishRoundTrip)
-	return
 }
 
 func (balancer *LoadBalancer) HealthChecker() {
