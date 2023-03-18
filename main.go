@@ -1,17 +1,13 @@
 package main
 
 import (
-	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
-	"io"
+	"github.com/pelageech/BDUTS/backend"
 	"log"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -19,8 +15,6 @@ import (
 	"github.com/pelageech/BDUTS/config"
 	"github.com/pelageech/BDUTS/timer"
 )
-
-type MyKey int
 
 const (
 	lbConfigPath      = "./resources/config.json"
@@ -30,42 +24,11 @@ const (
 	maxDBSize          = 100 * 1024 * 1024 // 100 MB
 	DBFillFactor       = 0.9
 	dbObserveFrequency = 10 * time.Second
-
-	keyStart = MyKey(iota)
 )
 
 type LoadBalancer struct {
 	config LoadBalancerConfig
-	pool   ServerPool
-}
-
-func NewLoadBalancer(config LoadBalancerConfig) *LoadBalancer {
-	return &LoadBalancer{
-		config: config,
-		pool:   ServerPool{},
-	}
-}
-
-func (balancer *LoadBalancer) configureServerPool(servers []config.ServerConfig) {
-	for _, server := range servers {
-		log.Printf("%v", server)
-
-		var backend Backend
-		var err error
-
-		backend.URL, err = url.Parse(server.URL)
-		if err != nil {
-			log.Printf("Failed to parse server URL: %s\n", err)
-			continue
-		}
-
-		backend.healthCheckTcpTimeout = time.Duration(server.HealthCheckTcpTimeout) * time.Millisecond
-		backend.alive = false
-
-		backend.requestChan = make(chan bool, server.MaximalRequests)
-
-		balancer.pool.servers = append(balancer.pool.servers, &backend)
-	}
+	pool   backend.ServerPool
 }
 
 // LoadBalancerConfig is parse from `config.json` file.
@@ -75,100 +38,35 @@ type LoadBalancerConfig struct {
 	healthCheckPeriod time.Duration
 }
 
-type Backend struct {
-	URL                   *url.URL
-	healthCheckTcpTimeout time.Duration
-	mux                   sync.Mutex
-	alive                 bool
-	requestChan           chan bool
-}
-
-func (server *Backend) setAlive(b bool) {
-	server.mux.Lock()
-	server.alive = b
-	server.mux.Unlock()
-}
-
-type ServerPool struct {
-	mux     sync.Mutex
-	servers []*Backend
-	current int32
-}
-
-type ResponseError struct {
-	request    *http.Request
-	statusCode int
-	err        error
-}
-
 var db *bolt.DB
 
-func (server *Backend) makeRequest(r *http.Request) (*http.Response, *ResponseError) {
-	newReq := *r
-	req := &newReq
-	respError := &ResponseError{request: req}
-	serverUrl := server.URL
-
-	// set req Host, URL and Request URI to forward a request to the origin server
-	req.Host = serverUrl.Host
-	req.URL.Host = serverUrl.Host
-	req.URL.Scheme = serverUrl.Scheme
-
-	// https://go.dev/src/net/http/client.go:217
-	req.RequestURI = ""
-
-	// save the response from the origin server
-	originServerResponse, err := http.DefaultClient.Do(req)
-
-	// error handler
-	if err != nil {
-		if uerr, ok := err.(*url.Error); ok {
-			respError.err = uerr.Err
-
-			if uerr.Err == context.Canceled {
-				respError.statusCode = -1
-			} else { // server error
-				respError.statusCode = http.StatusInternalServerError
-			}
-		}
-		return nil, respError
+func NewLoadBalancer(config LoadBalancerConfig) *LoadBalancer {
+	return &LoadBalancer{
+		config: config,
+		pool:   backend.ServerPool{},
 	}
-	status := originServerResponse.StatusCode
-	if status >= 500 && status < 600 &&
-		status != http.StatusHTTPVersionNotSupported &&
-		status != http.StatusNotImplemented {
-		respError.statusCode = status
-		return nil, respError
-	}
-	return originServerResponse, nil
 }
 
-func (serverPool *ServerPool) getNextPeer() (*Backend, error) {
-	serverList := serverPool.servers
+func (balancer *LoadBalancer) configureServerPool(servers []config.ServerConfig) {
+	for _, server := range servers {
+		log.Printf("%v", server)
 
-	serverPool.mux.Lock()
-	defer serverPool.mux.Unlock()
+		var b backend.Backend
+		var err error
 
-	for i := 0; i < len(serverList); i++ {
-		serverPool.current++
-		if serverPool.current == int32(len(serverList)) {
-			serverPool.current = 0
+		b.URL, err = url.Parse(server.URL)
+		if err != nil {
+			log.Printf("Failed to parse server URL: %s\n", err)
+			continue
 		}
-		if serverList[serverPool.current].alive {
-			return serverList[serverPool.current], nil
-		}
+
+		b.HealthCheckTcpTimeout = time.Duration(server.HealthCheckTcpTimeout) * time.Millisecond
+		b.Alive = false
+
+		b.RequestChan = make(chan bool, server.MaximalRequests)
+
+		balancer.pool.Servers = append(balancer.pool.Servers, &b)
 	}
-
-	return nil, errors.New("all backends are turned down")
-}
-
-func isHTTPVersionSupported(req *http.Request) bool {
-	if maj, min, ok := http.ParseHTTPVersion(req.Proto); ok {
-		if maj == 1 && min == 1 {
-			return true
-		}
-	}
-	return false
 }
 
 func checkCache(rw http.ResponseWriter, req *http.Request) error {
@@ -192,34 +90,16 @@ func checkCache(rw http.ResponseWriter, req *http.Request) error {
 	}
 	log.Println("Transferred")
 
-	if start, ok := req.Context().Value(keyStart).(time.Time); ok {
-		finish := time.Since(start)
-		timer.SaveTimerDataGotFromCache(&finish)
-	} else {
-		log.Println("Couldn't estimate transferring time")
-	}
-
 	return nil
 }
 
-func saveToCache(req *http.Request, resp *http.Response, byteArray []byte) {
-	if !(resp.StatusCode >= 200 && resp.StatusCode < 400) {
-		return
+func isHTTPVersionSupported(req *http.Request) bool {
+	if maj, min, ok := http.ParseHTTPVersion(req.Proto); ok {
+		if maj == 1 && min == 1 {
+			return true
+		}
 	}
-	log.Println("Saving response in cache")
-
-	go func() {
-		cacheItem := &cache.Item{
-			Body:   byteArray,
-			Header: resp.Header,
-		}
-		err := cache.PutPageInCache(db, req, resp, cacheItem)
-		if err != nil {
-			log.Println("Unsuccessful operation: ", err)
-			return
-		}
-		log.Println("Successfully saved")
-	}()
+	return false
 }
 
 func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
@@ -228,11 +108,12 @@ func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Req
 	}
 
 	start := time.Now()
-	req = req.WithContext(context.WithValue(req.Context(), keyStart, start))
 
 	// getting a response from cache
 	err := checkCache(rw, req)
 	if err == nil {
+		finish := time.Since(start)
+		timer.SaveTimerDataGotFromCache(&finish)
 		return
 	} else {
 		log.Println("Checking cache unsuccessful: ", err)
@@ -243,75 +124,41 @@ func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Req
 	}
 
 	// on cache miss make request to backend
-
-	for {
-		server, err := balancer.pool.getNextPeer()
-		select {
-		case server.requestChan <- true:
-		default:
-			continue
-		}
-
-		if err != nil {
-			log.Println(err)
-			http.Error(rw, "Service not available", http.StatusServiceUnavailable)
-			return
-		}
-		defer func() { <-server.requestChan }()
-
-		log.Printf("[%s] received a request\n", server.URL)
-
-		var backendTime *time.Duration
-		req, backendTime = timer.MakeRequestTimeTracker(req)
-		defer func() {
-			finishRoundTrip := time.Since(start)
-			timer.SaveTimeDataBackend(backendTime, &finishRoundTrip)
-		}()
-
-		// send it to the backend
-		resp, respError := server.makeRequest(req)
-		if respError != nil {
-			// on cancellation
-			if respError.err == context.Canceled {
-				//	cancel()
-				log.Printf("[%s] %s", server.URL, respError.err)
-				return
-			}
-
-			server.setAlive(false) // СДЕЛАТЬ СЧЁТЧИК ИЛИ ПОЧИТАТЬ КАК У НДЖИНКС
-			log.Println(respError.err)
-			continue
-		}
-
-		log.Printf("[%s] returned %s\n", server.URL, resp.Status)
-
-		for key, values := range resp.Header {
-			for _, value := range values {
-				rw.Header().Add(key, value)
-			}
-		}
-
-		byteArray, err := io.ReadAll(resp.Body)
-		if err != nil {
-			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
-			log.Println(err)
-		}
-		resp.Body.Close()
-
-		_, err = rw.Write(byteArray)
-		if err != nil {
-			http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
-			log.Println(err)
-		}
-
-		// caching
-		saveToCache(req, resp, byteArray)
-
+ChooseServer:
+	server, err := balancer.pool.GetNextPeer()
+	if err != nil {
+		log.Println(err)
+		http.Error(rw, "Service not available", http.StatusServiceUnavailable)
 		return
 	}
+	select {
+	case server.RequestChan <- true:
+	default:
+		goto ChooseServer
+	}
+
+	var backendTime *time.Duration
+	req, backendTime = timer.MakeRequestTimeTracker(req)
+
+	resp, err := server.SendRequestToBackend(rw, req)
+	if err != nil {
+		goto ChooseServer
+	}
+
+	byteArray, err := backend.WriteBodyAndReturn(rw, resp)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	backend.SaveToCache(db, req, resp, byteArray)
+
+	finishRoundTrip := time.Since(start)
+	timer.SaveTimeDataBackend(backendTime, &finishRoundTrip)
+	return
 }
 
-func (balancer *LoadBalancer) healthChecker() {
+func (balancer *LoadBalancer) HealthChecker() {
 	ticker := time.NewTicker(balancer.config.healthCheckPeriod)
 
 	for {
@@ -323,32 +170,15 @@ func (balancer *LoadBalancer) healthChecker() {
 }
 
 func (balancer *LoadBalancer) healthCheck() {
-	for _, server := range balancer.pool.servers {
-		alive := server.isAlive()
-		server.setAlive(alive)
+	for _, server := range balancer.pool.Servers {
+		alive := server.IsAlive()
+		server.SetAlive(alive)
 		if alive {
 			log.Printf("[%s] is alive.\n", server.URL.Host)
 		} else {
 			log.Printf("[%s] is down.\n", server.URL.Host)
 		}
 	}
-}
-
-func (server *Backend) isAlive() bool {
-	conn, err := net.DialTimeout("tcp", server.URL.Host, server.healthCheckTcpTimeout)
-
-	if err != nil {
-		log.Println("Connection problem: ", err)
-		return false
-	}
-
-	defer func(conn net.Conn) {
-		err := conn.Close()
-		if err != nil {
-			log.Println("Failed to close connection: ", err)
-		}
-	}(conn)
-	return true
 }
 
 func main() {
@@ -453,7 +283,7 @@ func main() {
 	}
 
 	// current is -1, it's automatically will turn into 0
-	loadBalancer.pool.current = -1
+	loadBalancer.pool.Current = -1
 
 	// Serving
 	http.HandleFunc("/", loadBalancer.loadBalancer)
@@ -469,7 +299,7 @@ func main() {
 	log.Println("Ready!")
 
 	// set up health check
-	go loadBalancer.healthChecker()
+	go loadBalancer.HealthChecker()
 
 	log.Printf("Load Balancer started at :%d\n", loadBalancer.config.port)
 	if err := http.Serve(ln, nil); err != nil {
