@@ -12,7 +12,7 @@ func MakeRequestTimeTracker(req *http.Request) (*http.Request, *time.Duration) {
 	var finishBackend time.Duration
 
 	trace := &httptrace.ClientTrace{
-		WroteHeaders: func() {
+		WroteRequest: func(_ httptrace.WroteRequestInfo) {
 			start = time.Now()
 		},
 
