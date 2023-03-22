@@ -22,14 +22,25 @@ import (
 type Key int
 
 const (
-	OnlyIfCachedKey   = Key(iota)
+	// OnlyIfCachedKey is used for saving to request context the directive
+	// 'only-if-cached' from Cache-Control.
+	OnlyIfCachedKey = Key(iota)
+
+	// OnlyIfCachedError is used for sending to the client an error about
+	// missing cache while 'only-if-cached' is specified in Cache-Control.
 	OnlyIfCachedError = "HTTP 504 Unsatisfiable Request (only-if-cached)"
 )
 
 const (
-	DbDirectory  = "./cache-data"
-	DbName       = "database.db"
-	PagesPath    = "./cache-data/db"
+	// DbDirectory is the directory of storing the BoltDB database.
+	DbDirectory = "./cache-data"
+
+	// DbName is a name of the database.
+	DbName = "database.db"
+
+	// PagesPath is the directory where the pages are written to.
+	PagesPath = "./cache-data/db"
+
 	hashLength   = sha1.Size * 2
 	subHashCount = 4 // Количество подотрезков хэша
 	pageInfo     = "pageInfo"
@@ -38,7 +49,10 @@ const (
 // Item структура, хранящая на диске страницу, которая
 // возвращается клиенту из кэша.
 type Item struct {
-	Body   []byte
+	// Body is the body of the response saving to the cache.
+	Body []byte
+
+	// Header is the response header saving to the cache.
 	Header http.Header
 }
 
@@ -50,6 +64,7 @@ type Item struct {
 //	NoTransform:
 //	OnlyIfCached: +
 
+// RequestDirectives
 type RequestDirectives struct {
 	MaxAge       time.Time
 	MaxStale     int64
@@ -80,9 +95,11 @@ type ResponseDirectives struct {
 	SMaxAge         time.Time
 }
 
-// Info - метаданные страницы, хранящейся в базе данных
+// Info is a struct of page metadata
 type Info struct {
-	Size               int64
+	// Size is the response body size.
+	Size int64
+
 	ResponseDirectives ResponseDirectives
 }
 
