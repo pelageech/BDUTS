@@ -7,12 +7,15 @@ import (
 	"time"
 )
 
+// MakeRequestTimeTracker sticks functions to the request that is called while
+// the request processes. Functions put some time points for calculating backend time
+// and full-trip time.
 func MakeRequestTimeTracker(req *http.Request) (*http.Request, *time.Duration) {
 	var start time.Time
 	var finishBackend time.Duration
 
 	trace := &httptrace.ClientTrace{
-		WroteRequest: func(_ httptrace.WroteRequestInfo) {
+		WroteHeaders: func() {
 			start = time.Now()
 		},
 
