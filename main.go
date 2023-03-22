@@ -172,7 +172,7 @@ ChooseServer:
 	timer.SaveTimeDataBackend(backendTime, &finishRoundTrip)
 }
 
-// HeathChe
+// HealthChecker periodically checks all the backends in balancer pool
 func (balancer *LoadBalancer) HealthChecker() {
 	ticker := time.NewTicker(balancer.config.healthCheckPeriod)
 

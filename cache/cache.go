@@ -64,7 +64,6 @@ type Item struct {
 //	NoTransform:
 //	OnlyIfCached: +
 
-// RequestDirectives
 type RequestDirectives struct {
 	MaxAge       time.Time
 	MaxStale     int64
