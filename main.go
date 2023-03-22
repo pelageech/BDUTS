@@ -152,7 +152,7 @@ ChooseServer:
 	var backendTime *time.Duration
 	req, backendTime = timer.MakeRequestTimeTracker(req)
 
-	resp, err := server.SendRequestToBackend(rw, req)
+	resp, err := server.SendRequestToBackend(req)
 	if err == context.Canceled {
 		return
 	} else if err != nil {

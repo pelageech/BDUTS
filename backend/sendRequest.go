@@ -3,8 +3,6 @@ package backend
 import (
 	"context"
 	"errors"
-	"github.com/boltdb/bolt"
-	"github.com/pelageech/BDUTS/cache"
 	"io"
 	"log"
 	"net"
@@ -12,6 +10,9 @@ import (
 	"net/url"
 	"sync"
 	"time"
+
+	"github.com/boltdb/bolt"
+	"github.com/pelageech/BDUTS/cache"
 )
 
 type Backend struct {
@@ -142,7 +143,7 @@ func SaveToCache(db *bolt.DB, req *http.Request, resp *http.Response, byteArray 
 }
 
 // SendRequestToBackend returns error if there is an error on backend side.
-func (server *Backend) SendRequestToBackend(rw http.ResponseWriter, req *http.Request) (*http.Response, error) {
+func (server *Backend) SendRequestToBackend(req *http.Request) (*http.Response, error) {
 	log.Printf("[%s] received a request\n", server.URL)
 
 	// send it to the backend
