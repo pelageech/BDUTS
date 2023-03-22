@@ -11,8 +11,9 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-// GetPageFromCache Обращается к диску для нахождения ответа на запрос.
-// Если таковой имеется - он возвращается, в противном случае выдаётся ошибка
+// GetPageFromCache gets corresponding page and its metadata
+// and returns it if it exists. Uses some parameters for building
+// a request key, see in cache package and cacheConfig file
 func GetPageFromCache(db *bolt.DB, req *http.Request) (*Page, error) {
 	var info *PageMetadata
 	var item Page
@@ -57,7 +58,7 @@ func GetPageFromCache(db *bolt.DB, req *http.Request) (*Page, error) {
 	return &item, nil
 }
 
-// Обращается к базе данных для получения мета-информации о кэше.
+// Accesses the database to get meta information about the cache.
 func getPageMetadata(db *bolt.DB, requestHash []byte) (*PageMetadata, error) {
 	var result []byte = nil
 
@@ -86,8 +87,7 @@ func getPageMetadata(db *bolt.DB, requestHash []byte) (*PageMetadata, error) {
 	return &info, nil
 }
 
-// Производит чтение страницы с диска
-// В случае успеха возвращает
+// Reads a page from disk
 func readPageFromDisk(requestHash []byte) ([]byte, error) {
 	subhashLength := hashLength / subHashCount
 
@@ -106,7 +106,7 @@ func readPageFromDisk(requestHash []byte) ([]byte, error) {
 	return bytes, err
 }
 
-// Универсальная функция получения бакета
+// a universal function for getting a bucket
 func getBucket(tx *bolt.Tx, key []byte) (*bolt.Bucket, error) {
 	if bucket := tx.Bucket(key); bucket != nil {
 		return bucket, nil

@@ -16,12 +16,11 @@ var (
 	nullTime     = time.Time{}
 )
 
-// PutPageInCache Помещает новую страницу в кэш или перезаписывает её.
-// Сначала добавляет в базу данных метаданные о странице, хранимой в cache.PageMetadata.
-// Затем начинает транзакционную запись на диск.
-//
-// Сохраняется json-файл, хранящий Page - тело страницы и заголовок.
-func PutPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *Page) error {
+// InsertPageInCache stores a new page in cache or rewrites the current page.
+// First, it adds PageMetadata in DB and then the function starts a process of
+// transactional writing the page on a disk.
+// Page transforms to json-file.
+func InsertPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *Page) error {
 	var byteInfo, bytePage []byte
 	var err error
 
@@ -44,7 +43,7 @@ func PutPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *P
 	keyString := constructKeyFromRequest(req)
 	requestHash := hash([]byte(keyString))
 
-	if err = putPageMetadata(db, requestHash, byteInfo); err != nil {
+	if err = insertPageMetadataToDB(db, requestHash, byteInfo); err != nil {
 		return err
 	}
 
@@ -57,8 +56,7 @@ func PutPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *P
 	return nil
 }
 
-// putPageMetadata Помещает в базу данных метаданные страницы, помещаемой в кэш
-func putPageMetadata(db *bolt.DB, requestHash []byte, value []byte) error {
+func insertPageMetadataToDB(db *bolt.DB, requestHash []byte, value []byte) error {
 	return db.Update(func(tx *bolt.Tx) error {
 		treeBucket, err := tx.CreateBucketIfNotExists(requestHash)
 		if err != nil {

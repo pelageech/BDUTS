@@ -21,7 +21,7 @@ func SaveToCache(db *bolt.DB, req *http.Request, resp *http.Response, byteArray 
 			Body:   byteArray,
 			Header: resp.Header,
 		}
-		err := cache.PutPageInCache(db, req, resp, cacheItem)
+		err := cache.InsertPageInCache(db, req, resp, cacheItem)
 		if err != nil {
 			log.Println("Unsuccessful operation: ", err)
 			return

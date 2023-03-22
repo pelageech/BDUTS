@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+// RemovePageFromCache removes the page from disk if it exists
+// and its metadata from the database
 func RemovePageFromCache(db *bolt.DB, key []byte) error {
 	if err := removePageMetadata(db, key); err != nil {
 		return errors.New("Error while deleting record from db: " + err.Error())
