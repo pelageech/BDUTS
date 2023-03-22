@@ -33,7 +33,6 @@ func (server *Backend) SetAlive(b bool) {
 
 func (server *Backend) IsAlive() bool {
 	conn, err := net.DialTimeout("tcp", server.URL.Host, server.HealthCheckTcpTimeout)
-
 	if err != nil {
 		log.Println("Connection problem: ", err)
 		return false
