@@ -17,7 +17,7 @@ func SaveToCache(db *bolt.DB, req *http.Request, resp *http.Response, byteArray 
 	log.Println("Saving response in cache")
 
 	go func() {
-		cacheItem := &cache.Item{
+		cacheItem := &cache.Page{
 			Body:   byteArray,
 			Header: resp.Header,
 		}

@@ -13,9 +13,9 @@ import (
 
 // GetPageFromCache Обращается к диску для нахождения ответа на запрос.
 // Если таковой имеется - он возвращается, в противном случае выдаётся ошибка
-func GetPageFromCache(db *bolt.DB, req *http.Request) (*Item, error) {
+func GetPageFromCache(db *bolt.DB, req *http.Request) (*Page, error) {
 	var info *PageMetadata
-	var item Item
+	var item Page
 	var err error
 
 	requestDirectives := loadRequestDirectives(req.Header)

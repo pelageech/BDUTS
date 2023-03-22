@@ -20,8 +20,8 @@ var (
 // Сначала добавляет в базу данных метаданные о странице, хранимой в cache.PageMetadata.
 // Затем начинает транзакционную запись на диск.
 //
-// Сохраняется json-файл, хранящий Item - тело страницы и заголовок.
-func PutPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *Item) error {
+// Сохраняется json-файл, хранящий Page - тело страницы и заголовок.
+func PutPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *Page) error {
 	var byteInfo, bytePage []byte
 	var err error
 
