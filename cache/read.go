@@ -14,7 +14,7 @@ import (
 // GetPageFromCache Обращается к диску для нахождения ответа на запрос.
 // Если таковой имеется - он возвращается, в противном случае выдаётся ошибка
 func GetPageFromCache(db *bolt.DB, req *http.Request) (*Item, error) {
-	var info *Info
+	var info *PageMetadata
 	var item Item
 	var err error
 
@@ -25,7 +25,7 @@ func GetPageFromCache(db *bolt.DB, req *http.Request) (*Item, error) {
 	keyString := constructKeyFromRequest(req)
 	requestHash := hash([]byte(keyString))
 
-	if info, err = getPageInfo(db, requestHash); err != nil {
+	if info, err = getPageMetadata(db, requestHash); err != nil {
 		return nil, err
 	}
 
@@ -58,7 +58,7 @@ func GetPageFromCache(db *bolt.DB, req *http.Request) (*Item, error) {
 }
 
 // Обращается к базе данных для получения мета-информации о кэше.
-func getPageInfo(db *bolt.DB, requestHash []byte) (*Info, error) {
+func getPageMetadata(db *bolt.DB, requestHash []byte) (*PageMetadata, error) {
 	var result []byte = nil
 
 	err := db.View(func(tx *bolt.Tx) error {
@@ -78,7 +78,7 @@ func getPageInfo(db *bolt.DB, requestHash []byte) (*Info, error) {
 		return nil, err
 	}
 
-	var info Info
+	var info PageMetadata
 	if err = json.Unmarshal(result, &info); err != nil {
 		return nil, err
 	}

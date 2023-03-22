@@ -17,7 +17,7 @@ var (
 )
 
 // PutPageInCache Помещает новую страницу в кэш или перезаписывает её.
-// Сначала добавляет в базу данных метаданные о странице, хранимой в cache.Info.
+// Сначала добавляет в базу данных метаданные о странице, хранимой в cache.PageMetadata.
 // Затем начинает транзакционную запись на диск.
 //
 // Сохраняется json-файл, хранящий Item - тело страницы и заголовок.
@@ -32,7 +32,7 @@ func PutPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *I
 		return errors.New("can't be stored in cache")
 	}
 
-	info := createCacheInfo(resp)
+	info := createCacheInfo(resp, int64(len(item.Body)))
 	if byteInfo, err = json.Marshal(*info); err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func PutPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *I
 	keyString := constructKeyFromRequest(req)
 	requestHash := hash([]byte(keyString))
 
-	if err = putPageInfo(db, requestHash, byteInfo); err != nil {
+	if err = putPageMetadata(db, requestHash, byteInfo); err != nil {
 		return err
 	}
 
@@ -57,8 +57,8 @@ func PutPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *I
 	return nil
 }
 
-// putPageInfo Помещает в базу данных метаданные страницы, помещаемой в кэш
-func putPageInfo(db *bolt.DB, requestHash []byte, value []byte) error {
+// putPageMetadata Помещает в базу данных метаданные страницы, помещаемой в кэш
+func putPageMetadata(db *bolt.DB, requestHash []byte, value []byte) error {
 	return db.Update(func(tx *bolt.Tx) error {
 		treeBucket, err := tx.CreateBucketIfNotExists(requestHash)
 		if err != nil {
@@ -102,13 +102,13 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 	return err
 }
 
-// Создаёт экземпляр структуры cache.Info, в которой хранится
+// Создаёт экземпляр структуры cache.PageMetadata, в которой хранится
 // информация о странице, помещаемой в кэш.
-func createCacheInfo(resp *http.Response) *Info {
-	info := &Info{
-		Size:               resp.ContentLength,
+func createCacheInfo(resp *http.Response, size int64) *PageMetadata {
+	meta := &PageMetadata{
+		Size:               size,
 		ResponseDirectives: *loadResponseDirectives(resp.Header),
 	}
 
-	return info
+	return meta
 }

@@ -53,7 +53,7 @@ func (c *cacheController) deleteExpiredCache() {
 	addExpiredKeys := func(name []byte, b *bolt.Bucket) error {
 		v := b.Get([]byte(pageInfo))
 
-		var info Info
+		var info PageMetadata
 		if err := json.Unmarshal(v, &info); err != nil {
 			return err
 		}

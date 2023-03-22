@@ -94,8 +94,8 @@ type ResponseDirectives struct {
 	SMaxAge         time.Time
 }
 
-// Info is a struct of page metadata
-type Info struct {
+// PageMetadata is a struct of page metadata
+type PageMetadata struct {
 	// Size is the response body size.
 	Size int64
 
@@ -151,7 +151,7 @@ func constructKeyFromRequest(req *http.Request) string {
 	return result
 }
 
-func isExpired(info *Info, afterDeath time.Duration) bool {
+func isExpired(info *PageMetadata, afterDeath time.Duration) bool {
 	return time.Now().After(info.ResponseDirectives.MaxAge.Add(afterDeath))
 }
 
