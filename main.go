@@ -18,19 +18,14 @@ import (
 )
 
 const (
+	dbFillFactor      = 0.9
 	lbConfigPath      = "./resources/config.json"
 	serversConfigPath = "./resources/servers.json"
 	cacheConfigPath   = "./resources/cache_config.json"
 
 	maxDBSize          = 100 * 1024 * 1024 // 100 MB
-	DBFillFactor       = 0.9
 	dbObserveFrequency = 10 * time.Second
 )
-
-type LoadBalancer struct {
-	config LoadBalancerConfig
-	pool   backend.ServerPool
-}
 
 // LoadBalancerConfig is parse from `config.json` file.
 // It contains all the necessary information of the load balancer.
@@ -39,15 +34,26 @@ type LoadBalancerConfig struct {
 	healthCheckPeriod time.Duration
 }
 
-var db *bolt.DB
+// LoadBalancer is a struct that contains all the configuration
+// of the load balancer.
+type LoadBalancer struct {
+	config          LoadBalancerConfig
+	pool            backend.ServerPool
+	db              *bolt.DB
+	healthCheckFunc func(*backend.Backend)
+}
 
-func NewLoadBalancer(config LoadBalancerConfig) *LoadBalancer {
+// NewLoadBalancer is the constructor of the load balancer
+func NewLoadBalancer(config LoadBalancerConfig, boltDB *bolt.DB, healthChecker func(*backend.Backend)) *LoadBalancer {
 	return &LoadBalancer{
-		config: config,
-		pool:   backend.ServerPool{},
+		config:          config,
+		pool:            backend.ServerPool{},
+		db:              boltDB,
+		healthCheckFunc: healthChecker,
 	}
 }
 
+// feels the balancer pool with servers
 func (balancer *LoadBalancer) configureServerPool(servers []config.ServerConfig) {
 	for _, server := range servers {
 		log.Printf("%v", server)
@@ -70,10 +76,12 @@ func (balancer *LoadBalancer) configureServerPool(servers []config.ServerConfig)
 	}
 }
 
-func checkCache(rw http.ResponseWriter, req *http.Request) error {
+// uses balancer db for taking the page from cache and writing it to http.ResponseWriter
+// if such a page is in cache
+func (balancer *LoadBalancer) writePageIfIsInCache(rw http.ResponseWriter, req *http.Request) error {
 	log.Println("Try to get a response from cache...")
 
-	cacheItem, err := cache.GetPageFromCache(db, req)
+	cacheItem, err := cache.GetPageFromCache(balancer.db, req)
 	if err != nil {
 		return err
 	}
@@ -94,6 +102,8 @@ func checkCache(rw http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
+// the balancer supports only HTTP 1.1 version because
+// the backends use a common HTTP protocol
 func isHTTPVersionSupported(req *http.Request) bool {
 	if maj, min, ok := http.ParseHTTPVersion(req.Proto); ok {
 		if maj == 1 && min == 1 {
@@ -103,6 +113,7 @@ func isHTTPVersionSupported(req *http.Request) bool {
 	return false
 }
 
+// the main Handle func
 func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Request) {
 	if !isHTTPVersionSupported(req) {
 		http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
@@ -111,7 +122,7 @@ func (balancer *LoadBalancer) loadBalancer(rw http.ResponseWriter, req *http.Req
 	start := time.Now()
 
 	// getting a response from cache
-	err := checkCache(rw, req)
+	err := balancer.writePageIfIsInCache(rw, req)
 	if err == nil {
 		finish := time.Since(start)
 		timer.SaveTimerDataGotFromCache(&finish)
@@ -155,32 +166,23 @@ ChooseServer:
 		return
 	}
 
-	go backend.SaveToCache(db, req, resp, byteArray)
+	go backend.SaveToCache(balancer.db, req, resp, byteArray)
 
 	finishRoundTrip := time.Since(start)
 	timer.SaveTimeDataBackend(backendTime, &finishRoundTrip)
 }
 
+// HeathChe
 func (balancer *LoadBalancer) HealthChecker() {
 	ticker := time.NewTicker(balancer.config.healthCheckPeriod)
 
 	for {
 		<-ticker.C
 		log.Println("Health Check has been started!")
-		balancer.healthCheck()
-		log.Println("All the checks has been completed!")
-	}
-}
-
-func (balancer *LoadBalancer) healthCheck() {
-	for _, server := range balancer.pool.Servers {
-		alive := server.IsAlive()
-		server.SetAlive(alive)
-		if alive {
-			log.Printf("[%s] is alive.\n", server.URL.Host)
-		} else {
-			log.Printf("[%s] is down.\n", server.URL.Host)
+		for _, server := range balancer.pool.Servers {
+			balancer.healthCheckFunc(server)
 		}
+		log.Println("All the checks has been completed!")
 	}
 }
 
@@ -203,10 +205,27 @@ func main() {
 		log.Fatal(err)
 	}
 
+	log.Println("Opening cache database")
+	boltdb, err := cache.OpenDatabase(cache.DbDirectory + "/" + cache.DbName)
+	if err != nil {
+		log.Fatalln("DB error: ", err)
+	}
+	defer cache.CloseDatabase(boltdb)
+
+	healthCheckFunc := func(server *backend.Backend) {
+		alive := server.IsAlive()
+		server.SetAlive(alive)
+		if alive {
+			log.Printf("[%s] is alive.\n", server.URL.Host)
+		} else {
+			log.Printf("[%s] is down.\n", server.URL.Host)
+		}
+	}
+
 	loadBalancer := NewLoadBalancer(LoadBalancerConfig{
 		port:              lbConfig.Port,
 		healthCheckPeriod: time.Duration(lbConfig.HealthCheckPeriod) * time.Second,
-	})
+	}, boltdb, healthCheckFunc)
 
 	// backends configuration
 	serversReader, err := config.NewServersReader(serversConfigPath)
@@ -232,14 +251,6 @@ func main() {
 		log.Fatalln("Cache files directory creation error: ", err)
 	}
 
-	// cache configuration
-	log.Println("Opening cache database")
-	db, err = cache.OpenDatabase(cache.DbDirectory + "/" + cache.DbName)
-	if err != nil {
-		log.Fatalln("DB error: ", err)
-	}
-	defer cache.CloseDatabase(db)
-
 	// create directory for cache files
 	err = os.Mkdir(cache.PagesPath, 0777)
 	if err != nil && !os.IsExist(err) {
@@ -252,9 +263,10 @@ func main() {
 		log.Fatalln("DB files opening error: ", err)
 	}
 
+	// thread that clears the cache
 	dbControllerTicker := time.NewTicker(dbObserveFrequency)
 	defer dbControllerTicker.Stop()
-	controller := cache.New(db, dbDir, maxDBSize, DBFillFactor, dbControllerTicker)
+	controller := cache.New(boltdb, dbDir, maxDBSize, dbFillFactor, dbControllerTicker)
 	go controller.Observe()
 	log.Println("Cache controller has been started!")
 
@@ -287,7 +299,9 @@ func main() {
 
 	// Firstly, identify the working servers
 	log.Println("Configured! Now setting up the first health check...")
-	loadBalancer.healthCheck()
+	for _, server := range loadBalancer.pool.Servers {
+		loadBalancer.healthCheckFunc(server)
+	}
 
 	log.Println("Ready!")
 
