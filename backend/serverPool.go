@@ -6,24 +6,48 @@ import (
 )
 
 type ServerPool struct {
-	Mux     sync.Mutex
-	Servers []*Backend
-	Current int32
+	mux     sync.Mutex
+	servers []*Backend
+	current int32
+}
+
+func (serverPool *ServerPool) Lock() {
+	serverPool.mux.Lock()
+}
+
+func (serverPool *ServerPool) Unlock() {
+	serverPool.mux.Unlock()
+}
+
+func (serverPool *ServerPool) Servers() []*Backend {
+	return serverPool.servers
+}
+
+func (serverPool *ServerPool) Current() int32 {
+	return serverPool.current
+}
+
+func (serverPool *ServerPool) IncrementCurrent() {
+	serverPool.current++
+	if serverPool.current == int32(len(serverPool.Servers())) {
+		serverPool.current = 0
+	}
+}
+
+func (serverPool *ServerPool) GetCurrentServer() *Backend {
+	return serverPool.servers[serverPool.current]
 }
 
 func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
-	serverList := serverPool.Servers
+	serverList := serverPool.Servers()
 
-	serverPool.Mux.Lock()
-	defer serverPool.Mux.Unlock()
+	serverPool.Lock()
+	defer serverPool.Unlock()
 
 	for i := 0; i < len(serverList); i++ {
-		serverPool.Current++
-		if serverPool.Current == int32(len(serverList)) {
-			serverPool.Current = 0
-		}
-		if serverList[serverPool.Current].Alive {
-			return serverList[serverPool.Current], nil
+		serverPool.IncrementCurrent()
+		if serverList[serverPool.Current()].Alive {
+			return serverPool.GetCurrentServer(), nil
 		}
 	}
 
