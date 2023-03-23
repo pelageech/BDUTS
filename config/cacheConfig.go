@@ -13,19 +13,9 @@ type CacheReader struct {
 }
 
 type CacheConfig struct {
-	location   string
-	requestKey string
+	Location   string
+	RequestKey string
 }
-
-func (c CacheConfig) Location() string {
-	return c.location
-}
-
-func (c CacheConfig) RequestKey() string {
-	return c.requestKey
-}
-
-var RequestKey []func(r *http.Request) string
 
 func NewCacheReader(configPath string) (*CacheReader, error) {
 	file, err := os.Open(configPath)

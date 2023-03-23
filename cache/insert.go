@@ -20,7 +20,7 @@ var (
 // First, it adds PageMetadata in DB and then the function starts a process of
 // transactional writing the page on a disk.
 // Page transforms to json-file.
-func InsertPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *Page) error {
+func (props *CachingProperties) InsertPageInCache(req *http.Request, resp *http.Response, item *Page) error {
 	var byteInfo, bytePage []byte
 	var err error
 
@@ -40,10 +40,10 @@ func InsertPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item
 		return err
 	}
 
-	keyString := constructKeyFromRequest(req)
+	keyString := props.constructKeyFromRequest(req)
 	requestHash := hash([]byte(keyString))
 
-	if err = insertPageMetadataToDB(db, requestHash, byteInfo); err != nil {
+	if err = insertPageMetadataToDB(props.DB(), requestHash, byteInfo); err != nil {
 		return err
 	}
 

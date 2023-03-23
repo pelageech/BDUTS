@@ -14,7 +14,7 @@ import (
 // GetPageFromCache gets corresponding page and its metadata
 // and returns it if it exists. Uses some parameters for building
 // a request key, see in cache package and cacheConfig file
-func GetPageFromCache(db *bolt.DB, req *http.Request) (*Page, error) {
+func (props *CachingProperties) GetPageFromCache(req *http.Request) (*Page, error) {
 	var info *PageMetadata
 	var item Page
 	var err error
@@ -23,10 +23,10 @@ func GetPageFromCache(db *bolt.DB, req *http.Request) (*Page, error) {
 	// doesn't modify the request but adds a context key-value item
 	*req = *req.WithContext(context.WithValue(req.Context(), OnlyIfCachedKey, requestDirectives.OnlyIfCached))
 
-	keyString := constructKeyFromRequest(req)
+	keyString := props.constructKeyFromRequest(req)
 	requestHash := hash([]byte(keyString))
 
-	if info, err = getPageMetadata(db, requestHash); err != nil {
+	if info, err = getPageMetadata(props.DB(), requestHash); err != nil {
 		return nil, err
 	}
 

@@ -67,43 +67,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// health checker configuration
-	healthCheckFunc := func(server *backend.Backend) {
-		alive := server.IsAlive()
-		server.SetAlive(alive)
-		if alive {
-			log.Printf("[%s] is alive.\n", server.URL.Host)
-		} else {
-			log.Printf("[%s] is down.\n", server.URL.Host)
-		}
-	}
-
-	// creating new load balancer
-	loadBalancer := lb.NewLoadBalancer(
-		lb.NewLoadBalancerConfig(lbConfig.Port, time.Duration(lbConfig.HealthCheckPeriod)*time.Second),
-		cache.NewCachingProperties(boltdb, cacheConfig),
-		healthCheckFunc,
-	)
-
-	// backends configuration
-	serversReader, err := config.NewServersReader(serversConfigPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func(serversReader *config.ServersReader) {
-		err := serversReader.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(serversReader)
-
-	serversConfig, err := serversReader.ReadServersConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	loadBalancer.ConfigureServerPool(serversConfig)
-
 	err = os.Mkdir(cache.DbDirectory, 0777)
 	if err != nil && !os.IsExist(err) {
 		log.Fatalln("Cache files directory creation error: ", err)
@@ -124,9 +87,47 @@ func main() {
 	// thread that clears the cache
 	dbControllerTicker := time.NewTicker(dbObserveFrequency)
 	defer dbControllerTicker.Stop()
-	controller := cache.NewCacheController(boltdb, dbDir, maxDBSize, dbFillFactor, dbControllerTicker)
-	go controller.Observe()
-	log.Println("Cache controller has been started!")
+	controller := cache.NewCacheCleaner(dbDir, maxDBSize, dbFillFactor, dbControllerTicker)
+
+	// health checker configuration
+	healthCheckFunc := func(server *backend.Backend) {
+		alive := server.IsAlive()
+		server.SetAlive(alive)
+		if alive {
+			log.Printf("[%s] is alive.\n", server.URL.Host)
+		} else {
+			log.Printf("[%s] is down.\n", server.URL.Host)
+		}
+	}
+
+	// creating new load balancer
+	loadBalancer := lb.NewLoadBalancer(
+		lb.NewLoadBalancerConfig(lbConfig.Port, time.Duration(lbConfig.HealthCheckPeriod)*time.Second),
+		cache.NewCachingProperties(boltdb, cacheConfig, controller),
+		healthCheckFunc,
+	)
+
+	go loadBalancer.CacheProps().Observe()
+	log.Println("Cache cleaning has been started!")
+
+	// backends configuration
+	serversReader, err := config.NewServersReader(serversConfigPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func(serversReader *config.ServersReader) {
+		err := serversReader.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(serversReader)
+
+	serversConfig, err := serversReader.ReadServersConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	loadBalancer.ConfigureServerPool(serversConfig)
 
 	// Serving
 	http.HandleFunc("/", loadBalancer.LoadBalancer)

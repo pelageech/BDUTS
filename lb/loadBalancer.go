@@ -120,7 +120,7 @@ func (balancer *LoadBalancer) writePageIfIsInCache(rw http.ResponseWriter, req *
 
 	log.Println("Try to get a response from cache...")
 
-	cacheItem, err := cache.GetPageFromCache(balancer.cacheProps.DB, req)
+	cacheItem, err := balancer.cacheProps.GetPageFromCache(req)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ ChooseServer:
 		return
 	}
 
-	go backend.SaveToCache(balancer.cacheProps.DB, req, resp, byteArray)
+	go balancer.SaveToCache(req, resp, byteArray)
 
 	finishRoundTrip := time.Since(start)
 	timer.SaveTimeDataBackend(backendTime, &finishRoundTrip)

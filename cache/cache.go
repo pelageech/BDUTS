@@ -38,6 +38,9 @@ const (
 	// DbName is a name of the database.
 	DbName = "database.db"
 
+	// DefaultKey is used if there's no key parameter of cache for url
+	DefaultKey = "REQ_METHOD;REQ_HOST;REQ_URI"
+
 	// PagesPath is the directory where the pages are written to.
 	PagesPath = "./cache-data/db"
 
@@ -46,29 +49,38 @@ const (
 	pageInfo     = "pageInfo"
 )
 
-type keyBrick struct {
-	Location    string
-	KeyBuilders []func(r *http.Request) string
-}
+type UrlToKeyBuilder map[string][]func(r *http.Request) string
 
 type CachingProperties struct {
-	DB        *bolt.DB
-	KeyBricks []keyBrick
+	db            *bolt.DB
+	keyBuilderMap UrlToKeyBuilder
+	cleaner       *CacheCleaner
 }
 
-func NewCachingProperties(DB *bolt.DB, cacheConfig []config.CacheConfig) *CachingProperties {
-	var keyBricks []keyBrick
-
-	for k, v := range cacheConfig {
-		keyBricks = append(keyBricks, keyBrick{})
-		keyBricks[k].Location = v.Location()
-		keyBricks[k].KeyBuilders = config.ParseRequestKey(v.RequestKey())
+func NewCachingProperties(DB *bolt.DB, cacheConfig []config.CacheConfig, cleaner *CacheCleaner) *CachingProperties {
+	keyBuilder := make(UrlToKeyBuilder)
+	log.Println(cacheConfig)
+	for _, v := range cacheConfig {
+		keyBuilder[v.Location] = config.ParseRequestKey(v.RequestKey)
 	}
 
 	return &CachingProperties{
-		DB:        DB,
-		KeyBricks: keyBricks,
+		db:            DB,
+		keyBuilderMap: keyBuilder,
+		cleaner:       cleaner,
 	}
+}
+
+func (props *CachingProperties) DB() *bolt.DB {
+	return props.db
+}
+
+func (props *CachingProperties) KeyBuilderMap() UrlToKeyBuilder {
+	return props.keyBuilderMap
+}
+
+func (props *CachingProperties) Cleaner() *CacheCleaner {
+	return props.cleaner
 }
 
 // Page is a structure that is the cache unit storing on a disk.
@@ -167,9 +179,16 @@ func hash(value []byte) []byte {
 // constructKeyFromRequest uses an array config.RequestKey
 // in order to construct a key for mapping this one with
 // values of page on a disk and its metadata in DB.
-func constructKeyFromRequest(req *http.Request) string {
+func (props *CachingProperties) constructKeyFromRequest(req *http.Request) string {
 	result := ""
-	for _, addStringKey := range config.RequestKey {
+
+	keyBuilderMap := props.KeyBuilderMap()
+	keyBuilder, ok := keyBuilderMap[req.URL.Path]
+	if !ok {
+		keyBuilder = config.ParseRequestKey(DefaultKey)
+	}
+
+	for _, addStringKey := range keyBuilder {
 		result += addStringKey(req)
 	}
 	return result
