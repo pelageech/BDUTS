@@ -20,7 +20,7 @@ const (
 	serversConfigPath = "./resources/servers.json"
 	cacheConfigPath   = "./resources/cache_config.json"
 
-	maxDBSize          = 100 * 1024 * 1024 // 100 MB
+	maxDBSize          = 100 * (1 << 20) // 100 MB
 	dbObserveFrequency = 10 * time.Second
 )
 
@@ -124,7 +124,7 @@ func main() {
 	// thread that clears the cache
 	dbControllerTicker := time.NewTicker(dbObserveFrequency)
 	defer dbControllerTicker.Stop()
-	controller := cache.New(boltdb, dbDir, maxDBSize, dbFillFactor, dbControllerTicker)
+	controller := cache.NewCacheController(boltdb, dbDir, maxDBSize, dbFillFactor, dbControllerTicker)
 	go controller.Observe()
 	log.Println("Cache controller has been started!")
 
@@ -137,7 +137,7 @@ func main() {
 
 	// Firstly, identify the working servers
 	log.Println("Configured! Now setting up the first health check...")
-	for _, server := range loadBalancer.Pool().Servers {
+	for _, server := range loadBalancer.Pool().Servers() {
 		loadBalancer.HealthCheckFunc()(server)
 	}
 

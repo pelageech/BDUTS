@@ -61,8 +61,8 @@ func NewCachingProperties(DB *bolt.DB, cacheConfig []config.CacheConfig) *Cachin
 
 	for k, v := range cacheConfig {
 		keyBricks = append(keyBricks, keyBrick{})
-		keyBricks[k].Location = v.Location
-		keyBricks[k].KeyBuilders = config.ParseRequestKey(v.RequestKey)
+		keyBricks[k].Location = v.Location()
+		keyBricks[k].KeyBuilders = config.ParseRequestKey(v.RequestKey())
 	}
 
 	return &CachingProperties{
@@ -78,6 +78,14 @@ type Page struct {
 
 	// Header is the response header saving to the cache.
 	Header http.Header
+}
+
+// PageMetadata is a struct of page metadata
+type PageMetadata struct {
+	// Size is the response body size.
+	Size int64
+
+	ResponseDirectives responseDirectives
 }
 
 //	MaxAge:       +
@@ -116,14 +124,6 @@ type responseDirectives struct {
 	ProxyRevalidate bool
 	MaxAge          time.Time
 	SMaxAge         time.Time
-}
-
-// PageMetadata is a struct of page metadata
-type PageMetadata struct {
-	// Size is the response body size.
-	Size int64
-
-	ResponseDirectives responseDirectives
 }
 
 // OpenDatabase Открывает базу данных для дальнейшего использования

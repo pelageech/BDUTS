@@ -13,32 +13,32 @@ import (
 	"time"
 )
 
-// loadBalancerConfig is parse from `config.json` file.
+// LoadBalancerConfig is parse from `config.json` file.
 // It contains all the necessary information of the load balancer.
-type loadBalancerConfig struct {
+type LoadBalancerConfig struct {
 	port              int
 	healthCheckPeriod time.Duration
 }
 
-func NewLoadBalancerConfig(port int, healthCheckPeriod time.Duration) *loadBalancerConfig {
-	return &loadBalancerConfig{
+func NewLoadBalancerConfig(port int, healthCheckPeriod time.Duration) *LoadBalancerConfig {
+	return &LoadBalancerConfig{
 		port:              port,
 		healthCheckPeriod: healthCheckPeriod,
 	}
 }
 
-func (l loadBalancerConfig) Port() int {
+func (l LoadBalancerConfig) Port() int {
 	return l.port
 }
 
-func (l loadBalancerConfig) HealthCheckPeriod() time.Duration {
+func (l LoadBalancerConfig) HealthCheckPeriod() time.Duration {
 	return l.healthCheckPeriod
 }
 
 // LoadBalancer is a struct that contains all the configuration
 // of the load balancer.
 type LoadBalancer struct {
-	config          *loadBalancerConfig
+	config          *LoadBalancerConfig
 	pool            *backend.ServerPool
 	cacheProps      *cache.CachingProperties
 	healthCheckFunc func(*backend.Backend)
@@ -46,13 +46,13 @@ type LoadBalancer struct {
 
 // NewLoadBalancer is the constructor of the load balancer
 func NewLoadBalancer(
-	config *loadBalancerConfig,
+	config *LoadBalancerConfig,
 	cachingProperties *cache.CachingProperties,
 	healthChecker func(*backend.Backend),
 ) *LoadBalancer {
 	return &LoadBalancer{
 		config:          config,
-		pool:            &backend.ServerPool{},
+		pool:            backend.NewServerPool(),
 		cacheProps:      cachingProperties,
 		healthCheckFunc: healthChecker,
 	}
@@ -62,7 +62,7 @@ func (balancer *LoadBalancer) CacheProps() *cache.CachingProperties {
 	return balancer.cacheProps
 }
 
-func (balancer *LoadBalancer) Config() *loadBalancerConfig {
+func (balancer *LoadBalancer) Config() *LoadBalancerConfig {
 	return balancer.config
 }
 
@@ -81,7 +81,7 @@ func (balancer *LoadBalancer) HealthChecker() {
 	for {
 		<-ticker.C
 		log.Println("Health Check has been started!")
-		for _, server := range balancer.pool.Servers {
+		for _, server := range balancer.Pool().Servers() {
 			balancer.healthCheckFunc(server)
 		}
 		log.Println("All the checks has been completed!")
@@ -107,9 +107,8 @@ func (balancer *LoadBalancer) ConfigureServerPool(servers []config.ServerConfig)
 
 		b.RequestChan = make(chan bool, server.MaximalRequests)
 
-		balancer.pool.Servers = append(balancer.pool.Servers, &b)
+		balancer.pool.AddServer(&b)
 	}
-	balancer.pool.Current = -1
 }
 
 // uses balancer db for taking the page from cache and writing it to http.ResponseWriter
@@ -153,7 +152,7 @@ func isHTTPVersionSupported(req *http.Request) bool {
 	return false
 }
 
-// the main Handle func
+// LoadBalancer is the main Handle func
 func (balancer *LoadBalancer) LoadBalancer(rw http.ResponseWriter, req *http.Request) {
 	if !isHTTPVersionSupported(req) {
 		http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
