@@ -16,12 +16,11 @@ var (
 	nullTime     = time.Time{}
 )
 
-// PutPageInCache Помещает новую страницу в кэш или перезаписывает её.
-// Сначала добавляет в базу данных метаданные о странице, хранимой в cache.Info.
-// Затем начинает транзакционную запись на диск.
-//
-// Сохраняется json-файл, хранящий Item - тело страницы и заголовок.
-func PutPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *Item) error {
+// InsertPageInCache stores a new page in cache or rewrites the current page.
+// First, it adds PageMetadata in DB and then the function starts a process of
+// transactional writing the page on a disk.
+// Page transforms to json-file.
+func InsertPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *Page) error {
 	var byteInfo, bytePage []byte
 	var err error
 
@@ -32,7 +31,7 @@ func PutPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *I
 		return errors.New("can't be stored in cache")
 	}
 
-	info := createCacheInfo(resp)
+	info := createCacheInfo(resp, int64(len(item.Body)))
 	if byteInfo, err = json.Marshal(*info); err != nil {
 		return err
 	}
@@ -44,7 +43,7 @@ func PutPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *I
 	keyString := constructKeyFromRequest(req)
 	requestHash := hash([]byte(keyString))
 
-	if err = putPageInfo(db, requestHash, byteInfo); err != nil {
+	if err = insertPageMetadataToDB(db, requestHash, byteInfo); err != nil {
 		return err
 	}
 
@@ -57,8 +56,7 @@ func PutPageInCache(db *bolt.DB, req *http.Request, resp *http.Response, item *I
 	return nil
 }
 
-// putPageInfo Помещает в базу данных метаданные страницы, помещаемой в кэш
-func putPageInfo(db *bolt.DB, requestHash []byte, value []byte) error {
+func insertPageMetadataToDB(db *bolt.DB, requestHash []byte, value []byte) error {
 	return db.Update(func(tx *bolt.Tx) error {
 		treeBucket, err := tx.CreateBucketIfNotExists(requestHash)
 		if err != nil {
@@ -102,13 +100,13 @@ func writePageToDisk(requestHash []byte, value []byte) error {
 	return err
 }
 
-// Создаёт экземпляр структуры cache.Info, в которой хранится
+// Создаёт экземпляр структуры cache.PageMetadata, в которой хранится
 // информация о странице, помещаемой в кэш.
-func createCacheInfo(resp *http.Response) *Info {
-	info := &Info{
-		Size:               resp.ContentLength,
+func createCacheInfo(resp *http.Response, size int64) *PageMetadata {
+	meta := &PageMetadata{
+		Size:               size,
 		ResponseDirectives: *loadResponseDirectives(resp.Header),
 	}
 
-	return info
+	return meta
 }

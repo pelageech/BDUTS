@@ -22,23 +22,36 @@ import (
 type Key int
 
 const (
-	OnlyIfCachedKey   = Key(iota)
+	// OnlyIfCachedKey is used for saving to request context the directive
+	// 'only-if-cached' from Cache-Control.
+	OnlyIfCachedKey = Key(iota)
+
+	// OnlyIfCachedError is used for sending to the client an error about
+	// missing cache while 'only-if-cached' is specified in Cache-Control.
 	OnlyIfCachedError = "HTTP 504 Unsatisfiable Request (only-if-cached)"
 )
 
 const (
-	DbDirectory  = "./cache-data"
-	DbName       = "database.db"
-	PagesPath    = "./cache-data/db"
+	// DbDirectory is the directory of storing the BoltDB database.
+	DbDirectory = "./cache-data"
+
+	// DbName is a name of the database.
+	DbName = "database.db"
+
+	// PagesPath is the directory where the pages are written to.
+	PagesPath = "./cache-data/db"
+
 	hashLength   = sha1.Size * 2
 	subHashCount = 4 // Количество подотрезков хэша
 	pageInfo     = "pageInfo"
 )
 
-// Item структура, хранящая на диске страницу, которая
-// возвращается клиенту из кэша.
-type Item struct {
-	Body   []byte
+// Page is a structure that is the cache unit storing on a disk.
+type Page struct {
+	// Body is the body of the response saving to the cache.
+	Body []byte
+
+	// Header is the response header saving to the cache.
 	Header http.Header
 }
 
@@ -50,7 +63,7 @@ type Item struct {
 //	NoTransform:
 //	OnlyIfCached: +
 
-type RequestDirectives struct {
+type requestDirectives struct {
 	MaxAge       time.Time
 	MaxStale     int64
 	MinFresh     time.Time
@@ -69,7 +82,7 @@ type RequestDirectives struct {
 //	MaxAge:          +
 //	SMaxAge:         +
 
-type ResponseDirectives struct {
+type responseDirectives struct {
 	MustRevalidate  bool
 	NoCache         bool
 	NoStore         bool
@@ -80,10 +93,12 @@ type ResponseDirectives struct {
 	SMaxAge         time.Time
 }
 
-// Info - метаданные страницы, хранящейся в базе данных
-type Info struct {
-	Size               int64
-	ResponseDirectives ResponseDirectives
+// PageMetadata is a struct of page metadata
+type PageMetadata struct {
+	// Size is the response body size.
+	Size int64
+
+	ResponseDirectives responseDirectives
 }
 
 // OpenDatabase Открывает базу данных для дальнейшего использования
@@ -104,7 +119,7 @@ func CloseDatabase(db *bolt.DB) {
 }
 
 // Сохраняет копию базы данных в файл
-/*func makeSnapshot(db *bolt.DB, filename string) error {
+/*func MakeSnapshot(db *bolt.DB, filename string) error {
 	f, err := os.Open(filename)
 	if err != nil {
 		return err
@@ -118,15 +133,15 @@ func CloseDatabase(db *bolt.DB) {
 	return err
 }*/
 
-// Возвращает хэш-encode от набора байт
+// Returns a hash-encode byte array of a value
 func hash(value []byte) []byte {
 	bytes := sha1.Sum(value)
 	return []byte(hex.EncodeToString(bytes[:]))
 }
 
-// constructKeyFromRequest использует массив config.RequestKey
-// для того, чтобы составить строку-ключ, по которому будет сохраняться
-// страница в кэше и её метаданные в БД.
+// constructKeyFromRequest uses an array config.RequestKey
+// in order to construct a key for mapping this one with
+// values of page on a disk and its metadata in DB.
 func constructKeyFromRequest(req *http.Request) string {
 	result := ""
 	for _, addStringKey := range config.RequestKey {
@@ -135,12 +150,12 @@ func constructKeyFromRequest(req *http.Request) string {
 	return result
 }
 
-func isExpired(info *Info, afterDeath time.Duration) bool {
+func isExpired(info *PageMetadata, afterDeath time.Duration) bool {
 	return time.Now().After(info.ResponseDirectives.MaxAge.Add(afterDeath))
 }
 
-func loadRequestDirectives(header http.Header) *RequestDirectives {
-	result := &RequestDirectives{
+func loadRequestDirectives(header http.Header) *requestDirectives {
+	result := &requestDirectives{
 		MaxAge:       nullTime,
 		MaxStale:     0,
 		MinFresh:     nullTime,
@@ -179,8 +194,8 @@ func loadRequestDirectives(header http.Header) *RequestDirectives {
 	return result
 }
 
-func loadResponseDirectives(header http.Header) *ResponseDirectives {
-	result := &ResponseDirectives{
+func loadResponseDirectives(header http.Header) *responseDirectives {
+	result := &responseDirectives{
 		MustRevalidate:  false,
 		NoCache:         false,
 		NoStore:         false,
