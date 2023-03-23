@@ -13,8 +13,16 @@ type CacheReader struct {
 }
 
 type CacheConfig struct {
-	Location   string
-	RequestKey string
+	location   string
+	requestKey string
+}
+
+func (c CacheConfig) Location() string {
+	return c.location
+}
+
+func (c CacheConfig) RequestKey() string {
+	return c.requestKey
 }
 
 var RequestKey []func(r *http.Request) string
