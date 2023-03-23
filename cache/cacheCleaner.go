@@ -18,7 +18,7 @@ type cacheController struct {
 }
 
 //goland:noinspection GoExportedFuncWithUnexportedType
-func New(db *bolt.DB, dbFile *os.File, maxFileSize int64, fillFactor float64, frequency *time.Ticker) *cacheController {
+func NewCacheController(db *bolt.DB, dbFile *os.File, maxFileSize int64, fillFactor float64, frequency *time.Ticker) *cacheController {
 	return &cacheController{
 		db:          db,
 		dbFile:      dbFile,
