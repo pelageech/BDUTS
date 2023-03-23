@@ -49,7 +49,6 @@ func ReadCacheConfig(r *CacheReader) (*CacheConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Println(cacheConfig)
 	return &cacheConfig, nil
 }
 
