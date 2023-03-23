@@ -19,7 +19,7 @@ type Backend struct {
 	RequestChan           chan bool
 }
 
-type ResponseError struct {
+type responseError struct {
 	request    *http.Request
 	statusCode int
 	err        error
@@ -108,9 +108,9 @@ func (server *Backend) prepareRequest(r *http.Request) *http.Request {
 	return req
 }
 
-func (server *Backend) makeRequest(r *http.Request) (*http.Response, *ResponseError) {
+func (server *Backend) makeRequest(r *http.Request) (*http.Response, *responseError) {
 	req := server.prepareRequest(r)
-	respError := &ResponseError{request: req}
+	respError := &responseError{request: req}
 
 	// save the response from the origin server
 	originServerResponse, err := http.DefaultClient.Do(req)
