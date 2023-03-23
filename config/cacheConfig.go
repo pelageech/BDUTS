@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -46,7 +47,7 @@ func ReadCacheConfig(r *CacheReader) ([]CacheConfig, error) {
 
 func ParseRequestKey(requestKey string) (result []func(r *http.Request) string) {
 	if len(requestKey) == 0 {
-		return nil
+		log.Panic("An empty line was got")
 	}
 
 	keys := strings.Split(requestKey, ";")
