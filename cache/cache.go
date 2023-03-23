@@ -46,6 +46,31 @@ const (
 	pageInfo     = "pageInfo"
 )
 
+type keyBrick struct {
+	Location    string
+	KeyBuilders []func(r *http.Request) string
+}
+
+type CachingProperties struct {
+	DB        *bolt.DB
+	KeyBricks []keyBrick
+}
+
+func NewCachingProperties(DB *bolt.DB, cacheConfig []config.CacheConfig) *CachingProperties {
+	var keyBricks []keyBrick
+
+	for k, v := range cacheConfig {
+		keyBricks = append(keyBricks, keyBrick{})
+		keyBricks[k].Location = v.Location
+		keyBricks[k].KeyBuilders = config.ParseRequestKey(v.RequestKey)
+	}
+
+	return &CachingProperties{
+		DB:        DB,
+		KeyBricks: keyBricks,
+	}
+}
+
 // Page is a structure that is the cache unit storing on a disk.
 type Page struct {
 	// Body is the body of the response saving to the cache.
