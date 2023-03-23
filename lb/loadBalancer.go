@@ -3,14 +3,15 @@ package lb
 import (
 	"context"
 	"errors"
-	"github.com/pelageech/BDUTS/backend"
-	"github.com/pelageech/BDUTS/cache"
-	"github.com/pelageech/BDUTS/config"
-	"github.com/pelageech/BDUTS/timer"
 	"log"
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/pelageech/BDUTS/backend"
+	"github.com/pelageech/BDUTS/cache"
+	"github.com/pelageech/BDUTS/config"
+	"github.com/pelageech/BDUTS/timer"
 )
 
 // LoadBalancerConfig is parse from `config.json` file.

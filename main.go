@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/pelageech/BDUTS/lb"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"github.com/pelageech/BDUTS/backend"
 	"github.com/pelageech/BDUTS/cache"
 	"github.com/pelageech/BDUTS/config"
+	"github.com/pelageech/BDUTS/lb"
 )
 
 const (

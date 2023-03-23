@@ -2,9 +2,10 @@ package cache
 
 import (
 	"errors"
-	"github.com/boltdb/bolt"
 	"os"
 	"strings"
+
+	"github.com/boltdb/bolt"
 )
 
 // RemovePageFromCache removes the page from disk if it exists
