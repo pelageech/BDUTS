@@ -11,6 +11,15 @@ type ServerPool struct {
 	current int32
 }
 
+func NewServerPool() *ServerPool {
+	var s []*Backend
+	return &ServerPool{
+		mux:     sync.Mutex{},
+		servers: s,
+		current: -1,
+	}
+}
+
 func (serverPool *ServerPool) Lock() {
 	serverPool.mux.Lock()
 }
@@ -36,6 +45,10 @@ func (serverPool *ServerPool) IncrementCurrent() {
 
 func (serverPool *ServerPool) GetCurrentServer() *Backend {
 	return serverPool.servers[serverPool.current]
+}
+
+func (serverPool *ServerPool) AddServer(b *Backend) {
+	serverPool.servers = append(serverPool.servers, b)
 }
 
 func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
