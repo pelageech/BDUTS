@@ -50,6 +50,7 @@ func NewLoadBalancer(
 	cachingProperties *cache.CachingProperties,
 	healthChecker func(*backend.Backend),
 ) *LoadBalancer {
+	setLogPrefixBDUTS()
 	return &LoadBalancer{
 		config:          config,
 		pool:            backend.NewServerPool(),
@@ -209,4 +210,8 @@ ChooseServer:
 
 	finishRoundTrip := time.Since(start)
 	timer.SaveTimeDataBackend(backendTime, &finishRoundTrip)
+}
+
+func setLogPrefixBDUTS() {
+	log.SetPrefix("[BDUTS] ")
 }
