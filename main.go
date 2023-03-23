@@ -24,9 +24,7 @@ const (
 	dbObserveFrequency = 10 * time.Second
 )
 
-func main() {
-
-	// load balancer configuration
+func loadBalancerConfigure() *config.LoadBalancerConfig {
 	loadBalancerReader, err := config.NewLoadBalancerReader(lbConfigPath)
 	if err != nil {
 		log.Fatal(err)
@@ -42,15 +40,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	return lbConfig
+}
 
-	// cache configuration
-	log.Println("Opening cache database")
-	boltdb, err := cache.OpenDatabase(cache.DbDirectory + "/" + cache.DbName)
-	if err != nil {
-		log.Fatalln("DB error: ", err)
-	}
-	defer cache.CloseDatabase(boltdb)
-
+func cacheConfigure() *config.CacheConfig {
 	cacheReader, err := config.NewCacheReader(cacheConfigPath)
 	if err != nil {
 		log.Fatal(err)
@@ -66,8 +59,30 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	return cacheConfig
+}
 
-	err = os.Mkdir(cache.DbDirectory, 0777)
+func serversConfigure() []config.ServerConfig {
+	serversReader, err := config.NewServersReader(serversConfigPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func(serversReader *config.ServersReader) {
+		err := serversReader.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(serversReader)
+
+	serversConfig, err := serversReader.ReadServersConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return serversConfig
+}
+
+func cacheCleanerConfigure(dbControllerTicker *time.Ticker) *cache.CacheCleaner {
+	err := os.Mkdir(cache.DbDirectory, 0777)
 	if err != nil && !os.IsExist(err) {
 		log.Fatalln("Cache files directory creation error: ", err)
 	}
@@ -83,11 +98,26 @@ func main() {
 	if err != nil {
 		log.Fatalln("DB files opening error: ", err)
 	}
+	return cache.NewCacheCleaner(dbDir, maxDBSize, dbFillFactor, dbControllerTicker)
+}
+
+func main() {
+	lbConfig := loadBalancerConfigure()
+
+	cacheConfig := cacheConfigure()
+
+	// database
+	log.Println("Opening cache database")
+	boltdb, err := cache.OpenDatabase(cache.DbDirectory + "/" + cache.DbName)
+	if err != nil {
+		log.Fatalln("DB error: ", err)
+	}
+	defer cache.CloseDatabase(boltdb)
 
 	// thread that clears the cache
 	dbControllerTicker := time.NewTicker(dbObserveFrequency)
+	controller := cacheCleanerConfigure(dbControllerTicker)
 	defer dbControllerTicker.Stop()
-	controller := cache.NewCacheCleaner(dbDir, maxDBSize, dbFillFactor, dbControllerTicker)
 
 	// health checker configuration
 	healthCheckFunc := func(server *backend.Backend) {
@@ -107,31 +137,9 @@ func main() {
 		healthCheckFunc,
 	)
 
-	go loadBalancer.CacheProps().Observe()
-	log.Println("Cache cleaning has been started!")
-
 	// backends configuration
-	serversReader, err := config.NewServersReader(serversConfigPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func(serversReader *config.ServersReader) {
-		err := serversReader.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(serversReader)
-
-	serversConfig, err := serversReader.ReadServersConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
-
+	serversConfig := serversConfigure()
 	loadBalancer.ConfigureServerPool(serversConfig)
-
-	// Serving
-	http.HandleFunc("/", loadBalancer.LoadBalancer)
-	http.HandleFunc("/favicon.ico", http.NotFound)
 
 	// wait while other containers will be ready
 	time.Sleep(5 * time.Second)
@@ -141,17 +149,20 @@ func main() {
 	for _, server := range loadBalancer.Pool().Servers() {
 		loadBalancer.HealthCheckFunc()(server)
 	}
-
 	log.Println("Ready!")
 
 	// set up health check
 	go loadBalancer.HealthChecker()
+	go loadBalancer.CacheProps().Observe()
+
+	// Serving
+	http.HandleFunc("/", loadBalancer.LoadBalancer)
+	http.HandleFunc("/favicon.ico", http.NotFound)
 
 	// Config TLS: setting a pair crt-key
 	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
 	tlsConfig := &tls.Config{Certificates: []tls.Certificate{Crt}}
 
-	// Start listening
 	ln, err := tls.Listen("tcp", fmt.Sprintf(":%d", loadBalancer.Config().Port()), tlsConfig)
 	if err != nil {
 		log.Fatal("There's problem with listening")
