@@ -59,7 +59,7 @@ type CachingProperties struct {
 
 func NewCachingProperties(DB *bolt.DB, cacheConfig []config.CacheConfig, cleaner *CacheCleaner) *CachingProperties {
 	keyBuilder := make(UrlToKeyBuilder)
-	log.Println(cacheConfig)
+
 	for _, v := range cacheConfig {
 		keyBuilder[v.Location] = config.ParseRequestKey(v.RequestKey)
 	}
@@ -191,6 +191,7 @@ func (props *CachingProperties) constructKeyFromRequest(req *http.Request) strin
 	for _, addStringKey := range keyBuilder {
 		result += addStringKey(req)
 	}
+
 	return result
 }
 
