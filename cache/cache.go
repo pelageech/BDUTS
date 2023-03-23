@@ -57,10 +57,10 @@ type CachingProperties struct {
 	cleaner       *CacheCleaner
 }
 
-func NewCachingProperties(DB *bolt.DB, cacheConfig []config.CacheConfig, cleaner *CacheCleaner) *CachingProperties {
+func NewCachingProperties(DB *bolt.DB, cacheConfig *config.CacheConfig, cleaner *CacheCleaner) *CachingProperties {
 	keyBuilder := make(UrlToKeyBuilder)
 
-	for _, v := range cacheConfig {
+	for _, v := range cacheConfig.Pairs() {
 		keyBuilder[v.Location] = config.ParseRequestKey(v.RequestKey)
 	}
 

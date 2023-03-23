@@ -13,9 +13,17 @@ type CacheReader struct {
 	file *os.File
 }
 
-type CacheConfig struct {
+type cachePairLocationRequestKey struct {
 	Location   string
 	RequestKey string
+}
+
+type CacheConfig struct {
+	pairs []cachePairLocationRequestKey
+}
+
+func (c CacheConfig) Pairs() []cachePairLocationRequestKey {
+	return c.pairs
 }
 
 func NewCacheReader(configPath string) (*CacheReader, error) {
@@ -30,19 +38,19 @@ func (r *CacheReader) Close() error {
 	return r.file.Close()
 }
 
-func ReadCacheConfig(r *CacheReader) ([]CacheConfig, error) {
+func ReadCacheConfig(r *CacheReader) (*CacheConfig, error) {
 	cacheFileByte, err := io.ReadAll(r.file)
 	if err != nil {
 		return nil, err
 	}
 
-	var cacheConfig []CacheConfig
-	err = json.Unmarshal(cacheFileByte, &cacheConfig)
+	var cacheConfig CacheConfig
+	err = json.Unmarshal(cacheFileByte, &cacheConfig.pairs)
 	if err != nil {
 		return nil, err
 	}
-
-	return cacheConfig, nil
+	log.Println(cacheConfig)
+	return &cacheConfig, nil
 }
 
 func ParseRequestKey(requestKey string) (result []func(r *http.Request) string) {
