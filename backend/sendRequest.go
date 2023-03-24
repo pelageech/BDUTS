@@ -25,14 +25,14 @@ type responseError struct {
 	err        error
 }
 
-func (server *Backend) SetAlive(b bool) {
-	server.Mux.Lock()
-	server.Alive = b
-	server.Mux.Unlock()
+func (b *Backend) SetAlive(alive bool) {
+	b.Mux.Lock()
+	b.Alive = alive
+	b.Mux.Unlock()
 }
 
-func (server *Backend) IsAlive() bool {
-	conn, err := net.DialTimeout("tcp", server.URL.Host, server.HealthCheckTcpTimeout)
+func (b *Backend) IsAlive() bool {
+	conn, err := net.DialTimeout("tcp", b.URL.Host, b.HealthCheckTcpTimeout)
 	if err != nil {
 		log.Println("Connection problem: ", err)
 		return false
@@ -48,26 +48,26 @@ func (server *Backend) IsAlive() bool {
 }
 
 // SendRequestToBackend returns error if there is an error on backend side.
-func (server *Backend) SendRequestToBackend(req *http.Request) (*http.Response, error) {
-	log.Printf("[%s] received a request\n", server.URL)
+func (b *Backend) SendRequestToBackend(req *http.Request) (*http.Response, error) {
+	log.Printf("[%s] received a request\n", b.URL)
 
 	// send it to the backend
-	resp, respError := server.makeRequest(req)
-	<-server.RequestChan
+	resp, respError := b.makeRequest(req)
+	<-b.RequestChan
 
 	if respError != nil {
 		// on cancellation
 		if respError.err == context.Canceled {
 			//	cancel()
-			log.Printf("[%s] %s", server.URL, respError.err)
+			log.Printf("[%s] %s", b.URL, respError.err)
 			return nil, respError.err
 		}
 
-		server.SetAlive(false) // СДЕЛАТЬ СЧЁТЧИК ИЛИ ПОЧИТАТЬ КАК У НДЖИНКС
+		b.SetAlive(false) // СДЕЛАТЬ СЧЁТЧИК ИЛИ ПОЧИТАТЬ КАК У НДЖИНКС
 		return nil, respError.err
 	}
 
-	log.Printf("[%s] returned %s\n", server.URL, resp.Status)
+	log.Printf("[%s] returned %s\n", b.URL, resp.Status)
 
 	return resp, nil
 }
@@ -93,12 +93,12 @@ func WriteBodyAndReturn(rw http.ResponseWriter, resp *http.Response) ([]byte, er
 	return byteArray, nil
 }
 
-func (server *Backend) prepareRequest(r *http.Request) *http.Request {
+func (b *Backend) prepareRequest(r *http.Request) *http.Request {
 	newReq := *r
 	req := &newReq
-	serverUrl := server.URL
+	serverUrl := b.URL
 
-	// set req Host, URL and Request URI to forward a request to the origin server
+	// set req Host, URL and Request URI to forward a request to the origin b
 	req.Host = serverUrl.Host
 	req.URL.Host = serverUrl.Host
 	req.URL.Scheme = serverUrl.Scheme
@@ -108,11 +108,11 @@ func (server *Backend) prepareRequest(r *http.Request) *http.Request {
 	return req
 }
 
-func (server *Backend) makeRequest(r *http.Request) (*http.Response, *responseError) {
-	req := server.prepareRequest(r)
+func (b *Backend) makeRequest(r *http.Request) (*http.Response, *responseError) {
+	req := b.prepareRequest(r)
 	respError := &responseError{request: req}
 
-	// save the response from the origin server
+	// save the response from the origin b
 	originServerResponse, err := http.DefaultClient.Do(req)
 
 	// error handler
@@ -122,7 +122,7 @@ func (server *Backend) makeRequest(r *http.Request) (*http.Response, *responseEr
 
 			if uerr.Err == context.Canceled {
 				respError.statusCode = -1
-			} else { // server error
+			} else { // b error
 				respError.statusCode = http.StatusInternalServerError
 			}
 		}

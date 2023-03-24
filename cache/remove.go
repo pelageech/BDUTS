@@ -10,8 +10,8 @@ import (
 
 // RemovePageFromCache removes the page from disk if it exists
 // and its metadata from the database
-func (props *CachingProperties) RemovePageFromCache(key []byte) error {
-	if err := removePageMetadata(props.DB(), key); err != nil {
+func (p *CachingProperties) RemovePageFromCache(key []byte) error {
+	if err := removePageMetadata(p.DB(), key); err != nil {
 		return errors.New("Error while deleting record from db: " + err.Error())
 	}
 

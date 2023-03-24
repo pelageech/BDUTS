@@ -71,16 +71,16 @@ func NewCachingProperties(DB *bolt.DB, cacheConfig *config.CacheConfig, cleaner 
 	}
 }
 
-func (props *CachingProperties) DB() *bolt.DB {
-	return props.db
+func (p *CachingProperties) DB() *bolt.DB {
+	return p.db
 }
 
-func (props *CachingProperties) KeyBuilderMap() UrlToKeyBuilder {
-	return props.keyBuilderMap
+func (p *CachingProperties) KeyBuilderMap() UrlToKeyBuilder {
+	return p.keyBuilderMap
 }
 
-func (props *CachingProperties) Cleaner() *CacheCleaner {
-	return props.cleaner
+func (p *CachingProperties) Cleaner() *CacheCleaner {
+	return p.cleaner
 }
 
 // Page is a structure that is the cache unit storing on a disk.
@@ -179,10 +179,10 @@ func hash(value []byte) []byte {
 // constructKeyFromRequest uses an array config.RequestKey
 // in order to construct a key for mapping this one with
 // values of page on a disk and its metadata in DB.
-func (props *CachingProperties) constructKeyFromRequest(req *http.Request) string {
+func (p *CachingProperties) constructKeyFromRequest(req *http.Request) string {
 	result := ""
 
-	keyBuilderMap := props.KeyBuilderMap()
+	keyBuilderMap := p.KeyBuilderMap()
 	keyBuilder, ok := keyBuilderMap[req.URL.Path]
 	if !ok {
 		keyBuilder = config.ParseRequestKey(DefaultKey)

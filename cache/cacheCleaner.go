@@ -25,25 +25,25 @@ func NewCacheCleaner(dbFile *os.File, maxFileSize int64, fillFactor float64, fre
 	}
 }
 
-func (props *CachingProperties) Observe() {
+func (p *CachingProperties) Observe() {
 	for {
-		<-props.cleaner.frequency.C
-		if props.isSizeExceeded() {
-			props.deleteExpiredCache()
+		<-p.cleaner.frequency.C
+		if p.isSizeExceeded() {
+			p.deleteExpiredCache()
 		}
 	}
 }
 
-func (props *CachingProperties) isSizeExceeded() bool {
-	fileInfo, err := props.cleaner.dbFile.Stat()
+func (p *CachingProperties) isSizeExceeded() bool {
+	fileInfo, err := p.cleaner.dbFile.Stat()
 	if err != nil {
 		log.Printf("Error getting file info in CacheCleaner: %v", err) //todo: how to handle this error properly?
 	}
 
-	return float64(fileInfo.Size()) > float64(props.cleaner.maxFileSize)*props.cleaner.fillFactor
+	return float64(fileInfo.Size()) > float64(p.cleaner.maxFileSize)*p.cleaner.fillFactor
 }
 
-func (props *CachingProperties) deleteExpiredCache() {
+func (p *CachingProperties) deleteExpiredCache() {
 	sizeReleased := int64(0)
 	expiredKeys := make([][]byte, 0)
 
@@ -64,7 +64,7 @@ func (props *CachingProperties) deleteExpiredCache() {
 
 	// iterating over all buckets and all keys in each bucket
 	// and collecting expired keys of expired data
-	err := props.DB().View(func(tx *bolt.Tx) error {
+	err := p.DB().View(func(tx *bolt.Tx) error {
 		return tx.ForEach(addExpiredKeys)
 	})
 	if err != nil {
@@ -76,7 +76,7 @@ func (props *CachingProperties) deleteExpiredCache() {
 	}
 	// deleting expired data
 	for _, key := range expiredKeys {
-		if err = props.RemovePageFromCache(key); err != nil {
+		if err = p.RemovePageFromCache(key); err != nil {
 			log.Println(err)
 		}
 	}

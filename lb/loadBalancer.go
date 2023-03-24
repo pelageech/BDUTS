@@ -28,12 +28,12 @@ func NewLoadBalancerConfig(port int, healthCheckPeriod time.Duration) *LoadBalan
 	}
 }
 
-func (l LoadBalancerConfig) Port() int {
-	return l.port
+func (c *LoadBalancerConfig) Port() int {
+	return c.port
 }
 
-func (l LoadBalancerConfig) HealthCheckPeriod() time.Duration {
-	return l.healthCheckPeriod
+func (c *LoadBalancerConfig) HealthCheckPeriod() time.Duration {
+	return c.healthCheckPeriod
 }
 
 // LoadBalancer is a struct that contains all the configuration
@@ -60,38 +60,38 @@ func NewLoadBalancer(
 	}
 }
 
-func (balancer *LoadBalancer) CacheProps() *cache.CachingProperties {
-	return balancer.cacheProps
+func (lb *LoadBalancer) CacheProps() *cache.CachingProperties {
+	return lb.cacheProps
 }
 
-func (balancer *LoadBalancer) Config() *LoadBalancerConfig {
-	return balancer.config
+func (lb *LoadBalancer) Config() *LoadBalancerConfig {
+	return lb.config
 }
 
-func (balancer *LoadBalancer) Pool() *backend.ServerPool {
-	return balancer.pool
+func (lb *LoadBalancer) Pool() *backend.ServerPool {
+	return lb.pool
 }
 
-func (balancer *LoadBalancer) HealthCheckFunc() func(*backend.Backend) {
-	return balancer.healthCheckFunc
+func (lb *LoadBalancer) HealthCheckFunc() func(*backend.Backend) {
+	return lb.healthCheckFunc
 }
 
 // HealthChecker periodically checks all the backends in balancer pool
-func (balancer *LoadBalancer) HealthChecker() {
-	ticker := time.NewTicker(balancer.config.healthCheckPeriod)
+func (lb *LoadBalancer) HealthChecker() {
+	ticker := time.NewTicker(lb.config.healthCheckPeriod)
 
 	for {
 		<-ticker.C
 		log.Println("Health Check has been started!")
-		for _, server := range balancer.Pool().Servers() {
-			balancer.healthCheckFunc(server)
+		for _, server := range lb.Pool().Servers() {
+			lb.healthCheckFunc(server)
 		}
 		log.Println("All the checks has been completed!")
 	}
 }
 
 // ConfigureServerPool feels the balancer pool with servers
-func (balancer *LoadBalancer) ConfigureServerPool(servers []config.ServerConfig) {
+func (lb *LoadBalancer) ConfigureServerPool(servers []config.ServerConfig) {
 	for _, server := range servers {
 		log.Printf("%v", server)
 
@@ -109,20 +109,20 @@ func (balancer *LoadBalancer) ConfigureServerPool(servers []config.ServerConfig)
 
 		b.RequestChan = make(chan bool, server.MaximalRequests)
 
-		balancer.pool.AddServer(&b)
+		lb.pool.AddServer(&b)
 	}
 }
 
 // uses balancer db for taking the page from cache and writing it to http.ResponseWriter
 // if such a page is in cache
-func (balancer *LoadBalancer) writePageIfIsInCache(rw http.ResponseWriter, req *http.Request) error {
-	if balancer.cacheProps == nil {
+func (lb *LoadBalancer) writePageIfIsInCache(rw http.ResponseWriter, req *http.Request) error {
+	if lb.cacheProps == nil {
 		return errors.New("cache properties weren't set")
 	}
 
 	log.Println("Try to get a response from cache...")
 
-	cacheItem, err := balancer.cacheProps.GetPageFromCache(req)
+	cacheItem, err := lb.cacheProps.GetPageFromCache(req)
 	if err != nil {
 		return err
 	}
@@ -155,7 +155,7 @@ func isHTTPVersionSupported(req *http.Request) bool {
 }
 
 // LoadBalancer is the main Handle func
-func (balancer *LoadBalancer) LoadBalancer(rw http.ResponseWriter, req *http.Request) {
+func (lb *LoadBalancer) LoadBalancer(rw http.ResponseWriter, req *http.Request) {
 	if !isHTTPVersionSupported(req) {
 		http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
 	}
@@ -163,7 +163,7 @@ func (balancer *LoadBalancer) LoadBalancer(rw http.ResponseWriter, req *http.Req
 	start := time.Now()
 
 	// getting a response from cache
-	err := balancer.writePageIfIsInCache(rw, req)
+	err := lb.writePageIfIsInCache(rw, req)
 	if err == nil {
 		finish := time.Since(start)
 		timer.SaveTimerDataGotFromCache(&finish)
@@ -178,7 +178,7 @@ func (balancer *LoadBalancer) LoadBalancer(rw http.ResponseWriter, req *http.Req
 
 	// on cache miss make request to backend
 ChooseServer:
-	server, err := balancer.pool.GetNextPeer()
+	server, err := lb.pool.GetNextPeer()
 	if err != nil {
 		log.Println(err)
 		http.Error(rw, "Service not available", http.StatusServiceUnavailable)
@@ -207,7 +207,7 @@ ChooseServer:
 		return
 	}
 
-	go balancer.SaveToCache(req, resp, byteArray)
+	go lb.SaveToCache(req, resp, byteArray)
 
 	finishRoundTrip := time.Since(start)
 	timer.SaveTimeDataBackend(backendTime, &finishRoundTrip)

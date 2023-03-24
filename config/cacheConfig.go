@@ -22,7 +22,7 @@ type CacheConfig struct {
 	pairs []cachePairLocationRequestKey
 }
 
-func (c CacheConfig) Pairs() []cachePairLocationRequestKey {
+func (c *CacheConfig) Pairs() []cachePairLocationRequestKey {
 	return c.pairs
 }
 
