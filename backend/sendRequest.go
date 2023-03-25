@@ -56,14 +56,6 @@ func (b *Backend) SendRequestToBackend(req *http.Request) (*http.Response, error
 	<-b.RequestChan
 
 	if respError != nil {
-		// on cancellation
-		if respError.err == context.Canceled {
-			//	cancel()
-			log.Printf("[%s] %s", b.URL, respError.err)
-			return nil, respError.err
-		}
-
-		b.SetAlive(false) // СДЕЛАТЬ СЧЁТЧИК ИЛИ ПОЧИТАТЬ КАК У НДЖИНКС
 		return nil, respError.err
 	}
 

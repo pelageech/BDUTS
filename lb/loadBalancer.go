@@ -194,9 +194,13 @@ ChooseServer:
 	req, backendTime = timer.MakeRequestTimeTracker(req)
 
 	resp, err := server.SendRequestToBackend(req)
+
+	// on cancellation
 	if err == context.Canceled {
+		log.Printf("[%s] %s", server.URL, err)
 		return
 	} else if err != nil {
+		server.SetAlive(false) // СДЕЛАТЬ СЧЁТЧИК ИЛИ ПОЧИТАТЬ КАК У НДЖИНКС
 		goto ChooseServer
 	}
 	defer resp.Body.Close()
