@@ -20,47 +20,47 @@ func NewServerPool() *ServerPool {
 	}
 }
 
-func (serverPool *ServerPool) Lock() {
-	serverPool.mux.Lock()
+func (p *ServerPool) Lock() {
+	p.mux.Lock()
 }
 
-func (serverPool *ServerPool) Unlock() {
-	serverPool.mux.Unlock()
+func (p *ServerPool) Unlock() {
+	p.mux.Unlock()
 }
 
-func (serverPool *ServerPool) Servers() []*Backend {
-	return serverPool.servers
+func (p *ServerPool) Servers() []*Backend {
+	return p.servers
 }
 
-func (serverPool *ServerPool) Current() int32 {
-	return serverPool.current
+func (p *ServerPool) Current() int32 {
+	return p.current
 }
 
-func (serverPool *ServerPool) IncrementCurrent() {
-	serverPool.current++
-	if serverPool.current == int32(len(serverPool.Servers())) {
-		serverPool.current = 0
+func (p *ServerPool) IncrementCurrent() {
+	p.current++
+	if p.current == int32(len(p.Servers())) {
+		p.current = 0
 	}
 }
 
-func (serverPool *ServerPool) GetCurrentServer() *Backend {
-	return serverPool.servers[serverPool.current]
+func (p *ServerPool) GetCurrentServer() *Backend {
+	return p.servers[p.current]
 }
 
-func (serverPool *ServerPool) AddServer(b *Backend) {
-	serverPool.servers = append(serverPool.servers, b)
+func (p *ServerPool) AddServer(b *Backend) {
+	p.servers = append(p.servers, b)
 }
 
-func (serverPool *ServerPool) GetNextPeer() (*Backend, error) {
-	serverList := serverPool.Servers()
+func (p *ServerPool) GetNextPeer() (*Backend, error) {
+	serverList := p.Servers()
 
-	serverPool.Lock()
-	defer serverPool.Unlock()
+	p.Lock()
+	defer p.Unlock()
 
 	for i := 0; i < len(serverList); i++ {
-		serverPool.IncrementCurrent()
-		if serverList[serverPool.Current()].Alive {
-			return serverPool.GetCurrentServer(), nil
+		p.IncrementCurrent()
+		if serverList[p.Current()].Alive {
+			return p.GetCurrentServer(), nil
 		}
 	}
 
