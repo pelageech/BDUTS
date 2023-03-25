@@ -2,6 +2,7 @@ package backend
 
 import (
 	"errors"
+	"net/url"
 	"sync"
 )
 
@@ -43,12 +44,31 @@ func (p *ServerPool) IncrementCurrent() {
 	}
 }
 
+func (p *ServerPool) DecrementCurrent() {
+	p.current--
+	if p.current == 0 {
+		p.current = int32(len(p.Servers())) - 1
+	}
+}
+
 func (p *ServerPool) GetCurrentServer() *Backend {
 	return p.servers[p.current]
 }
 
 func (p *ServerPool) AddServer(b *Backend) {
 	p.servers = append(p.servers, b)
+}
+
+func (p *ServerPool) RemoveServerByUrl(url *url.URL) error {
+	backends := p.servers
+
+	for k, v := range backends {
+		if v.URL.String() == url.String() {
+			p.servers = append(p.servers[:k], p.servers[k+1:]...)
+			return nil
+		}
+	}
+	return errors.New("server not found")
 }
 
 func (p *ServerPool) GetNextPeer() (*Backend, error) {
