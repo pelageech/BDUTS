@@ -52,8 +52,8 @@ func (b *Backend) SendRequestToBackend(req *http.Request) (*http.Response, error
 	log.Printf("[%s] received a request\n", b.URL)
 
 	// send it to the backend
-	resp, respError := b.makeRequest(req)
-	<-b.RequestChan
+	r := b.prepareRequest(req)
+	resp, respError := b.makeRequest(r)
 
 	if respError != nil {
 		return nil, respError.err
@@ -100,8 +100,7 @@ func (b *Backend) prepareRequest(r *http.Request) *http.Request {
 	return req
 }
 
-func (b *Backend) makeRequest(r *http.Request) (*http.Response, *responseError) {
-	req := b.prepareRequest(r)
+func (b *Backend) makeRequest(req *http.Request) (*http.Response, *responseError) {
 	respError := &responseError{request: req}
 
 	// save the response from the origin b

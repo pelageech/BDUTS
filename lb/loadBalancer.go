@@ -194,6 +194,7 @@ ChooseServer:
 	req, backendTime = timer.MakeRequestTimeTracker(req)
 
 	resp, err := server.SendRequestToBackend(req)
+	<-server.RequestChan
 
 	// on cancellation
 	if err == context.Canceled {
