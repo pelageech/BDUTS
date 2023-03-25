@@ -72,11 +72,10 @@ func (p *ServerPool) RemoveServerByUrl(url *url.URL) error {
 }
 
 func (p *ServerPool) GetNextPeer() (*Backend, error) {
-	serverList := p.Servers()
-
 	p.Lock()
 	defer p.Unlock()
 
+	serverList := p.Servers()
 	for i := 0; i < len(serverList); i++ {
 		p.IncrementCurrent()
 		if serverList[p.Current()].Alive {
