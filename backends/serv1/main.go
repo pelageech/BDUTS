@@ -8,18 +8,24 @@ import (
 	"os/exec"
 )
 
-func hello(w http.ResponseWriter, req *http.Request) {
-	var stdout bytes.Buffer
+func index(w http.ResponseWriter, req *http.Request) {
+	http.ServeFile(w, req, "backends/serv1/index.html")
+}
+
+func draw(w http.ResponseWriter, req *http.Request) {
+	var stdout, stderr bytes.Buffer
 	f := req.FormValue("func")
 	if f == "" {
-		f = "Sin (Div (Num 1) X)"
+		f = "Sin ( Div (Num 1) X)"
 	}
 
-	e := exec.Command("./Graphics-exe.exe", f, "--width", "2000", "--height", "1500")
+	e := exec.Command("./Graphics-exe.exe", f, "--width", "3200", "--height", "2000")
 	e.Stdout = &stdout
+	e.Stderr = &stderr
 
 	if err := e.Start(); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
 	}
 	go func() {
 		<-req.Context().Done()
@@ -27,17 +33,20 @@ func hello(w http.ResponseWriter, req *http.Request) {
 	}()
 
 	if err := e.Wait(); err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
 	}
 
 	if _, err := fmt.Fprintln(w, stdout.String()); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
 	}
 }
 
 func main() {
 
-	http.HandleFunc("/hello", hello)
+	http.HandleFunc("/draw", draw)
+	http.HandleFunc("/", index)
 
 	err := http.ListenAndServe(":3031", nil)
 	if err != nil {
