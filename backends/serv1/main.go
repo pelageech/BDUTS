@@ -4,12 +4,25 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os/exec"
 )
 
 func index(w http.ResponseWriter, req *http.Request) {
 	http.ServeFile(w, req, "backends/serv1/index.html")
+}
+
+func drawRandom(w http.ResponseWriter, req *http.Request) {
+	w.Header().Add("cache-control", "no-store")
+
+	t := rand.Intn(20) - 10
+	str := fmt.Sprintf("Sin (Mul X (Num (%d)))", t)
+	fmt.Println(str)
+	q := req.URL.Query()
+	q.Set("func", str)
+	req.URL.RawQuery = q.Encode()
+	draw(w, req)
 }
 
 func draw(w http.ResponseWriter, req *http.Request) {
@@ -46,6 +59,7 @@ func draw(w http.ResponseWriter, req *http.Request) {
 func main() {
 
 	http.HandleFunc("/draw", draw)
+	http.HandleFunc("/random", drawRandom)
 	http.HandleFunc("/", index)
 
 	err := http.ListenAndServe(":3031", nil)
