@@ -67,6 +67,10 @@ func ParseRequestKey(requestKey string) (result []func(r *http.Request) string) 
 			m = func(r *http.Request) string { return r.Host }
 		case "REQ_URI":
 			m = func(r *http.Request) string { return r.URL.Path }
+		case "REQ_QUERY":
+			m = func(r *http.Request) string { return r.URL.RawQuery }
+		default:
+			continue
 		}
 		result = append(result, m)
 	}
