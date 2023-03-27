@@ -19,9 +19,6 @@ const (
 	lbConfigPath      = "./resources/config.json"
 	serversConfigPath = "./resources/servers.json"
 	cacheConfigPath   = "./resources/cache_config.json"
-
-	maxDBSize          = 100 * (1 << 20) // 100 MB
-	dbObserveFrequency = 10 * time.Second
 )
 
 func loadBalancerConfigure() *config.LoadBalancerConfig {
@@ -81,7 +78,7 @@ func serversConfigure() []config.ServerConfig {
 	return serversConfig
 }
 
-func cacheCleanerConfigure(dbControllerTicker *time.Ticker) *cache.CacheCleaner {
+func cacheCleanerConfigure(dbControllerTicker *time.Ticker, maxCacheSize int64) *cache.CacheCleaner {
 	err := os.Mkdir(cache.DbDirectory, 0777)
 	if err != nil && !os.IsExist(err) {
 		log.Fatalln("Cache files directory creation error: ", err)
@@ -98,11 +95,17 @@ func cacheCleanerConfigure(dbControllerTicker *time.Ticker) *cache.CacheCleaner 
 	if err != nil {
 		log.Fatalln("DB files opening error: ", err)
 	}
-	return cache.NewCacheCleaner(dbDir, maxDBSize, dbFillFactor, dbControllerTicker)
+	return cache.NewCacheCleaner(dbDir, maxCacheSize, dbFillFactor, dbControllerTicker)
 }
 
 func main() {
-	lbConfig := loadBalancerConfigure()
+	lbConfJSON := loadBalancerConfigure()
+	lbConfig := lb.NewLoadBalancerConfig(
+		lbConfJSON.Port,
+		time.Duration(lbConfJSON.HealthCheckPeriod)*time.Millisecond,
+		lbConfJSON.MaxCacheSize,
+		time.Duration(lbConfJSON.ObserveFrequency)*time.Millisecond,
+	)
 
 	cacheConfig := cacheConfigure()
 
@@ -115,8 +118,8 @@ func main() {
 	defer cache.CloseDatabase(boltdb)
 
 	// thread that clears the cache
-	dbControllerTicker := time.NewTicker(dbObserveFrequency)
-	controller := cacheCleanerConfigure(dbControllerTicker)
+	dbControllerTicker := time.NewTicker(lbConfig.ObserveFrequency())
+	controller := cacheCleanerConfigure(dbControllerTicker, lbConfig.MaxCacheSize())
 	defer dbControllerTicker.Stop()
 
 	// health checker configuration
@@ -132,7 +135,7 @@ func main() {
 
 	// creating new load balancer
 	loadBalancer := lb.NewLoadBalancer(
-		lb.NewLoadBalancerConfig(lbConfig.Port, time.Duration(lbConfig.HealthCheckPeriod)*time.Second),
+		lbConfig,
 		cache.NewCachingProperties(boltdb, cacheConfig, controller),
 		healthCheckFunc,
 	)

@@ -3,6 +3,7 @@ package lb
 import (
 	"context"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -19,12 +20,21 @@ import (
 type LoadBalancerConfig struct {
 	port              int
 	healthCheckPeriod time.Duration
+	maxCacheSize      int64
+	observeFrequency  time.Duration
 }
 
-func NewLoadBalancerConfig(port int, healthCheckPeriod time.Duration) *LoadBalancerConfig {
+func NewLoadBalancerConfig(
+	port int,
+	healthCheckPeriod time.Duration,
+	maxCacheSize int64,
+	observeFrequency time.Duration,
+) *LoadBalancerConfig {
 	return &LoadBalancerConfig{
 		port:              port,
 		healthCheckPeriod: healthCheckPeriod,
+		maxCacheSize:      maxCacheSize,
+		observeFrequency:  observeFrequency,
 	}
 }
 
@@ -34,6 +44,14 @@ func (c *LoadBalancerConfig) Port() int {
 
 func (c *LoadBalancerConfig) HealthCheckPeriod() time.Duration {
 	return c.healthCheckPeriod
+}
+
+func (c *LoadBalancerConfig) MaxCacheSize() int64 {
+	return c.maxCacheSize
+}
+
+func (c *LoadBalancerConfig) ObserveFrequency() time.Duration {
+	return c.observeFrequency
 }
 
 // LoadBalancer is a struct that contains all the configuration
@@ -204,7 +222,12 @@ ChooseServer:
 		server.SetAlive(false) // СДЕЛАТЬ СЧЁТЧИК ИЛИ ПОЧИТАТЬ КАК У НДЖИНКС
 		goto ChooseServer
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}(resp.Body)
 
 	byteArray, err := backend.WriteBodyAndReturn(rw, resp)
 	if err != nil {
