@@ -1,6 +1,6 @@
 [
   {
-    "url" : "http://192.168.0.4:3037",
+    "url" : "http://localhost:3031",
     "healthCheckTcpTimeout" : 2000,
     "maximalRequests" : 5
   }
