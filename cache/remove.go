@@ -2,15 +2,16 @@ package cache
 
 import (
 	"errors"
-	"github.com/boltdb/bolt"
 	"os"
 	"strings"
+
+	"github.com/boltdb/bolt"
 )
 
 // RemovePageFromCache removes the page from disk if it exists
 // and its metadata from the database
-func RemovePageFromCache(db *bolt.DB, key []byte) error {
-	if err := removePageMetadata(db, key); err != nil {
+func (p *CachingProperties) RemovePageFromCache(key []byte) error {
+	if err := removePageMetadata(p.DB(), key); err != nil {
 		return errors.New("Error while deleting record from db: " + err.Error())
 	}
 

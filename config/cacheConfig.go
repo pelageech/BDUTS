@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -12,11 +13,18 @@ type CacheReader struct {
 	file *os.File
 }
 
-type CacheConfig struct {
+type cachePairLocationRequestKey struct {
+	Location   string
 	RequestKey string
 }
 
-var RequestKey []func(r *http.Request) string
+type CacheConfig struct {
+	pairs []cachePairLocationRequestKey
+}
+
+func (c *CacheConfig) Pairs() []cachePairLocationRequestKey {
+	return c.pairs
+}
 
 func NewCacheReader(configPath string) (*CacheReader, error) {
 	file, err := os.Open(configPath)
@@ -37,17 +45,16 @@ func ReadCacheConfig(r *CacheReader) (*CacheConfig, error) {
 	}
 
 	var cacheConfig CacheConfig
-	err = json.Unmarshal(cacheFileByte, &cacheConfig)
+	err = json.Unmarshal(cacheFileByte, &cacheConfig.pairs)
 	if err != nil {
 		return nil, err
 	}
-
 	return &cacheConfig, nil
 }
 
 func ParseRequestKey(requestKey string) (result []func(r *http.Request) string) {
 	if len(requestKey) == 0 {
-		return nil
+		log.Panic("An empty line was got")
 	}
 
 	keys := strings.Split(requestKey, ";")

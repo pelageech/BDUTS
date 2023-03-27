@@ -9,18 +9,15 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-type cacheController struct {
-	db          *bolt.DB
+type CacheCleaner struct {
 	dbFile      *os.File
 	maxFileSize int64
 	fillFactor  float64
 	frequency   *time.Ticker
 }
 
-//goland:noinspection GoExportedFuncWithUnexportedType
-func New(db *bolt.DB, dbFile *os.File, maxFileSize int64, fillFactor float64, frequency *time.Ticker) *cacheController {
-	return &cacheController{
-		db:          db,
+func NewCacheCleaner(dbFile *os.File, maxFileSize int64, fillFactor float64, frequency *time.Ticker) *CacheCleaner {
+	return &CacheCleaner{
 		dbFile:      dbFile,
 		maxFileSize: maxFileSize,
 		fillFactor:  fillFactor,
@@ -28,25 +25,25 @@ func New(db *bolt.DB, dbFile *os.File, maxFileSize int64, fillFactor float64, fr
 	}
 }
 
-func (c *cacheController) Observe() {
+func (p *CachingProperties) Observe() {
 	for {
-		<-c.frequency.C
-		if c.isSizeExceeded() {
-			c.deleteExpiredCache()
+		<-p.cleaner.frequency.C
+		if p.isSizeExceeded() {
+			p.deleteExpiredCache()
 		}
 	}
 }
 
-func (c *cacheController) isSizeExceeded() bool {
-	fileInfo, err := c.dbFile.Stat()
+func (p *CachingProperties) isSizeExceeded() bool {
+	fileInfo, err := p.cleaner.dbFile.Stat()
 	if err != nil {
-		log.Printf("Error getting file info in cacheController: %v", err) //todo: how to handle this error properly?
+		log.Printf("Error getting file info in CacheCleaner: %v", err) //todo: how to handle this error properly?
 	}
 
-	return float64(fileInfo.Size()) > float64(c.maxFileSize)*c.fillFactor
+	return float64(fileInfo.Size()) > float64(p.cleaner.maxFileSize)*p.cleaner.fillFactor
 }
 
-func (c *cacheController) deleteExpiredCache() {
+func (p *CachingProperties) deleteExpiredCache() {
 	sizeReleased := int64(0)
 	expiredKeys := make([][]byte, 0)
 
@@ -67,11 +64,11 @@ func (c *cacheController) deleteExpiredCache() {
 
 	// iterating over all buckets and all keys in each bucket
 	// and collecting expired keys of expired data
-	err := c.db.View(func(tx *bolt.Tx) error {
+	err := p.DB().View(func(tx *bolt.Tx) error {
 		return tx.ForEach(addExpiredKeys)
 	})
 	if err != nil {
-		log.Printf("Error while viewing cache in cacheController: %v", err)
+		log.Printf("Error while viewing cache in CacheCleaner: %v", err)
 	}
 
 	if sizeReleased > 0 {
@@ -79,7 +76,7 @@ func (c *cacheController) deleteExpiredCache() {
 	}
 	// deleting expired data
 	for _, key := range expiredKeys {
-		if err = RemovePageFromCache(c.db, key); err != nil {
+		if err = p.RemovePageFromCache(key); err != nil {
 			log.Println(err)
 		}
 	}

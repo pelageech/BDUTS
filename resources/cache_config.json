@@ -1,3 +1,6 @@
-{
-  "requestKey" : "REQ_METHOD;REQ_HOST;REQ_URI"
-}
+[
+  {
+    "location" : "/",
+    "requestKey" : "REQ_METHOD;REQ_HOST;REQ_URI"
+  }
+]

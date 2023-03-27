@@ -38,6 +38,9 @@ const (
 	// DbName is a name of the database.
 	DbName = "database.db"
 
+	// DefaultKey is used if there's no key parameter of cache for url
+	DefaultKey = "REQ_METHOD;REQ_HOST;REQ_URI"
+
 	// PagesPath is the directory where the pages are written to.
 	PagesPath = "./cache-data/db"
 
@@ -46,6 +49,40 @@ const (
 	pageInfo     = "pageInfo"
 )
 
+type UrlToKeyBuilder map[string][]func(r *http.Request) string
+
+type CachingProperties struct {
+	db            *bolt.DB
+	keyBuilderMap UrlToKeyBuilder
+	cleaner       *CacheCleaner
+}
+
+func NewCachingProperties(DB *bolt.DB, cacheConfig *config.CacheConfig, cleaner *CacheCleaner) *CachingProperties {
+	keyBuilder := make(UrlToKeyBuilder)
+
+	for _, v := range cacheConfig.Pairs() {
+		keyBuilder[v.Location] = config.ParseRequestKey(v.RequestKey)
+	}
+
+	return &CachingProperties{
+		db:            DB,
+		keyBuilderMap: keyBuilder,
+		cleaner:       cleaner,
+	}
+}
+
+func (p *CachingProperties) DB() *bolt.DB {
+	return p.db
+}
+
+func (p *CachingProperties) KeyBuilderMap() UrlToKeyBuilder {
+	return p.keyBuilderMap
+}
+
+func (p *CachingProperties) Cleaner() *CacheCleaner {
+	return p.cleaner
+}
+
 // Page is a structure that is the cache unit storing on a disk.
 type Page struct {
 	// Body is the body of the response saving to the cache.
@@ -53,6 +90,14 @@ type Page struct {
 
 	// Header is the response header saving to the cache.
 	Header http.Header
+}
+
+// PageMetadata is a struct of page metadata
+type PageMetadata struct {
+	// Size is the response body size.
+	Size int64
+
+	ResponseDirectives responseDirectives
 }
 
 //	MaxAge:       +
@@ -91,14 +136,6 @@ type responseDirectives struct {
 	ProxyRevalidate bool
 	MaxAge          time.Time
 	SMaxAge         time.Time
-}
-
-// PageMetadata is a struct of page metadata
-type PageMetadata struct {
-	// Size is the response body size.
-	Size int64
-
-	ResponseDirectives responseDirectives
 }
 
 // OpenDatabase Открывает базу данных для дальнейшего использования
@@ -142,11 +179,19 @@ func hash(value []byte) []byte {
 // constructKeyFromRequest uses an array config.RequestKey
 // in order to construct a key for mapping this one with
 // values of page on a disk and its metadata in DB.
-func constructKeyFromRequest(req *http.Request) string {
+func (p *CachingProperties) constructKeyFromRequest(req *http.Request) string {
 	result := ""
-	for _, addStringKey := range config.RequestKey {
+
+	keyBuilderMap := p.KeyBuilderMap()
+	keyBuilder, ok := keyBuilderMap[req.URL.Path]
+	if !ok {
+		keyBuilder = config.ParseRequestKey(DefaultKey)
+	}
+
+	for _, addStringKey := range keyBuilder {
 		result += addStringKey(req)
 	}
+
 	return result
 }
 

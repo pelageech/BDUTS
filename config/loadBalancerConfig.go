@@ -13,6 +13,8 @@ type LoadBalancerReader struct {
 type LoadBalancerConfig struct {
 	Port              int
 	HealthCheckPeriod int64
+	MaxCacheSize      int64
+	ObserveFrequency  int64
 }
 
 func NewLoadBalancerReader(configPath string) (*LoadBalancerReader, error) {
