@@ -224,7 +224,11 @@ func loadRequestDirectives(header http.Header) *requestDirectives {
 		} else if strings.Contains(v, "max-age") {
 			_, t, _ := strings.Cut(v, "=")
 			age, _ := strconv.Atoi(t)
-			result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
+			if age == 0 {
+				result.MaxAge = infinityTime
+			} else {
+				result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
+			}
 		} else if strings.Contains(v, "max-stale") {
 			_, t, _ := strings.Cut(v, "=")
 			age, _ := strconv.Atoi(t)
@@ -269,6 +273,11 @@ func loadResponseDirectives(header http.Header) *responseDirectives {
 		} else if strings.Contains(v, "max-age") {
 			_, t, _ := strings.Cut(v, "=")
 			age, _ := strconv.Atoi(t)
+			if age == 0 {
+				result.MaxAge = infinityTime
+			} else {
+				result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
+			}
 			result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
 		} else if strings.Contains(v, "s-maxage") {
 			_, t, _ := strings.Cut(v, "=")
