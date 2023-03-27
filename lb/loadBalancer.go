@@ -3,7 +3,6 @@ package lb
 import (
 	"context"
 	"errors"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -222,12 +221,7 @@ ChooseServer:
 		server.SetAlive(false) // СДЕЛАТЬ СЧЁТЧИК ИЛИ ПОЧИТАТЬ КАК У НДЖИНКС
 		goto ChooseServer
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Println(err)
-		}
-	}(resp.Body)
+	defer resp.Body.Close()
 
 	byteArray, err := backend.WriteBodyAndReturn(rw, resp)
 	if err != nil {
