@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>About</title>
+</head>
+<body>
+<h1>graphics</h1>
+<p>My haskell project. You can draw different function to SVG-file</p>
+
+<h2>How to use it?</h2>
+<p>
+First you need Haskell Stack. Clone this repo and run stack build the created folder.<br>
+
+You can find the application in .\graphics\.stack-work\dist\d53b6a14\build\Graphics-exe<br>
+
+Run ./Graphics-exe.exe "FUNCTION" (for example, ./Graphics-exe.exe "Add X (Sin X)"). SVG-file will be created in the same folder where the program was launched from.
+</p>
+<h2>Function</h2>
+<p>
+  Building a function:<br>
+
+  Num 14 - a number<br>
+  X - an argument<br>
+  Add/Sub/Mul/Div ( Expr ) ( Expr )<br>
+  Pow ( Expr ) ( Expr ) - Expr^Expr<br>
+  Sin/Cos/Tan ( Expr )</p>
+<b>Example: Mul ( Sin ( Pow X ( Num 2 ) ) ) ( Add ( Cos X ) ( Div ( Sin X ) X ) ) - sin(X^2) * (cosX + sinX / X)</b><br>
+
+The result will be:
+<br>
+<img src="assets/img.png" alt="No image:(" width="512">
+<a href="/"><h1>Let's draw!</h1></a>
+</body>
+</html>

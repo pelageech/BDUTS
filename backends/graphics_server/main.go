@@ -10,14 +10,20 @@ import (
 )
 
 func index(w http.ResponseWriter, req *http.Request) {
-	http.ServeFile(w, req, "backends/serv1/index.html")
+	w.Header().Add("cache-control", "max-age=0;public")
+	http.ServeFile(w, req, "backends/graphics_server/main.html")
+}
+
+func about(w http.ResponseWriter, req *http.Request) {
+	w.Header().Add("cache-control", "max-age=0;public")
+	http.ServeFile(w, req, "backends/graphics_server/about.html")
 }
 
 func drawRandom(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("cache-control", "no-store")
 
-	t := rand.Intn(20) - 10
-	str := fmt.Sprintf("Sin (Mul X (Num (%d)))", t)
+	t := rand.Intn(20)
+	str := fmt.Sprintf("Mul (Sin (Mul X (Num (%d)))) (Div (Num %d) (Num 10))", t, t)
 	fmt.Println(str)
 	q := req.URL.Query()
 	q.Set("func", str)
@@ -50,6 +56,11 @@ func draw(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if _, err := fmt.Fprintln(w, `<a href="/">Return</a><br>`); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
 	if _, err := fmt.Fprintln(w, stdout.String()); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -58,10 +69,11 @@ func draw(w http.ResponseWriter, req *http.Request) {
 
 func main() {
 
+	http.HandleFunc("/about", about)
 	http.HandleFunc("/draw", draw)
 	http.HandleFunc("/random", drawRandom)
 	http.HandleFunc("/", index)
-
+	http.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir("backends/graphics_server/assets"))))
 	err := http.ListenAndServe(":3031", nil)
 	if err != nil {
 		log.Println(err)

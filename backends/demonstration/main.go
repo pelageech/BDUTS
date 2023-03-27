@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func hello(w http.ResponseWriter, req *http.Request) {
+func hello(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Add("cache-control", "max-age=10")
 
 	time.Sleep(5 * time.Second)
