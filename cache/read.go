@@ -14,7 +14,7 @@ import (
 // GetPageFromCache gets corresponding page and its metadata
 // and returns it if it exists. Uses some parameters for building
 // a request key, see in cache package and cacheConfig file
-func (p *CachingProperties) GetPageFromCache(req *http.Request) (*Page, error) {
+func (p *CachingProperties) GetPageFromCache(key []byte, req *http.Request) (*Page, error) {
 	var info *PageMetadata
 	var item Page
 	var err error
@@ -23,10 +23,7 @@ func (p *CachingProperties) GetPageFromCache(req *http.Request) (*Page, error) {
 	// doesn't modify the request but adds a context key-value item
 	*req = *req.WithContext(context.WithValue(req.Context(), OnlyIfCachedKey, requestDirectives.OnlyIfCached))
 
-	keyString := p.constructKeyFromRequest(req)
-	requestHash := hash([]byte(keyString))
-
-	if info, err = getPageMetadata(p.DB(), requestHash); err != nil {
+	if info, err = getPageMetadata(p.DB(), key); err != nil {
 		return nil, err
 	}
 
@@ -47,7 +44,7 @@ func (p *CachingProperties) GetPageFromCache(req *http.Request) (*Page, error) {
 	}
 
 	var byteItem []byte
-	if byteItem, err = readPageFromDisk(requestHash); err != nil {
+	if byteItem, err = readPageFromDisk(key); err != nil {
 		return nil, err
 	}
 

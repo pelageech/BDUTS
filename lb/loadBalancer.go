@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/pelageech/BDUTS/backend"
@@ -77,6 +76,22 @@ func NewLoadBalancer(
 	}
 }
 
+func NewLoadBalancerWithPool(
+	config *LoadBalancerConfig,
+	cachingProperties *cache.CachingProperties,
+	healthChecker func(*backend.Backend),
+	servers []config.ServerConfig,
+) *LoadBalancer {
+	lb := NewLoadBalancer(
+		config,
+		cachingProperties,
+		healthChecker,
+	)
+	lb.pool.ConfigureServerPool(servers)
+
+	return lb
+}
+
 func (lb *LoadBalancer) CacheProps() *cache.CachingProperties {
 	return lb.cacheProps
 }
@@ -107,29 +122,6 @@ func (lb *LoadBalancer) HealthChecker() {
 	}
 }
 
-// ConfigureServerPool feels the balancer pool with servers
-func (lb *LoadBalancer) ConfigureServerPool(servers []config.ServerConfig) {
-	for _, server := range servers {
-		log.Printf("%v", server)
-
-		var b backend.Backend
-		var err error
-
-		b.URL, err = url.Parse(server.URL)
-		if err != nil {
-			log.Printf("Failed to parse server URL: %s\n", err)
-			continue
-		}
-
-		b.HealthCheckTcpTimeout = time.Duration(server.HealthCheckTcpTimeout) * time.Millisecond
-		b.Alive = false
-
-		b.RequestChan = make(chan bool, server.MaximalRequests)
-
-		lb.pool.AddServer(&b)
-	}
-}
-
 // uses balancer db for taking the page from cache and writing it to http.ResponseWriter
 // if such a page is in cache
 func (lb *LoadBalancer) writePageIfIsInCache(rw http.ResponseWriter, req *http.Request) error {
@@ -139,7 +131,8 @@ func (lb *LoadBalancer) writePageIfIsInCache(rw http.ResponseWriter, req *http.R
 
 	log.Println("Try to get a response from cache...")
 
-	cacheItem, err := lb.cacheProps.GetPageFromCache(req)
+	key := req.Context().Value(cache.Hash).([]byte)
+	cacheItem, err := lb.cacheProps.GetPageFromCache(key, req)
 	if err != nil {
 		return err
 	}
@@ -179,6 +172,9 @@ func (lb *LoadBalancer) LoadBalancer(rw http.ResponseWriter, req *http.Request) 
 
 	start := time.Now()
 
+	requestHash := lb.cacheProps.RequestHashKey(req)
+	*req = *req.WithContext(context.WithValue(req.Context(), cache.Hash, requestHash))
+
 	// getting a response from cache
 	err := lb.writePageIfIsInCache(rw, req)
 	if err == nil {
@@ -201,9 +197,7 @@ ChooseServer:
 		http.Error(rw, "Service not available", http.StatusServiceUnavailable)
 		return
 	}
-	select {
-	case server.RequestChan <- true:
-	default:
+	if ok := server.AssignRequest(); ok {
 		goto ChooseServer
 	}
 
@@ -211,11 +205,11 @@ ChooseServer:
 	req, backendTime = timer.MakeRequestTimeTracker(req)
 
 	resp, err := server.SendRequestToBackend(req)
-	<-server.RequestChan
+	server.Free()
 
 	// on cancellation
 	if err == context.Canceled {
-		log.Printf("[%s] %s", server.URL, err)
+		log.Printf("[%s] %s", server.URL(), err)
 		return
 	} else if err != nil {
 		server.SetAlive(false) // СДЕЛАТЬ СЧЁТЧИК ИЛИ ПОЧИТАТЬ КАК У НДЖИНКС

@@ -20,8 +20,9 @@ func (lb *LoadBalancer) SaveToCache(req *http.Request, resp *http.Response, byte
 			Body:   byteArray,
 			Header: resp.Header,
 		}
-		err := lb.cacheProps.InsertPageInCache(req, resp, cacheItem)
-		if err != nil {
+
+		key := req.Context().Value(cache.Hash).([]byte)
+		if err := lb.cacheProps.InsertPageInCache(key, req, resp, cacheItem); err != nil {
 			log.Println("Unsuccessful operation: ", err)
 			return
 		}

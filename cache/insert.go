@@ -20,7 +20,7 @@ var (
 // First, it adds PageMetadata in DB and then the function starts a process of
 // transactional writing the page on a disk.
 // Page transforms to json-file.
-func (p *CachingProperties) InsertPageInCache(req *http.Request, resp *http.Response, item *Page) error {
+func (p *CachingProperties) InsertPageInCache(key []byte, req *http.Request, resp *http.Response, item *Page) error {
 	var byteInfo, bytePage []byte
 	var err error
 
@@ -40,14 +40,11 @@ func (p *CachingProperties) InsertPageInCache(req *http.Request, resp *http.Resp
 		return err
 	}
 
-	keyString := p.constructKeyFromRequest(req)
-	requestHash := hash([]byte(keyString))
-
-	if err = insertPageMetadataToDB(p.DB(), requestHash, byteInfo); err != nil {
+	if err = insertPageMetadataToDB(p.DB(), key, byteInfo); err != nil {
 		return err
 	}
 
-	if err = writePageToDisk(requestHash, bytePage); err != nil {
+	if err = writePageToDisk(key, bytePage); err != nil {
 		return err
 	}
 

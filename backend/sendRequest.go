@@ -12,11 +12,62 @@ import (
 )
 
 type Backend struct {
-	URL                   *url.URL
-	HealthCheckTcpTimeout time.Duration
-	Mux                   sync.Mutex
-	Alive                 bool
-	RequestChan           chan bool
+	url                   *url.URL
+	healthCheckTcpTimeout time.Duration
+	mux                   sync.Mutex
+	alive                 bool
+	requestChan           chan bool
+}
+
+func NewBackend(url *url.URL, healthCheckTimeout time.Duration, maxRequests int32) *Backend {
+	c := make(chan bool, maxRequests)
+	return &Backend{
+		url:                   url,
+		healthCheckTcpTimeout: healthCheckTimeout,
+		mux:                   sync.Mutex{},
+		alive:                 false,
+		requestChan:           c,
+	}
+}
+
+func (b *Backend) URL() *url.URL {
+	return b.url
+}
+
+func (b *Backend) HealthCheckTcpTimeout() time.Duration {
+	return b.healthCheckTcpTimeout
+}
+
+func (b *Backend) Lock() {
+	b.mux.Lock()
+}
+
+func (b *Backend) Unlock() {
+	b.mux.Unlock()
+}
+
+func (b *Backend) Alive() bool {
+	return b.alive
+}
+
+// AssignRequest returns true if backend's channel is not full.
+// Apart from that, channel gets a new item.
+func (b *Backend) AssignRequest() bool {
+	select {
+	case b.requestChan <- true:
+		return true
+	default:
+		return false
+	}
+}
+
+func (b *Backend) Free() bool {
+	select {
+	case <-b.requestChan:
+		return true
+	default:
+		return false
+	}
 }
 
 type responseError struct {
@@ -26,13 +77,13 @@ type responseError struct {
 }
 
 func (b *Backend) SetAlive(alive bool) {
-	b.Mux.Lock()
-	b.Alive = alive
-	b.Mux.Unlock()
+	b.Lock()
+	b.alive = alive
+	b.Unlock()
 }
 
-func (b *Backend) IsAlive() bool {
-	conn, err := net.DialTimeout("tcp", b.URL.Host, b.HealthCheckTcpTimeout)
+func (b *Backend) CheckIfAlive() bool {
+	conn, err := net.DialTimeout("tcp", b.URL().Host, b.HealthCheckTcpTimeout())
 	if err != nil {
 		log.Println("Connection problem: ", err)
 		return false
@@ -49,7 +100,7 @@ func (b *Backend) IsAlive() bool {
 
 // SendRequestToBackend returns error if there is an error on backend side.
 func (b *Backend) SendRequestToBackend(req *http.Request) (*http.Response, error) {
-	log.Printf("[%s] received a request\n", b.URL)
+	log.Printf("[%s] received a request\n", b.URL())
 
 	// send it to the backend
 	r := b.prepareRequest(req)
@@ -59,7 +110,7 @@ func (b *Backend) SendRequestToBackend(req *http.Request) (*http.Response, error
 		return nil, respError.err
 	}
 
-	log.Printf("[%s] returned %s\n", b.URL, resp.Status)
+	log.Printf("[%s] returned %s\n", b.URL(), resp.Status)
 
 	return resp, nil
 }
@@ -88,7 +139,7 @@ func WriteBodyAndReturn(rw http.ResponseWriter, resp *http.Response) ([]byte, er
 func (b *Backend) prepareRequest(r *http.Request) *http.Request {
 	newReq := *r
 	req := &newReq
-	serverUrl := b.URL
+	serverUrl := b.URL()
 
 	// set req Host, URL and Request URI to forward a request to the origin b
 	req.Host = serverUrl.Host

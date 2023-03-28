@@ -26,6 +26,8 @@ const (
 	// 'only-if-cached' from Cache-Control.
 	OnlyIfCachedKey = Key(iota)
 
+	Hash
+
 	// OnlyIfCachedError is used for sending to the client an error about
 	// missing cache while 'only-if-cached' is specified in Cache-Control.
 	OnlyIfCachedError = "HTTP 504 Unsatisfiable Request (only-if-cached)"
@@ -169,6 +171,12 @@ func CloseDatabase(db *bolt.DB) {
 
 	return err
 }*/
+
+func (p *CachingProperties) RequestHashKey(req *http.Request) []byte {
+	return hash([]byte(
+		p.constructKeyFromRequest(req),
+	))
+}
 
 // Returns a hash-encode byte array of a value
 func hash(value []byte) []byte {

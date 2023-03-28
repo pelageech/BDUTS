@@ -2,8 +2,12 @@ package backend
 
 import (
 	"errors"
+	"log"
 	"net/url"
 	"sync"
+	"time"
+
+	"github.com/pelageech/BDUTS/config"
 )
 
 type ServerPool struct {
@@ -18,6 +22,27 @@ func NewServerPool() *ServerPool {
 		mux:     sync.Mutex{},
 		servers: s,
 		current: -1,
+	}
+}
+
+func (p *ServerPool) ConfigureServerPool(servers []config.ServerConfig) {
+	for _, server := range servers {
+		log.Printf("%v", server)
+
+		parsed, err := url.Parse(server.URL)
+		if err != nil {
+			log.Printf("Failed to parse server URL: %s\n", err)
+			continue
+		}
+		u := parsed
+
+		h := time.Duration(server.HealthCheckTcpTimeout) * time.Millisecond
+
+		max := server.MaximalRequests
+
+		b := NewBackend(u, h, max)
+
+		p.AddServer(b)
 	}
 }
 
@@ -63,7 +88,7 @@ func (p *ServerPool) RemoveServerByUrl(url *url.URL) error {
 	backends := p.servers
 
 	for k, v := range backends {
-		if v.URL.String() == url.String() {
+		if v.URL().String() == url.String() {
 			p.servers = append(p.servers[:k], p.servers[k+1:]...)
 			return nil
 		}
@@ -78,7 +103,7 @@ func (p *ServerPool) GetNextPeer() (*Backend, error) {
 	serverList := p.Servers()
 	for i := 0; i < len(serverList); i++ {
 		p.IncrementCurrent()
-		if serverList[p.Current()].Alive {
+		if serverList[p.Current()].alive {
 			return p.GetCurrentServer(), nil
 		}
 	}

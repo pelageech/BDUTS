@@ -124,25 +124,22 @@ func main() {
 
 	// health checker configuration
 	healthCheckFunc := func(server *backend.Backend) {
-		alive := server.IsAlive()
+		alive := server.CheckIfAlive()
 		server.SetAlive(alive)
 		if alive {
-			log.Printf("[%s] is alive.\n", server.URL.Host)
+			log.Printf("[%s] is alive.\n", server.URL().Host)
 		} else {
-			log.Printf("[%s] is down.\n", server.URL.Host)
+			log.Printf("[%s] is down.\n", server.URL().Host)
 		}
 	}
 
 	// creating new load balancer
-	loadBalancer := lb.NewLoadBalancer(
+	loadBalancer := lb.NewLoadBalancerWithPool(
 		lbConfig,
 		cache.NewCachingProperties(boltdb, cacheConfig, controller),
 		healthCheckFunc,
+		serversConfigure(),
 	)
-
-	// backends configuration
-	serversConfig := serversConfigure()
-	loadBalancer.ConfigureServerPool(serversConfig)
 
 	// wait while other containers will be ready
 	time.Sleep(5 * time.Second)
