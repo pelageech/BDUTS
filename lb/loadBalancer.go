@@ -131,7 +131,8 @@ func (lb *LoadBalancer) writePageIfIsInCache(rw http.ResponseWriter, req *http.R
 
 	log.Println("Try to get a response from cache...")
 
-	cacheItem, err := lb.cacheProps.GetPageFromCache(req)
+	key := req.Context().Value(cache.Hash).([]byte)
+	cacheItem, err := lb.cacheProps.GetPageFromCache(key, req)
 	if err != nil {
 		return err
 	}
@@ -170,6 +171,9 @@ func (lb *LoadBalancer) LoadBalancer(rw http.ResponseWriter, req *http.Request) 
 	}
 
 	start := time.Now()
+
+	requestHash := lb.cacheProps.RequestHashKey(req)
+	*req = *req.WithContext(context.WithValue(req.Context(), cache.Hash, requestHash))
 
 	// getting a response from cache
 	err := lb.writePageIfIsInCache(rw, req)
