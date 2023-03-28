@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/pelageech/BDUTS/backend"
@@ -77,6 +76,22 @@ func NewLoadBalancer(
 	}
 }
 
+func NewLoadBalancerWithPool(
+	config *LoadBalancerConfig,
+	cachingProperties *cache.CachingProperties,
+	healthChecker func(*backend.Backend),
+	servers []config.ServerConfig,
+) *LoadBalancer {
+	lb := NewLoadBalancer(
+		config,
+		cachingProperties,
+		healthChecker,
+	)
+	lb.pool.ConfigureServerPool(servers)
+
+	return lb
+}
+
 func (lb *LoadBalancer) CacheProps() *cache.CachingProperties {
 	return lb.cacheProps
 }
@@ -104,29 +119,6 @@ func (lb *LoadBalancer) HealthChecker() {
 			lb.healthCheckFunc(server)
 		}
 		log.Println("All the checks has been completed!")
-	}
-}
-
-// ConfigureServerPool feels the balancer pool with servers
-func (lb *LoadBalancer) ConfigureServerPool(servers []config.ServerConfig) {
-	for _, server := range servers {
-		log.Printf("%v", server)
-
-		var b backend.Backend
-		var err error
-
-		b.URL, err = url.Parse(server.URL)
-		if err != nil {
-			log.Printf("Failed to parse server URL: %s\n", err)
-			continue
-		}
-
-		b.HealthCheckTcpTimeout = time.Duration(server.HealthCheckTcpTimeout) * time.Millisecond
-		b.Alive = false
-
-		b.RequestChan = make(chan bool, server.MaximalRequests)
-
-		lb.pool.AddServer(&b)
 	}
 }
 
@@ -201,9 +193,7 @@ ChooseServer:
 		http.Error(rw, "Service not available", http.StatusServiceUnavailable)
 		return
 	}
-	select {
-	case server.RequestChan <- true:
-	default:
+	if ok := server.AssignRequest(); ok {
 		goto ChooseServer
 	}
 
@@ -211,11 +201,11 @@ ChooseServer:
 	req, backendTime = timer.MakeRequestTimeTracker(req)
 
 	resp, err := server.SendRequestToBackend(req)
-	<-server.RequestChan
+	server.Free()
 
 	// on cancellation
 	if err == context.Canceled {
-		log.Printf("[%s] %s", server.URL, err)
+		log.Printf("[%s] %s", server.URL(), err)
 		return
 	} else if err != nil {
 		server.SetAlive(false) // СДЕЛАТЬ СЧЁТЧИК ИЛИ ПОЧИТАТЬ КАК У НДЖИНКС
