@@ -12,7 +12,7 @@ import (
 // RemovePageFromCache removes the page from disk if it exists
 // and its metadata from the database
 func (p *CachingProperties) RemovePageFromCache(key []byte) error {
-	keyCopy := make([]byte, len(key), len(key)) // todo: ПОЧЕМУ ГРЕБАНЫЙ КЛЮЧ key МЕНЯЕТСЯ????!!! разобраться
+	keyCopy := make([]byte, len(key)) // todo: ПОЧЕМУ ГРЕБАНЫЙ КЛЮЧ key МЕНЯЕТСЯ????!!! разобраться
 	copy(keyCopy, key)
 
 	_, err := p.removePageMetadata(keyCopy)
