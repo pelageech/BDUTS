@@ -12,12 +12,14 @@ import (
 // RemovePageFromCache removes the page from disk if it exists
 // and its metadata from the database
 func (p *CachingProperties) RemovePageFromCache(key []byte) error {
-	_, err := p.removePageMetadata(key)
+	keyCopy := make([]byte, len(key), len(key)) // todo: ПОЧЕМУ ГРЕБАНЫЙ КЛЮЧ key МЕНЯЕТСЯ????!!! разобраться
+	copy(keyCopy, key)
+
+	_, err := p.removePageMetadata(keyCopy)
 	if err != nil {
 		return errors.New("Error while deleting record from db: " + err.Error())
 	}
-
-	if err := removePageFromDisk(key); err != nil {
+	if err := removePageFromDisk(keyCopy); err != nil {
 		return errors.New("Error while deleting page from disk: " + err.Error())
 	}
 
@@ -33,7 +35,7 @@ func (p *CachingProperties) removePageMetadata(key []byte) (*PageMetadata, error
 		if b == nil {
 			return errors.New("there's no page to delete")
 		}
-		m = b.Get([]byte(pageInfo))
+		m = b.Get([]byte(pageMetadataKey))
 
 		return tx.DeleteBucket(key)
 	})

@@ -3,6 +3,7 @@ package cache
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -47,6 +48,7 @@ func (p *CachingProperties) InsertPageInCache(key []byte, req *http.Request, res
 }
 
 func (p *CachingProperties) insertPageMetadataToDB(key []byte, meta *PageMetadata) error {
+	fmt.Println(string(key))
 	value, err := json.Marshal(*meta)
 	if err != nil {
 		return err
@@ -58,7 +60,7 @@ func (p *CachingProperties) insertPageMetadataToDB(key []byte, meta *PageMetadat
 			b = tx.Bucket(key)
 		}
 		if err == nil || err == bolt.ErrBucketExists {
-			_ = b.Put([]byte(pageInfo), value)
+			_ = b.Put([]byte(pageMetadataKey), value)
 		}
 
 		return err

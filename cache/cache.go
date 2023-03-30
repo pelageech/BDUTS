@@ -49,9 +49,9 @@ const (
 	// PagesPath is the directory where the pages are written to.
 	PagesPath = "./cache-data/db"
 
-	hashLength   = sha1.Size * 2
-	subHashCount = 4 // Количество подотрезков хэша
-	pageInfo     = "pageInfo"
+	hashLength      = sha1.Size * 2
+	subHashCount    = 4 // Количество подотрезков хэша
+	pageMetadataKey = "pageMetadataKey"
 )
 
 type UrlToKeyBuilder map[string][]func(r *http.Request) string
@@ -98,9 +98,9 @@ func (p *CachingProperties) CalculateSize() {
 	size := int64(0)
 	err := p.db.View(func(tx *bolt.Tx) error {
 		return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
-			metaBytes := b.Get([]byte(pageInfo))
+			metaBytes := b.Get([]byte(pageMetadataKey))
 			if metaBytes == nil {
-				return errors.New("all the buckets must have pageInfo-value, you should clear the database and cache")
+				return errors.New("all the buckets must have pageMetadataKey-value, you should clear the database and cache")
 			}
 
 			var m PageMetadata

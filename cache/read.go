@@ -60,7 +60,7 @@ func (p *CachingProperties) getPageMetadata(key []byte) (*PageMetadata, error) {
 			return errors.New("missed cache")
 		}
 
-		result = b.Get([]byte(pageInfo))
+		result = b.Get([]byte(pageMetadataKey))
 		if result == nil {
 			return errors.New("no record in cache")
 		}
