@@ -53,12 +53,12 @@ func (p *CachingProperties) insertPageMetadataToDB(requestHash []byte, meta *Pag
 	}
 
 	err = p.db.Update(func(tx *bolt.Tx) error {
-		treeBucket, err := tx.CreateBucket(requestHash)
+		b, err := tx.CreateBucket(requestHash)
 		if err == bolt.ErrBucketExists {
-			treeBucket = tx.Bucket(requestHash)
+			b = tx.Bucket(requestHash)
 		}
 		if err == nil || err == bolt.ErrBucketExists {
-			_ = treeBucket.Put([]byte(pageInfo), value)
+			_ = b.Put([]byte(pageInfo), value)
 		}
 
 		return err

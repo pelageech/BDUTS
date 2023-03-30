@@ -51,16 +51,16 @@ func (p *CachingProperties) GetPageFromCache(key []byte, req *http.Request) (*Pa
 }
 
 // Accesses the database to get meta information about the cache.
-func getPageMetadata(db *bolt.DB, requestHash []byte) (*PageMetadata, error) {
+func getPageMetadata(db *bolt.DB, key []byte) (*PageMetadata, error) {
 	var result []byte = nil
 
 	err := db.View(func(tx *bolt.Tx) error {
-		treeBucket, err := getBucket(tx, requestHash)
-		if err != nil {
-			return err
+		b := tx.Bucket(key)
+		if b == nil {
+			return errors.New("missed cache")
 		}
 
-		result = treeBucket.Get([]byte(pageInfo))
+		result = b.Get([]byte(pageInfo))
 		if result == nil {
 			return errors.New("no record in cache")
 		}
@@ -101,13 +101,4 @@ func readPageFromDisk(requestHash []byte) (*Page, error) {
 		return nil, err
 	}
 	return &page, err
-}
-
-// a universal function for getting a bucket
-func getBucket(tx *bolt.Tx, key []byte) (*bolt.Bucket, error) {
-	if bucket := tx.Bucket(key); bucket != nil {
-		return bucket, nil
-	}
-
-	return nil, errors.New("miss cache")
 }

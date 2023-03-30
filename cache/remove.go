@@ -29,9 +29,9 @@ func (p *CachingProperties) removePageMetadata(key []byte) (*PageMetadata, error
 	var m []byte
 	var meta *PageMetadata
 	err := p.db.Update(func(tx *bolt.Tx) error {
-		b, err := getBucket(tx, key)
-		if err != nil {
-			return err
+		b := tx.Bucket(key)
+		if b == nil {
+			return errors.New("there's no page to delete")
 		}
 		m = b.Get([]byte(pageInfo))
 
