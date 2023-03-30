@@ -122,6 +122,9 @@ func main() {
 	controller := cacheCleanerConfigure(dbControllerTicker, lbConfig.MaxCacheSize())
 	defer dbControllerTicker.Stop()
 
+	cacheProps := cache.NewCachingProperties(boltdb, cacheConfig, controller)
+	cacheProps.CalculateSize()
+
 	// health checker configuration
 	healthCheckFunc := func(server *backend.Backend) {
 		alive := server.CheckIfAlive()
@@ -136,7 +139,7 @@ func main() {
 	// creating new load balancer
 	loadBalancer := lb.NewLoadBalancerWithPool(
 		lbConfig,
-		cache.NewCachingProperties(boltdb, cacheConfig, controller),
+		cacheProps,
 		healthCheckFunc,
 		serversConfigure(),
 	)

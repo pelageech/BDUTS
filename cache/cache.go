@@ -9,6 +9,8 @@ package cache
 import (
 	"crypto/sha1"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -90,6 +92,29 @@ func (p *CachingProperties) Cleaner() *CacheCleaner {
 
 func (p *CachingProperties) IncrementSize(delta int64) {
 	atomic.AddInt64(&p.Size, delta)
+}
+
+func (p *CachingProperties) CalculateSize() {
+	size := int64(0)
+	err := p.db.View(func(tx *bolt.Tx) error {
+		return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+			metaBytes := b.Get([]byte(pageInfo))
+			if metaBytes == nil {
+				return errors.New("all the buckets must have pageInfo-value, you should clear the database and cache")
+			}
+
+			var m PageMetadata
+			if err := json.Unmarshal(metaBytes, &m); err != nil {
+				return errors.New("Non-persistent json-data, clear the cache! " + err.Error())
+			}
+			size += m.Size
+			return nil
+		})
+	})
+	if err != nil {
+		log.Fatalln(err)
+	}
+	p.Size = size
 }
 
 // Page is a structure that is the cache unit storing on a disk.

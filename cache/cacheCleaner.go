@@ -35,11 +35,6 @@ func (p *CachingProperties) Observe() {
 }
 
 func (p *CachingProperties) isSizeExceeded() bool {
-	//fileInfo, err := p.cleaner.dbFile.Stat()
-	//if err != nil {
-	//	log.Printf("Error getting file info in CacheCleaner: %v", err) //todo: how to handle this error properly?
-	//}
-	log.Println(p.Size)
 	return float64(p.Size) > float64(p.cleaner.maxFileSize)*p.cleaner.fillFactor
 }
 
