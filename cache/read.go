@@ -16,7 +16,7 @@ import (
 // a request key, see in cache package and cacheConfig file
 func (p *CachingProperties) GetPageFromCache(key []byte, req *http.Request) (*Page, error) {
 	var info *PageMetadata
-	var item Page
+	var page *Page
 	var err error
 
 	requestDirectives := loadRequestDirectives(req.Header)
@@ -43,29 +43,24 @@ func (p *CachingProperties) GetPageFromCache(key []byte, req *http.Request) (*Pa
 		return nil, errors.New("not fresh")
 	}
 
-	var byteItem []byte
-	if byteItem, err = readPageFromDisk(key); err != nil {
+	if page, err = readPageFromDisk(key); err != nil {
 		return nil, err
 	}
 
-	if err = json.Unmarshal(byteItem, &item); err != nil {
-		return nil, err
-	}
-
-	return &item, nil
+	return page, nil
 }
 
 // Accesses the database to get meta information about the cache.
-func getPageMetadata(db *bolt.DB, requestHash []byte) (*PageMetadata, error) {
+func getPageMetadata(db *bolt.DB, key []byte) (*PageMetadata, error) {
 	var result []byte = nil
 
 	err := db.View(func(tx *bolt.Tx) error {
-		treeBucket, err := getBucket(tx, requestHash)
-		if err != nil {
-			return err
+		b := tx.Bucket(key)
+		if b == nil {
+			return errors.New("missed cache")
 		}
 
-		result = treeBucket.Get([]byte(pageInfo))
+		result = b.Get([]byte(pageInfo))
 		if result == nil {
 			return errors.New("no record in cache")
 		}
@@ -85,29 +80,25 @@ func getPageMetadata(db *bolt.DB, requestHash []byte) (*PageMetadata, error) {
 }
 
 // Reads a page from disk
-func readPageFromDisk(requestHash []byte) ([]byte, error) {
+func readPageFromDisk(key []byte) (*Page, error) {
 	subhashLength := hashLength / subHashCount
 
 	var subHashes [][]byte
 	for i := 0; i < subHashCount; i++ {
-		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
+		subHashes = append(subHashes, key[i*subhashLength:(i+1)*subhashLength])
 	}
 
 	path := PagesPath
 	for _, v := range subHashes {
 		path += "/" + string(v)
 	}
-	path += "/" + string(requestHash[:])
+	path += "/" + string(key[:])
 
 	bytes, err := os.ReadFile(path)
-	return bytes, err
-}
 
-// a universal function for getting a bucket
-func getBucket(tx *bolt.Tx, key []byte) (*bolt.Bucket, error) {
-	if bucket := tx.Bucket(key); bucket != nil {
-		return bucket, nil
+	var page Page
+	if err := json.Unmarshal(bytes, &page); err != nil {
+		return nil, err
 	}
-
-	return nil, errors.New("miss cache")
+	return &page, err
 }

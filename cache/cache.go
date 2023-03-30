@@ -9,10 +9,13 @@ package cache
 import (
 	"crypto/sha1"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -57,6 +60,7 @@ type CachingProperties struct {
 	db            *bolt.DB
 	keyBuilderMap UrlToKeyBuilder
 	cleaner       *CacheCleaner
+	Size          int64
 }
 
 func NewCachingProperties(DB *bolt.DB, cacheConfig *config.CacheConfig, cleaner *CacheCleaner) *CachingProperties {
@@ -70,6 +74,7 @@ func NewCachingProperties(DB *bolt.DB, cacheConfig *config.CacheConfig, cleaner 
 		db:            DB,
 		keyBuilderMap: keyBuilder,
 		cleaner:       cleaner,
+		Size:          0,
 	}
 }
 
@@ -83,6 +88,33 @@ func (p *CachingProperties) KeyBuilderMap() UrlToKeyBuilder {
 
 func (p *CachingProperties) Cleaner() *CacheCleaner {
 	return p.cleaner
+}
+
+func (p *CachingProperties) IncrementSize(delta int64) {
+	atomic.AddInt64(&p.Size, delta)
+}
+
+func (p *CachingProperties) CalculateSize() {
+	size := int64(0)
+	err := p.db.View(func(tx *bolt.Tx) error {
+		return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+			metaBytes := b.Get([]byte(pageInfo))
+			if metaBytes == nil {
+				return errors.New("all the buckets must have pageInfo-value, you should clear the database and cache")
+			}
+
+			var m PageMetadata
+			if err := json.Unmarshal(metaBytes, &m); err != nil {
+				return errors.New("Non-persistent json-data, clear the cache! " + err.Error())
+			}
+			size += m.Size
+			return nil
+		})
+	})
+	if err != nil {
+		log.Fatalln(err)
+	}
+	p.Size = size
 }
 
 // Page is a structure that is the cache unit storing on a disk.
@@ -286,11 +318,14 @@ func loadResponseDirectives(header http.Header) *responseDirectives {
 			} else {
 				result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
 			}
-			result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
 		} else if strings.Contains(v, "s-maxage") {
 			_, t, _ := strings.Cut(v, "=")
 			age, _ := strconv.Atoi(t)
-			result.SMaxAge = time.Now().Add(time.Duration(age) * time.Second)
+			if age == 0 {
+				result.SMaxAge = nullTime
+			} else {
+				result.SMaxAge = time.Now().Add(time.Duration(age) * time.Second)
+			}
 		}
 	}
 
