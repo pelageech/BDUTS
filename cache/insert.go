@@ -116,6 +116,7 @@ func createCacheInfo(resp *http.Response, size int64) *PageMetadata {
 	meta := &PageMetadata{
 		Size:               size,
 		ResponseDirectives: *loadResponseDirectives(resp.Header),
+		Uses:               0,
 	}
 
 	return meta

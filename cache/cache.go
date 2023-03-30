@@ -132,6 +132,9 @@ type PageMetadata struct {
 	Size int64
 
 	ResponseDirectives responseDirectives
+
+	// Uses is the count of referring to the page
+	Uses int
 }
 
 //	MaxAge:       +

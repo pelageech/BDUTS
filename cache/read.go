@@ -23,7 +23,7 @@ func (p *CachingProperties) GetPageFromCache(key []byte, req *http.Request) (*Pa
 	// doesn't modify the request but adds a context key-value item
 	*req = *req.WithContext(context.WithValue(req.Context(), OnlyIfCachedKey, requestDirectives.OnlyIfCached))
 
-	if info, err = getPageMetadata(p.DB(), key); err != nil {
+	if info, err = p.getPageMetadata(key); err != nil {
 		return nil, err
 	}
 
@@ -51,10 +51,10 @@ func (p *CachingProperties) GetPageFromCache(key []byte, req *http.Request) (*Pa
 }
 
 // Accesses the database to get meta information about the cache.
-func getPageMetadata(db *bolt.DB, key []byte) (*PageMetadata, error) {
+func (p *CachingProperties) getPageMetadata(key []byte) (*PageMetadata, error) {
 	var result []byte = nil
 
-	err := db.View(func(tx *bolt.Tx) error {
+	err := p.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(key)
 		if b == nil {
 			return errors.New("missed cache")
@@ -71,12 +71,20 @@ func getPageMetadata(db *bolt.DB, key []byte) (*PageMetadata, error) {
 		return nil, err
 	}
 
-	var info PageMetadata
-	if err = json.Unmarshal(result, &info); err != nil {
+	var meta PageMetadata
+	if err = json.Unmarshal(result, &meta); err != nil {
 		return nil, err
 	}
 
-	return &info, nil
+	go func() {
+		newMeta := meta
+		newMeta.Uses++
+
+		// there won't be an error, because the key is correct
+		_ = p.insertPageMetadataToDB(key, &newMeta)
+	}()
+
+	return &meta, nil
 }
 
 // Reads a page from disk
