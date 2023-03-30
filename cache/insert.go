@@ -46,16 +46,16 @@ func (p *CachingProperties) InsertPageInCache(key []byte, req *http.Request, res
 	return nil
 }
 
-func (p *CachingProperties) insertPageMetadataToDB(requestHash []byte, meta *PageMetadata) error {
+func (p *CachingProperties) insertPageMetadataToDB(key []byte, meta *PageMetadata) error {
 	value, err := json.Marshal(*meta)
 	if err != nil {
 		return err
 	}
 
 	err = p.db.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucket(requestHash)
+		b, err := tx.CreateBucket(key)
 		if err == bolt.ErrBucketExists {
-			b = tx.Bucket(requestHash)
+			b = tx.Bucket(key)
 		}
 		if err == nil || err == bolt.ErrBucketExists {
 			_ = b.Put([]byte(pageInfo), value)
@@ -73,7 +73,7 @@ func (p *CachingProperties) insertPageMetadataToDB(requestHash []byte, meta *Pag
 	return err
 }
 
-func writePageToDisk(requestHash []byte, page *Page) error {
+func writePageToDisk(key []byte, page *Page) error {
 	value, err := json.Marshal(*page)
 	if err != nil {
 		return err
@@ -83,7 +83,7 @@ func writePageToDisk(requestHash []byte, page *Page) error {
 
 	var subHashes [][]byte
 	for i := 0; i < subHashCount; i++ {
-		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
+		subHashes = append(subHashes, key[i*subhashLength:(i+1)*subhashLength])
 	}
 
 	path := PagesPath
@@ -95,7 +95,7 @@ func writePageToDisk(requestHash []byte, page *Page) error {
 		return err
 	}
 
-	file, err := os.Create(path + "/" + string(requestHash[:]))
+	file, err := os.Create(path + "/" + string(key[:]))
 	if err != nil {
 		return err
 	}

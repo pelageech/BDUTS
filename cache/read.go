@@ -80,19 +80,19 @@ func getPageMetadata(db *bolt.DB, key []byte) (*PageMetadata, error) {
 }
 
 // Reads a page from disk
-func readPageFromDisk(requestHash []byte) (*Page, error) {
+func readPageFromDisk(key []byte) (*Page, error) {
 	subhashLength := hashLength / subHashCount
 
 	var subHashes [][]byte
 	for i := 0; i < subHashCount; i++ {
-		subHashes = append(subHashes, requestHash[i*subhashLength:(i+1)*subhashLength])
+		subHashes = append(subHashes, key[i*subhashLength:(i+1)*subhashLength])
 	}
 
 	path := PagesPath
 	for _, v := range subHashes {
 		path += "/" + string(v)
 	}
-	path += "/" + string(requestHash[:])
+	path += "/" + string(key[:])
 
 	bytes, err := os.ReadFile(path)
 
