@@ -37,7 +37,7 @@ func (p *CachingProperties) InsertPageInCache(key []byte, req *http.Request, res
 	}
 
 	if err = writePageToDisk(key, page); err != nil {
-		meta, _ = p.removePageMetadata(key)
+		_, _ = p.removePageMetadata(key)
 		return err
 	}
 
