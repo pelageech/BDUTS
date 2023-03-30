@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"strings"
@@ -11,7 +12,8 @@ import (
 // RemovePageFromCache removes the page from disk if it exists
 // and its metadata from the database
 func (p *CachingProperties) RemovePageFromCache(key []byte) error {
-	if err := removePageMetadata(p.DB(), key); err != nil {
+	_, err := p.removePageMetadata(key)
+	if err != nil {
 		return errors.New("Error while deleting record from db: " + err.Error())
 	}
 
@@ -23,10 +25,28 @@ func (p *CachingProperties) RemovePageFromCache(key []byte) error {
 }
 
 // removePageMetadata удаляет cache.PageMetadata запись из базы данных
-func removePageMetadata(db *bolt.DB, key []byte) error {
-	return db.Update(func(tx *bolt.Tx) error {
+func (p *CachingProperties) removePageMetadata(key []byte) (*PageMetadata, error) {
+	var m []byte
+	var meta *PageMetadata
+	err := p.db.Update(func(tx *bolt.Tx) error {
+		b, err := getBucket(tx, key)
+		if err != nil {
+			return err
+		}
+		m = b.Get([]byte(pageInfo))
+
 		return tx.DeleteBucket(key)
 	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(m, &meta); err != nil {
+		return nil, err
+	}
+	p.IncrementSize(-meta.Size)
+	return meta, nil
 }
 
 func removePageFromDisk(key []byte) error {

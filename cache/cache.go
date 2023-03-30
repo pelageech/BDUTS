@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -57,6 +58,7 @@ type CachingProperties struct {
 	db            *bolt.DB
 	keyBuilderMap UrlToKeyBuilder
 	cleaner       *CacheCleaner
+	Size          int64
 }
 
 func NewCachingProperties(DB *bolt.DB, cacheConfig *config.CacheConfig, cleaner *CacheCleaner) *CachingProperties {
@@ -70,6 +72,7 @@ func NewCachingProperties(DB *bolt.DB, cacheConfig *config.CacheConfig, cleaner 
 		db:            DB,
 		keyBuilderMap: keyBuilder,
 		cleaner:       cleaner,
+		Size:          0,
 	}
 }
 
@@ -83,6 +86,10 @@ func (p *CachingProperties) KeyBuilderMap() UrlToKeyBuilder {
 
 func (p *CachingProperties) Cleaner() *CacheCleaner {
 	return p.cleaner
+}
+
+func (p *CachingProperties) IncrementSize(delta int64) {
+	atomic.AddInt64(&p.Size, delta)
 }
 
 // Page is a structure that is the cache unit storing on a disk.

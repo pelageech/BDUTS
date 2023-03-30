@@ -20,8 +20,7 @@ var (
 // First, it adds PageMetadata in DB and then the function starts a process of
 // transactional writing the page on a disk.
 // Page transforms to json-file.
-func (p *CachingProperties) InsertPageInCache(key []byte, req *http.Request, resp *http.Response, item *Page) error {
-	var byteInfo, bytePage []byte
+func (p *CachingProperties) InsertPageInCache(key []byte, req *http.Request, resp *http.Response, page *Page) error {
 	var err error
 
 	requestDirectives := loadRequestDirectives(req.Header)
@@ -31,41 +30,55 @@ func (p *CachingProperties) InsertPageInCache(key []byte, req *http.Request, res
 		return errors.New("can't be stored in cache")
 	}
 
-	info := createCacheInfo(resp, int64(len(item.Body)))
-	if byteInfo, err = json.Marshal(*info); err != nil {
+	meta := createCacheInfo(resp, int64(len(page.Body)))
+
+	if err = p.insertPageMetadataToDB(key, meta); err != nil {
 		return err
 	}
 
-	if bytePage, err = json.Marshal(*item); err != nil {
+	if err = writePageToDisk(key, page); err != nil {
+		meta, _ = p.removePageMetadata(key)
 		return err
 	}
 
-	if err = insertPageMetadataToDB(p.DB(), key, byteInfo); err != nil {
-		return err
-	}
-
-	if err = writePageToDisk(key, bytePage); err != nil {
-		return err
-	}
-
-	log.Println("Successfully saved, page's size = ", info.Size)
+	log.Println("Successfully saved, page's size = ", meta.Size)
 
 	return nil
 }
 
-func insertPageMetadataToDB(db *bolt.DB, requestHash []byte, value []byte) error {
-	return db.Update(func(tx *bolt.Tx) error {
-		treeBucket, err := tx.CreateBucketIfNotExists(requestHash)
-		if err != nil {
-			return err
+func (p *CachingProperties) insertPageMetadataToDB(requestHash []byte, meta *PageMetadata) error {
+	value, err := json.Marshal(*meta)
+	if err != nil {
+		return err
+	}
+
+	err = p.db.Update(func(tx *bolt.Tx) error {
+		treeBucket, err := tx.CreateBucket(requestHash)
+		if err == bolt.ErrBucketExists {
+			treeBucket = tx.Bucket(requestHash)
+		}
+		if err == nil || err == bolt.ErrBucketExists {
+			_ = treeBucket.Put([]byte(pageInfo), value)
 		}
 
-		err = treeBucket.Put([]byte(pageInfo), value)
 		return err
 	})
+
+	if err == nil {
+		p.IncrementSize(meta.Size)
+	}
+	if err == bolt.ErrBucketExists {
+		return nil
+	}
+	return err
 }
 
-func writePageToDisk(requestHash []byte, value []byte) error {
+func writePageToDisk(requestHash []byte, page *Page) error {
+	value, err := json.Marshal(*page)
+	if err != nil {
+		return err
+	}
+
 	subhashLength := hashLength / subHashCount
 
 	var subHashes [][]byte
