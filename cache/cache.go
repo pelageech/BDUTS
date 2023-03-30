@@ -293,11 +293,14 @@ func loadResponseDirectives(header http.Header) *responseDirectives {
 			} else {
 				result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
 			}
-			result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
 		} else if strings.Contains(v, "s-maxage") {
 			_, t, _ := strings.Cut(v, "=")
 			age, _ := strconv.Atoi(t)
-			result.SMaxAge = time.Now().Add(time.Duration(age) * time.Second)
+			if age == 0 {
+				result.SMaxAge = nullTime
+			} else {
+				result.SMaxAge = time.Now().Add(time.Duration(age) * time.Second)
+			}
 		}
 	}
 
