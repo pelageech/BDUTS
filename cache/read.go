@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -71,18 +72,23 @@ func (p *CachingProperties) getPageMetadata(key []byte) (*PageMetadata, error) {
 		return nil, err
 	}
 
+	_ = p.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(key)
+		bs := b.Get([]byte(usesKey))
+		if bs == nil {
+			return errors.New("value ot found")
+		}
+
+		incr := make([]byte, 4)
+		binary.LittleEndian.PutUint32(incr, binary.LittleEndian.Uint32(bs)+uint32(1))
+		_ = b.Put([]byte(usesKey), incr)
+		return nil
+	})
+
 	var meta PageMetadata
 	if err = json.Unmarshal(result, &meta); err != nil {
 		return nil, err
 	}
-
-	go func() {
-		newMeta := meta
-		newMeta.Uses++
-
-		// there won't be an error, because the key is correct
-		_ = p.insertPageMetadataToDB(key, &newMeta)
-	}()
 
 	return &meta, nil
 }

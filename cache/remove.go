@@ -11,19 +11,16 @@ import (
 
 // RemovePageFromCache removes the page from disk if it exists
 // and its metadata from the database
-func (p *CachingProperties) RemovePageFromCache(key []byte) error {
-	keyCopy := make([]byte, len(key)) // todo: ПОЧЕМУ ГРЕБАНЫЙ КЛЮЧ key МЕНЯЕТСЯ????!!! разобраться
-	copy(keyCopy, key)
-
-	_, err := p.removePageMetadata(keyCopy)
+func (p *CachingProperties) RemovePageFromCache(key []byte) (*PageMetadata, error) {
+	meta, err := p.removePageMetadata(key)
 	if err != nil {
-		return errors.New("Error while deleting record from db: " + err.Error())
+		return nil, errors.New("Error while deleting record from db: " + err.Error())
 	}
-	if err := removePageFromDisk(keyCopy); err != nil {
-		return errors.New("Error while deleting page from disk: " + err.Error())
+	if err := removePageFromDisk(key); err != nil {
+		return nil, errors.New("Error while deleting page from disk: " + err.Error())
 	}
 
-	return nil
+	return meta, nil
 }
 
 // removePageMetadata удаляет cache.PageMetadata запись из базы данных

@@ -52,6 +52,7 @@ const (
 	hashLength      = sha1.Size * 2
 	subHashCount    = 4 // Количество подотрезков хэша
 	pageMetadataKey = "pageMetadataKey"
+	usesKey         = "usesKey"
 )
 
 type UrlToKeyBuilder map[string][]func(r *http.Request) string
@@ -132,9 +133,6 @@ type PageMetadata struct {
 	Size int64
 
 	ResponseDirectives responseDirectives
-
-	// Uses is the count of referring to the page
-	Uses int
 }
 
 //	MaxAge:       +

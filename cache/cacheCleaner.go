@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"log"
 	"os"
@@ -50,7 +51,7 @@ func (p *CachingProperties) deleteExpiredCache() int64 {
 		size int64
 	}
 
-	sizeReleased := int64(0)
+	size := int64(0)
 	expiredKeys := make([]expiredItem, 0)
 
 	addExpiredKeys := func(name []byte, b *bolt.Bucket) error {
@@ -63,7 +64,6 @@ func (p *CachingProperties) deleteExpiredCache() int64 {
 
 		if isExpired(&info, time.Duration(0)) {
 			expiredKeys = append(expiredKeys, expiredItem{name, info.Size})
-			sizeReleased += info.Size
 		}
 		return nil
 	}
@@ -79,30 +79,34 @@ func (p *CachingProperties) deleteExpiredCache() int64 {
 
 	// deleting expired data
 	for _, item := range expiredKeys {
-		if err = p.RemovePageFromCache(item.key); err != nil {
+		meta, err := p.RemovePageFromCache(item.key)
+		if err != nil {
 			log.Println(err)
 		}
-		sizeReleased += item.size
+		size += meta.Size
 	}
 
-	return sizeReleased
+	return size
 }
 
 func (p *CachingProperties) deletePagesLRU() int64 {
 	type lruItem struct {
 		key  []byte
-		uses int
-		size int64
+		uses uint32
 	}
 
 	var lruItems []lruItem
 	_ = p.db.View(func(tx *bolt.Tx) error {
 		return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
-			var meta PageMetadata
+			bytes := b.Get([]byte(usesKey))
 
-			bytes := b.Get([]byte(pageMetadataKey))
-			_ = json.Unmarshal(bytes, &meta)
-			lruItems = append(lruItems, lruItem{name, meta.Uses, meta.Size})
+			newLruItems := lruItem{
+				key:  make([]byte, len(name)),
+				uses: binary.LittleEndian.Uint32(bytes),
+			}
+
+			copy(newLruItems.key, name)
+			lruItems = append(lruItems, newLruItems)
 			return nil
 		})
 	})
@@ -113,10 +117,11 @@ func (p *CachingProperties) deletePagesLRU() int64 {
 
 	var size int64
 	for i := 0; p.isSizeExceeded() && i < len(lruItems); i++ {
-		if err := p.RemovePageFromCache(lruItems[i].key); err != nil {
+		meta, err := p.RemovePageFromCache(lruItems[i].key)
+		if err != nil {
 			log.Println(err)
 		}
-		size += lruItems[i].size
+		size += meta.Size
 	}
 
 	return size
