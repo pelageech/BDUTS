@@ -45,6 +45,9 @@ func (p *CachingProperties) GetPageFromCache(key []byte, req *http.Request) (*Pa
 	}
 
 	if page, err = readPageFromDisk(key); err != nil {
+		if err == os.ErrNotExist {
+			_, _ = p.removePageMetadata(key)
+		}
 		return nil, err
 	}
 
@@ -109,6 +112,9 @@ func readPageFromDisk(key []byte) (*Page, error) {
 	path += "/" + string(key[:])
 
 	bytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
 
 	var page Page
 	if err := json.Unmarshal(bytes, &page); err != nil {
