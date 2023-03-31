@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -23,7 +24,7 @@ func (p *CachingProperties) GetPageFromCache(key []byte, req *http.Request) (*Pa
 	// doesn't modify the request but adds a context key-value item
 	*req = *req.WithContext(context.WithValue(req.Context(), OnlyIfCachedKey, requestDirectives.OnlyIfCached))
 
-	if info, err = getPageMetadata(p.DB(), key); err != nil {
+	if info, err = p.getPageMetadata(key); err != nil {
 		return nil, err
 	}
 
@@ -44,6 +45,9 @@ func (p *CachingProperties) GetPageFromCache(key []byte, req *http.Request) (*Pa
 	}
 
 	if page, err = readPageFromDisk(key); err != nil {
+		if err == os.ErrNotExist {
+			_, _ = p.removePageMetadata(key)
+		}
 		return nil, err
 	}
 
@@ -51,16 +55,16 @@ func (p *CachingProperties) GetPageFromCache(key []byte, req *http.Request) (*Pa
 }
 
 // Accesses the database to get meta information about the cache.
-func getPageMetadata(db *bolt.DB, key []byte) (*PageMetadata, error) {
+func (p *CachingProperties) getPageMetadata(key []byte) (*PageMetadata, error) {
 	var result []byte = nil
 
-	err := db.View(func(tx *bolt.Tx) error {
+	err := p.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(key)
 		if b == nil {
 			return errors.New("missed cache")
 		}
 
-		result = b.Get([]byte(pageInfo))
+		result = b.Get([]byte(pageMetadataKey))
 		if result == nil {
 			return errors.New("no record in cache")
 		}
@@ -71,12 +75,25 @@ func getPageMetadata(db *bolt.DB, key []byte) (*PageMetadata, error) {
 		return nil, err
 	}
 
-	var info PageMetadata
-	if err = json.Unmarshal(result, &info); err != nil {
+	_ = p.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(key)
+		bs := b.Get([]byte(usesKey))
+		if bs == nil {
+			return errors.New("value ot found")
+		}
+
+		incr := make([]byte, 4)
+		binary.LittleEndian.PutUint32(incr, binary.LittleEndian.Uint32(bs)+uint32(1))
+		_ = b.Put([]byte(usesKey), incr)
+		return nil
+	})
+
+	var meta PageMetadata
+	if err = json.Unmarshal(result, &meta); err != nil {
 		return nil, err
 	}
 
-	return &info, nil
+	return &meta, nil
 }
 
 // Reads a page from disk
@@ -95,6 +112,9 @@ func readPageFromDisk(key []byte) (*Page, error) {
 	path += "/" + string(key[:])
 
 	bytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
 
 	var page Page
 	if err := json.Unmarshal(bytes, &page); err != nil {

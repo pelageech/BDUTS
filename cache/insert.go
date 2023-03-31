@@ -58,7 +58,9 @@ func (p *CachingProperties) insertPageMetadataToDB(key []byte, meta *PageMetadat
 			b = tx.Bucket(key)
 		}
 		if err == nil || err == bolt.ErrBucketExists {
-			_ = b.Put([]byte(pageInfo), value)
+			_ = b.Put([]byte(pageMetadataKey), value)
+			bs := make([]byte, 4)
+			_ = b.Put([]byte(usesKey), bs)
 		}
 
 		return err
