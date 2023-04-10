@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"log"
@@ -101,15 +102,14 @@ func writePageToDisk(key []byte, page *Page) error {
 	if err != nil {
 		return err
 	}
-	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			log.Println("Write to disk error: ", err)
-		}
-	}(file)
+	defer file.Close()
 
-	_, err = file.Write(value)
-	return err
+	w := bufio.NewWriterSize(file, bufferSize)
+	_, err = w.Write(value)
+	if err != nil {
+		return err
+	}
+	return w.Flush()
 }
 
 // Создаёт экземпляр структуры cache.PageMetadata, в которой хранится
