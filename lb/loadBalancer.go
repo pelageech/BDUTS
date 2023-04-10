@@ -254,4 +254,5 @@ func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
 	}
 	b := lb.pool.CreateBackend(server)
 	lb.pool.AddServer(b)
+	lb.healthCheckFunc(b)
 }
