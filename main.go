@@ -161,6 +161,7 @@ func main() {
 	// Serving
 	http.HandleFunc("/", loadBalancer.LoadBalancer)
 	http.HandleFunc("/favicon.ico", http.NotFound)
+	http.HandleFunc("/serverPool/add", loadBalancer.AddServer)
 
 	// Config TLS: setting a pair crt-key
 	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
