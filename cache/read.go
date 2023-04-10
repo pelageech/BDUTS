@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"bufio"
 	"context"
 	"encoding/binary"
 	"encoding/json"
@@ -111,13 +112,17 @@ func readPageFromDisk(key []byte) (*Page, error) {
 	}
 	path += "/" + string(key[:])
 
-	bytes, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
+	defer file.Close()
+
+	r := bufio.NewReaderSize(file, bufferSize)
+	bytesPage, _ := r.ReadBytes(byte(0))
 
 	var page Page
-	if err := json.Unmarshal(bytes, &page); err != nil {
+	if err := json.Unmarshal(bytesPage, &page); err != nil {
 		return nil, err
 	}
 	return &page, err
