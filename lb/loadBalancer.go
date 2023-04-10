@@ -2,7 +2,9 @@ package lb
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -236,4 +238,15 @@ ChooseServer:
 
 func setLogPrefixBDUTS() {
 	log.SetPrefix("[BDUTS] ")
+}
+
+func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
+	var server config.ServerConfig
+	err := json.NewDecoder(req.Body).Decode(&server)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+	b := lb.pool.CreateBackend(server)
+	lb.pool.AddServer(b)
 }
