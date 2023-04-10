@@ -241,6 +241,11 @@ func setLogPrefixBDUTS() {
 }
 
 func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		http.Error(rw, "Only POST requests are supported", http.StatusMethodNotAllowed)
+		return
+	}
+
 	var server config.ServerConfig
 	err := json.NewDecoder(req.Body).Decode(&server)
 	if err != nil {
