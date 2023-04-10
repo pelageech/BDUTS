@@ -55,6 +55,10 @@ const (
 	usesKey         = "usesKey"
 )
 
+const (
+	bufferSize = 128 << 10
+)
+
 type UrlToKeyBuilder map[string][]func(r *http.Request) string
 
 type CachingProperties struct {
