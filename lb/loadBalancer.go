@@ -215,7 +215,12 @@ ChooseServer:
 		server.SetAlive(false) // СДЕЛАТЬ СЧЁТЧИК ИЛИ ПОЧИТАТЬ КАК У НДЖИНКС
 		goto ChooseServer
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("[%s] %s", server.URL(), err)
+		}
+	}(resp.Body)
 
 	byteArray, err := backend.WriteBodyAndReturn(rw, resp)
 	if err != nil {
