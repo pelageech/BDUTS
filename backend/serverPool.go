@@ -25,24 +25,27 @@ func NewServerPool() *ServerPool {
 	}
 }
 
+func (p *ServerPool) CreateBackend(server config.ServerConfig) *Backend {
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		log.Printf("Failed to parse server URL: %s\n", err)
+		return nil
+	}
+
+	u := parsed
+	h := time.Duration(server.HealthCheckTcpTimeout) * time.Millisecond
+	max := server.MaximalRequests
+	b := NewBackend(u, h, max)
+
+	return b
+}
+
 func (p *ServerPool) ConfigureServerPool(servers []config.ServerConfig) {
 	for _, server := range servers {
 		log.Printf("%v", server)
-
-		parsed, err := url.Parse(server.URL)
-		if err != nil {
-			log.Printf("Failed to parse server URL: %s\n", err)
-			continue
+		if b := p.CreateBackend(server); b != nil {
+			p.AddServer(b)
 		}
-		u := parsed
-
-		h := time.Duration(server.HealthCheckTcpTimeout) * time.Millisecond
-
-		max := server.MaximalRequests
-
-		b := NewBackend(u, h, max)
-
-		p.AddServer(b)
 	}
 }
 
