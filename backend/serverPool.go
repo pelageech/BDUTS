@@ -84,8 +84,10 @@ func (p *ServerPool) GetCurrentServer() *Backend {
 }
 
 func (p *ServerPool) AddServer(b *Backend) {
+	p.Lock()
 	log.Printf("Adding server: %s\n", b.URL().String())
 	p.servers = append(p.servers, b)
+	p.Unlock()
 }
 
 func (p *ServerPool) RemoveServerByUrl(url *url.URL) error {
