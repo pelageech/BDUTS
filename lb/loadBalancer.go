@@ -256,3 +256,20 @@ func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
 	lb.pool.AddServer(b)
 	lb.healthCheckFunc(b)
 }
+
+func (lb *LoadBalancer) RemoveServer(rw http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodDelete {
+		http.Error(rw, "Only DELETE requests are supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	b := req.URL.Query().Get("backend")
+	if b == "" {
+		http.Error(rw, "Invalid request. No backend specified in the request URL.", http.StatusBadRequest)
+	}
+
+	err := lb.pool.RemoveServerByUrl(b)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusNotFound)
+	}
+}
