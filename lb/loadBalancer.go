@@ -266,10 +266,12 @@ func (lb *LoadBalancer) RemoveServer(rw http.ResponseWriter, req *http.Request) 
 	b := req.URL.Query().Get("backend")
 	if b == "" {
 		http.Error(rw, "Invalid request. No backend specified in the request URL.", http.StatusBadRequest)
+		return
 	}
 
 	err := lb.pool.RemoveServerByUrl(b)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusNotFound)
+		return
 	}
 }
