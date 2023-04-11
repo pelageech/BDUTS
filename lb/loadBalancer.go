@@ -275,3 +275,18 @@ func (lb *LoadBalancer) RemoveServer(rw http.ResponseWriter, req *http.Request) 
 		return
 	}
 }
+
+func (lb *LoadBalancer) GetServers(rw http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		http.Error(rw, "Only GET requests are supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	urls := lb.pool.ServersURLs()
+
+	err := json.NewEncoder(rw).Encode(urls)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
