@@ -2,12 +2,9 @@ package backend
 
 import (
 	"errors"
-	"log"
-	"net/url"
-	"sync"
-	"time"
-
 	"github.com/pelageech/BDUTS/config"
+	"log"
+	"sync"
 )
 
 type ServerPool struct {
@@ -28,21 +25,9 @@ func NewServerPool() *ServerPool {
 func (p *ServerPool) ConfigureServerPool(servers []config.ServerConfig) {
 	for _, server := range servers {
 		log.Printf("%v", server)
-
-		parsed, err := url.Parse(server.URL)
-		if err != nil {
-			log.Printf("Failed to parse server URL: %s\n", err)
-			continue
+		if b := NewBackendConfig(server); b != nil {
+			p.AddServer(b)
 		}
-		u := parsed
-
-		h := time.Duration(server.HealthCheckTcpTimeout) * time.Millisecond
-
-		max := server.MaximalRequests
-
-		b := NewBackend(u, h, max)
-
-		p.AddServer(b)
 	}
 }
 
@@ -81,15 +66,19 @@ func (p *ServerPool) GetCurrentServer() *Backend {
 }
 
 func (p *ServerPool) AddServer(b *Backend) {
+	p.Lock()
+	defer p.Unlock()
+	log.Printf("Adding server: %s\n", b.URL().String())
 	p.servers = append(p.servers, b)
 }
 
-func (p *ServerPool) RemoveServerByUrl(url *url.URL) error {
-	backends := p.servers
-
-	for k, v := range backends {
-		if v.URL().String() == url.String() {
+func (p *ServerPool) RemoveServerByUrl(url string) error {
+	p.Lock()
+	defer p.Unlock()
+	for k, v := range p.servers {
+		if v.URL().String() == url {
 			p.servers = append(p.servers[:k], p.servers[k+1:]...)
+			log.Printf("[%s] removed from server pool\n", url)
 			return nil
 		}
 	}
@@ -109,4 +98,12 @@ func (p *ServerPool) GetNextPeer() (*Backend, error) {
 	}
 
 	return nil, errors.New("all backends are turned down")
+}
+
+func (p *ServerPool) ServersURLs() []string {
+	var urls []string
+	for _, v := range p.Servers() {
+		urls = append(urls, v.URL().String())
+	}
+	return urls
 }

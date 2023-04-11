@@ -2,7 +2,9 @@ package lb
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -215,7 +217,12 @@ ChooseServer:
 		server.SetAlive(false) // СДЕЛАТЬ СЧЁТЧИК ИЛИ ПОЧИТАТЬ КАК У НДЖИНКС
 		goto ChooseServer
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("[%s] %s", server.URL(), err)
+		}
+	}(resp.Body)
 
 	byteArray, err := backend.WriteBodyAndReturn(rw, resp)
 	if err != nil {
@@ -231,4 +238,55 @@ ChooseServer:
 
 func setLogPrefixBDUTS() {
 	log.SetPrefix("[BDUTS] ")
+}
+
+func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodPost {
+		http.Error(rw, "Only POST requests are supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var server config.ServerConfig
+	err := json.NewDecoder(req.Body).Decode(&server)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+	b := backend.NewBackendConfig(server)
+	lb.pool.AddServer(b)
+	lb.healthCheckFunc(b)
+}
+
+func (lb *LoadBalancer) RemoveServer(rw http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodDelete {
+		http.Error(rw, "Only DELETE requests are supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	b := req.URL.Query().Get("backend")
+	if b == "" {
+		http.Error(rw, "Invalid request. No backend specified in the request URL.", http.StatusBadRequest)
+		return
+	}
+
+	err := lb.pool.RemoveServerByUrl(b)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusNotFound)
+		return
+	}
+}
+
+func (lb *LoadBalancer) GetServers(rw http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		http.Error(rw, "Only GET requests are supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	urls := lb.pool.ServersURLs()
+
+	err := json.NewEncoder(rw).Encode(urls)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
