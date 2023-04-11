@@ -85,6 +85,7 @@ func (p *ServerPool) GetCurrentServer() *Backend {
 
 func (p *ServerPool) AddServer(b *Backend) {
 	p.Lock()
+	defer p.Unlock()
 	log.Printf("Adding server: %s\n", b.URL().String())
 	p.servers = append(p.servers, b)
 	p.Unlock()
