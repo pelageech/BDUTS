@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"github.com/pelageech/BDUTS/config"
 	"io"
 	"log"
 	"net"
@@ -28,6 +29,19 @@ func NewBackend(url *url.URL, healthCheckTimeout time.Duration, maxRequests int3
 		alive:                 false,
 		requestChan:           c,
 	}
+}
+
+func NewBackendConfig(server config.ServerConfig) *Backend {
+	parsed, err := url.Parse(server.URL)
+	if err != nil {
+		log.Printf("Failed to parse server URL: %s\n", err)
+		return nil
+	}
+
+	u := parsed
+	h := time.Duration(server.HealthCheckTcpTimeout) * time.Millisecond
+	max := server.MaximalRequests
+	return NewBackend(u, h, max)
 }
 
 func (b *Backend) URL() *url.URL {

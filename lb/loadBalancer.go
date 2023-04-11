@@ -252,7 +252,7 @@ func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
-	b := lb.pool.CreateBackend(server)
+	b := backend.NewBackendConfig(server)
 	lb.pool.AddServer(b)
 	lb.healthCheckFunc(b)
 }
