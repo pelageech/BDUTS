@@ -2,8 +2,7 @@
 <img alt="BDUTS!!! Gopher has blown up the logo" src="./logo/bduts_logo.png" width="228"><br>
 The easy Go Load Balancer repository includes a distribution of requests by backends and caching.
 
-# Getting started
-## Edit configuration
+# Configuration
 
 ### Backends
 Before starting you should configure your backends and put their information to ```resources/servers.json```.
@@ -23,7 +22,9 @@ where:<br>
 - **"healthCheckTcpTimeout"** is maximum response time from the backend for a tcp packet of the health checker;
 - **"maximalRequests"** is how many requests can be processed on the backend at the same time.
 
-### Load balancer
+### Load Balancer
+BDUTS uses **HTTPS** method, that's why you need to put files ```MyCertificate.crt``` and ```MyKey.key``` to the root of project.
+
 Then, configure your load balancer in ```resources/config.json```
 ```
 {
@@ -75,9 +76,42 @@ You will see some logs in your terminal:
 - A result of the first health checking;
 - "Load Balancer started at :port".
 
-If you see these logs and there are alive backends, the balancer works! 
+If you see these logs and there are alive backends, the balancer works! <br>
+Let for each backend you have path ```/hello``` and the balancer listens on :8080.
 
-Let for each backend you have path ```/hello``` and the balancer listens on :8080. Check your load balancer:
-```curl -k https://localhost:8080/hello```.
+Check your load balancer:
+```curl -k https://localhost:8080/hello```.<br>
+You will see in the logs the backend got the response from the balancer!
 
-You will see the backend got the response from the balancer!
+# Pool of Backends
+When you start the load balancer, it reads all the information about backends and creates a server pool.
+The server pool contains a list of backends and some data about each of them: all the fields from JSON-config and
+their life status (alive or not).
+
+The balancer uses Weighted Round-Robin algorithm (WRR) for balancing between backends. The pool has a pointer (_int index_)
+looking at the last backend that the request was sent to.
+The beginning value of the pointer is -1, after the first request its value is always between **0** and **len(pool) - 1**.
+
+The algorithm chooses only alive servers. If the backend is chosen, the request will be sent to this one.<br>
+WRR begins again if backend is full of requests (recall that backends have limits on the number of requests processing at the same time).
+
+If the backend doesn't answer or it returns 5xx, it marks *not-alive*.
+The backend can become alive again if it passes the next health checker test.
+
+# Cache-Proxy
+Before sending request the load balancer checks the page in cache. If there is one, the page is read from disk and returned to the client.
+
+The metadata of the page is stored in memory, exactly in boltDB. Before reading it's checked a presence of metadata of the page we're looking for.
+If everything is OK, the page is read from a disk. If there's no any errors, the page is returned to the client.
+The balancer sends a request to the backend in case any error is occured.
+
+The load balancer creates a key by key directives from ```resources/cache_config.json``` and take a hash of it with hex-encoding. The value saves into request's context.
+The value always uses if it deals with cache:
+
+_Let we have a hash with 128 length:_<br>
+- Writing: the page will be saved into a specified directory and named<br>```:root:/cache-data/db/hash[0:31]/hash[32:63]/hash[64:95]/hash[96:127]/hash[:]```;
+- Reading: the balancer will use this hash for searching the page on a disk by the directory above.
+
+<hr>
+
+#### Logo by <a href="https://kazachokolate.tumblr.com/">Kazachokolate</a>
