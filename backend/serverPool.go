@@ -117,3 +117,11 @@ func (p *ServerPool) GetNextPeer() (*Backend, error) {
 
 	return nil, errors.New("all backends are turned down")
 }
+
+func (p *ServerPool) ServersURLs() []string {
+	var urls []string
+	for _, v := range p.Servers() {
+		urls = append(urls, v.URL().String())
+	}
+	return urls
+}
