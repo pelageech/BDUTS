@@ -90,11 +90,11 @@ func (p *ServerPool) AddServer(b *Backend) {
 	p.servers = append(p.servers, b)
 }
 
-func (p *ServerPool) RemoveServerByUrl(url *url.URL) error {
-	backends := p.servers
-
-	for k, v := range backends {
-		if v.URL().String() == url.String() {
+func (p *ServerPool) RemoveServerByUrl(url string) error {
+	p.Lock()
+	defer p.Unlock()
+	for k, v := range p.servers {
+		if v.URL().String() == url {
 			p.servers = append(p.servers[:k], p.servers[k+1:]...)
 			log.Printf("[%s] removed from server pool\n", url)
 			return nil
