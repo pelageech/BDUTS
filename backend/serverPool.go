@@ -88,7 +88,6 @@ func (p *ServerPool) AddServer(b *Backend) {
 	defer p.Unlock()
 	log.Printf("Adding server: %s\n", b.URL().String())
 	p.servers = append(p.servers, b)
-	p.Unlock()
 }
 
 func (p *ServerPool) RemoveServerByUrl(url *url.URL) error {
