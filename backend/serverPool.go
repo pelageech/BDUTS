@@ -96,6 +96,7 @@ func (p *ServerPool) RemoveServerByUrl(url *url.URL) error {
 	for k, v := range backends {
 		if v.URL().String() == url.String() {
 			p.servers = append(p.servers[:k], p.servers[k+1:]...)
+			log.Printf("[%s] removed from server pool\n", url)
 			return nil
 		}
 	}
