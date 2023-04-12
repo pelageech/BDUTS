@@ -1,4 +1,6 @@
 cache-data
 cache-data/database.db
+resources/Cert.crt
+resources/Key.key
 .idea
 .DS_Store
