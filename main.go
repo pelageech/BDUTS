@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/pelageech/BDUTS/auth"
 	"github.com/pelageech/BDUTS/backend"
 	"github.com/pelageech/BDUTS/cache"
 	"github.com/pelageech/BDUTS/config"
@@ -164,6 +165,7 @@ func main() {
 	http.HandleFunc("/serverPool/add", loadBalancer.AddServer)
 	http.HandleFunc("/serverPool/remove", loadBalancer.RemoveServer)
 	http.HandleFunc("/serverPool", loadBalancer.GetServers)
+	http.HandleFunc("/admin/signup", auth.SignUp)
 
 	// Config TLS: setting a pair crt-key
 	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
