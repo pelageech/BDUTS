@@ -12,6 +12,7 @@ import (
 	"github.com/pelageech/BDUTS/backend"
 	"github.com/pelageech/BDUTS/cache"
 	"github.com/pelageech/BDUTS/config"
+	"github.com/pelageech/BDUTS/db"
 	"github.com/pelageech/BDUTS/lb"
 )
 
@@ -156,13 +157,27 @@ func main() {
 	go loadBalancer.HealthChecker()
 	go loadBalancer.CacheProps().Observe()
 
+	// connect to lb_admins database
+	postgresUser := os.Getenv("POSTGRES_USER")
+	password := os.Getenv("USER_PASSWORD")
+	host := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbName := os.Getenv("DB_NAME")
+	psqlDb, err := db.Connect(postgresUser, password, host, dbPort, dbName)
+	if err != nil {
+		log.Fatalf("Unable to connect to database: %s\n", err)
+	}
+
+	// set up auth
+	authSvc := auth.New(psqlDb)
+
 	// Serving
 	http.HandleFunc("/", loadBalancer.LoadBalancer)
 	http.HandleFunc("/favicon.ico", http.NotFound)
 	http.HandleFunc("/serverPool/add", loadBalancer.AddServer)
 	http.HandleFunc("/serverPool/remove", loadBalancer.RemoveServer)
 	http.HandleFunc("/serverPool", loadBalancer.GetServers)
-	http.HandleFunc("/admin/signup", auth.SignUp)
+	http.HandleFunc("/admin/signup", authSvc.SignUp)
 
 	// Config TLS: setting a pair crt-key
 	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
