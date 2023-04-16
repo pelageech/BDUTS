@@ -327,5 +327,8 @@ func (lb *LoadBalancer) GetServers(rw http.ResponseWriter, req *http.Request) {
 		)...)
 	}
 	b = append(b, footer...)
-	fmt.Println(string(b))
+	if _, err := rw.Write(b); err != nil {
+		http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 }
