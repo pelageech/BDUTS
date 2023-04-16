@@ -279,26 +279,31 @@ func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
 	case http.MethodGet:
 		http.ServeFile(rw, req, "views/add.html")
 	default:
-		http.Error(rw, "Only POST requests are supported", http.StatusMethodNotAllowed)
+		http.Error(rw, "Only POST and GET requests are supported", http.StatusMethodNotAllowed)
 	}
 }
 
 func (lb *LoadBalancer) RemoveServer(rw http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodDelete {
-		http.Error(rw, "Only DELETE requests are supported", http.StatusMethodNotAllowed)
-		return
-	}
-
-	b := req.URL.Query().Get("backend")
-	if b == "" {
-		http.Error(rw, "Invalid request. No backend specified in the request URL.", http.StatusBadRequest)
-		return
-	}
-
-	err := lb.pool.RemoveServerByUrl(b)
-	if err != nil {
-		http.Error(rw, err.Error(), http.StatusNotFound)
-		return
+	switch req.Method {
+	case http.MethodPost:
+		if err := req.ParseForm(); err != nil {
+			http.Error(rw, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		if err := req.ParseForm(); err != nil {
+			http.Error(rw, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		url := req.FormValue("url")
+		if err := lb.Pool().RemoveServerByUrl(url); err != nil {
+			http.Error(rw, "Server doesn't exist", http.StatusNotFound)
+			return
+		}
+		_, _ = rw.Write([]byte("Success!"))
+	case http.MethodGet:
+		http.ServeFile(rw, req, "views/remove.html")
+	default:
+		http.Error(rw, "Only POST and GET requests are supported", http.StatusMethodNotAllowed)
 	}
 }
 
