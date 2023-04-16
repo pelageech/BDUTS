@@ -1,6 +1,7 @@
 cache-data
-nginx_server/logs
-nginx_server/data/cache
 cache-data/database.db
+resources/Cert.crt
+resources/Key.key
 .idea
 .DS_Store
+backends

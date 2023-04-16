@@ -166,7 +166,7 @@ func main() {
 	http.HandleFunc("/serverPool", loadBalancer.GetServers)
 
 	// Config TLS: setting a pair crt-key
-	Crt, _ := tls.LoadX509KeyPair("MyCertificate.crt", "MyKey.key")
+	Crt, _ := tls.LoadX509KeyPair("resources/Cert.crt", "resources/Key.key")
 	tlsConfig := &tls.Config{Certificates: []tls.Certificate{Crt}}
 
 	ln, err := tls.Listen("tcp", fmt.Sprintf(":%d", loadBalancer.Config().Port()), tlsConfig)
