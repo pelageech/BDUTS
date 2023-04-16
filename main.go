@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/tls"
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -165,16 +164,16 @@ func main() {
 	host := os.Getenv("DB_HOST")
 	dbPort := os.Getenv("DB_PORT")
 	dbName := os.Getenv("DB_NAME")
-	psqlDb, err := db.Connect(postgresUser, password, host, dbPort, dbName)
+	dbService := db.Service{}
+	err = dbService.Connect(postgresUser, password, host, dbPort, dbName)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %s\n", err)
 	}
-	defer func(psqlDb *sql.DB) {
-		err := psqlDb.Close()
-		if err != nil {
-			log.Printf("Unable to close database: %s\n", err)
-		}
-	}(psqlDb)
+	defer func(dbService *db.Service) {
+		// Do not log the error since it has already been logged in dbService.Close()
+		// However, return the error in case someone wants to implement multiple attempts to close the database
+		_ = dbService.Close()
+	}(&dbService)
 
 	// set up email
 	smtpUser := os.Getenv("SMTP_USER")
@@ -184,7 +183,7 @@ func main() {
 	sender := email.New(smtpUser, smtpPassword, smtpHost, smtpPort)
 
 	// set up auth
-	authSvc := auth.New(psqlDb, sender)
+	authSvc := auth.New(dbService, sender)
 
 	// Serving
 	http.HandleFunc("/", loadBalancer.LoadBalancer)

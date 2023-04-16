@@ -2,7 +2,6 @@ package auth
 
 import (
 	"crypto/rand"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	_ "github.com/lib/pq"
+	"github.com/pelageech/BDUTS/db"
 	"github.com/pelageech/BDUTS/email"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -29,11 +29,11 @@ const (
 )
 
 type Service struct {
-	db     *sql.DB
+	db     db.Service
 	sender *email.Sender
 }
 
-func New(db *sql.DB, sender *email.Sender) *Service {
+func New(db db.Service, sender *email.Sender) *Service {
 	return &Service{
 		db:     db,
 		sender: sender,
@@ -64,86 +64,6 @@ func generateSalt() (salt string, err error) {
 		return
 	}
 	salt = base64.URLEncoding.EncodeToString(saltBytes)
-	return
-}
-
-func (s *Service) insertUser(username, salt, hash, email string) (errs []error) {
-	tx, err := s.db.Begin()
-	if err != nil {
-		log.Printf("Error starting the transaction: %s\n", err)
-		errs = append(errs, err)
-		return
-	}
-
-	stmt1, err := tx.Prepare("INSERT INTO users_credentials (username, salt, hash) VALUES ($1, $2, $3)")
-	if err != nil {
-		log.Printf("Error preparing query: %s\n", err)
-		errs = append(errs, err)
-		err = tx.Rollback()
-		if err != nil {
-			log.Printf("Error aborting the transaction: %s\n", err)
-			errs = append(errs, err)
-		}
-		return
-	}
-	defer func(stmt *sql.Stmt) {
-		err = stmt.Close()
-		if err != nil {
-			log.Printf("Error closing statement: %s\n", err)
-			errs = append(errs, err)
-		}
-	}(stmt1)
-
-	_, err = stmt1.Exec(username, salt, hash)
-	if err != nil {
-		log.Printf("Error executing query: %s\n", err)
-		errs = append(errs, err)
-		err = tx.Rollback()
-		if err != nil {
-			log.Printf("Error aborting the transaction: %s\n", err)
-			errs = append(errs, err)
-		}
-		return
-	}
-
-	stmt2, err := tx.Prepare("INSERT INTO users_info (username, email) VALUES ($1, $2)")
-	if err != nil {
-		log.Printf("Error preparing query: %s\n", err)
-		errs = append(errs, err)
-		err = tx.Rollback()
-		if err != nil {
-			log.Printf("Error aborting the transaction: %s\n", err)
-			errs = append(errs, err)
-		}
-		return
-	}
-	defer func(stmt *sql.Stmt) {
-		err = stmt.Close()
-		if err != nil {
-			log.Printf("Error closing statement: %s\n", err)
-			errs = append(errs, err)
-		}
-	}(stmt2)
-
-	_, err = stmt2.Exec(username, email)
-	if err != nil {
-		log.Printf("Error executing query: %s\n", err)
-		errs = append(errs, err)
-		err = tx.Rollback()
-		if err != nil {
-			log.Printf("Error aborting the transaction: %s\n", err)
-			errs = append(errs, err)
-		}
-		return
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		log.Printf("Error committing the transaction: %s\n", err)
-		errs = append(errs, err)
-		return
-	}
-
 	return
 }
 
@@ -193,7 +113,7 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 	// Convert the hashed password to a string
 	hashString := string(hash)
 
-	errs := s.insertUser(user.Username, salt, hashString, user.Email)
+	errs := s.db.InsertUser(user.Username, salt, hashString, user.Email)
 	if len(errs) != 0 {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
