@@ -47,6 +47,7 @@ func init() {
 
 type User struct {
 	Username string `json:"username"`
+	Email    string `json:"email"`
 }
 
 func generateRandomPassword() (password string, err error) {
@@ -105,7 +106,7 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	// Hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(password+salt), bcrypt.DefaultCost)
 	if err != nil {
-		log.Printf("Error hashing password: %s", err)
+		log.Printf("Error hashing password: %s\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -113,22 +114,72 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	// Convert the hashed password to a string
 	hashString := string(hash)
 
-	stmt, err := db.Prepare("INSERT INTO users_credentials (username, salt, hash) VALUES ($1, $2, $3)")
+	tx, err := db.Begin()
 	if err != nil {
-		log.Printf("Error preparing query: %s", err)
+		log.Printf("Error starting the transaction: %s\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	stmt1, err := tx.Prepare("INSERT INTO users_credentials (username, salt, hash) VALUES ($1, $2, $3)")
+	if err != nil {
+		log.Printf("Error preparing query: %s\n", err)
+		err := tx.Rollback()
+		if err != nil {
+			log.Printf("Error aborting the transaction: %s\n", err)
+		}
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	defer func(stmt *sql.Stmt) {
 		err := stmt.Close()
 		if err != nil {
-			log.Printf("Error closing statement: %s", err)
+			log.Printf("Error closing statement: %s\n", err)
 		}
-	}(stmt)
+	}(stmt1)
 
-	_, err = stmt.Exec(user.Username, salt, hashString)
+	_, err = stmt1.Exec(user.Username, salt, hashString)
 	if err != nil {
-		log.Printf("Error executing query: %s", err)
+		log.Printf("Error executing query: %s\n", err)
+		err := tx.Rollback()
+		if err != nil {
+			log.Printf("Error aborting the transaction: %s\n", err)
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	stmt2, err := tx.Prepare("INSERT INTO users_info (username, email) VALUES ($1, $2)")
+	if err != nil {
+		log.Printf("Error preparing query: %s\n", err)
+		err := tx.Rollback()
+		if err != nil {
+			log.Printf("Error aborting the transaction: %s\n", err)
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer func(stmt *sql.Stmt) {
+		err := stmt.Close()
+		if err != nil {
+			log.Printf("Error closing statement: %s\n", err)
+		}
+	}(stmt2)
+
+	_, err = stmt2.Exec(user.Username, user.Email)
+	if err != nil {
+		log.Printf("Error executing query: %s\n", err)
+		err := tx.Rollback()
+		if err != nil {
+			log.Printf("Error aborting the transaction: %s\n", err)
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Printf("Error committing the transaction: %s\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
