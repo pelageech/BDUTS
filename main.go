@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/pelageech/BDUTS/cache"
 	"github.com/pelageech/BDUTS/config"
 	"github.com/pelageech/BDUTS/db"
+	"github.com/pelageech/BDUTS/email"
 	"github.com/pelageech/BDUTS/lb"
 )
 
@@ -167,9 +169,22 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %s\n", err)
 	}
+	defer func(psqlDb *sql.DB) {
+		err := psqlDb.Close()
+		if err != nil {
+			log.Printf("Unable to close database: %s\n", err)
+		}
+	}(psqlDb)
+
+	// set up email
+	smtpUser := os.Getenv("SMTP_USER")
+	smtpPassword := os.Getenv("SMTP_PASSWORD")
+	smtpHost := os.Getenv("SMTP_HOST")
+	smtpPort := os.Getenv("SMTP_PORT")
+	sender := email.New(smtpUser, smtpPassword, smtpHost, smtpPort)
 
 	// set up auth
-	authSvc := auth.New(psqlDb)
+	authSvc := auth.New(psqlDb, sender)
 
 	// Serving
 	http.HandleFunc("/", loadBalancer.LoadBalancer)

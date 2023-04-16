@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	_ "github.com/lib/pq"
+	"github.com/pelageech/BDUTS/email"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -18,15 +19,25 @@ const (
 	saltLength     = 20
 	minUsername    = 4
 	maxUsername    = 20
+
+	subject     = "Your credentials for BDUTS load balancer"
+	msgTemplate = "Your username: %s\n" +
+		"Your password: %s\n\n" +
+		"Please log in and change your password.\n" +
+		"By changing your temporary password, you're helping to ensure that your account is secure " +
+		"and that only you have access to it. It's also an opportunity to choose a password " +
+		"that's easy for you to remember, but difficult for others to guess."
 )
 
 type Service struct {
-	db *sql.DB
+	db     *sql.DB
+	sender *email.Sender
 }
 
-func New(db *sql.DB) *Service {
+func New(db *sql.DB, sender *email.Sender) *Service {
 	return &Service{
-		db: db,
+		db:     db,
+		sender: sender,
 	}
 }
 
@@ -181,6 +192,17 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 
 	errs := s.insertUser(user.Username, salt, hashString, user.Email)
 	if len(errs) != 0 {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	msg := fmt.Sprintf(msgTemplate, user.Username, password)
+	if err := s.sender.Send(
+		user.Email,
+		subject,
+		msg,
+	); err != nil {
+		log.Printf("Error sending email: %s\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
