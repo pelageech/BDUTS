@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/go-playground/validator/v10"
 	_ "github.com/lib/pq"
 	"github.com/pelageech/BDUTS/email"
 	"golang.org/x/crypto/bcrypt"
@@ -17,8 +18,6 @@ import (
 const (
 	passwordLength = 25
 	saltLength     = 20
-	minUsername    = 4
-	maxUsername    = 20
 
 	subject     = "Your credentials for BDUTS load balancer"
 	msgTemplate = "Your username: %s\n" +
@@ -42,8 +41,8 @@ func New(db *sql.DB, sender *email.Sender) *Service {
 }
 
 type User struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
+	Username string `json:"username" validate:"required,min=4,max=20,alphanum"`
+	Email    string `json:"email" validate:"required,email"`
 }
 
 func generateRandomPassword() (password string, err error) {
@@ -161,10 +160,14 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(user.Username) < minUsername || len(user.Username) > maxUsername {
-		msg := fmt.Sprintf("Username must be between %d and %d characters", minUsername, maxUsername)
-		http.Error(w, msg, http.StatusBadRequest)
-		return
+	v := validator.New()
+	err = v.Struct(user)
+	if err != nil {
+		for _, e := range err.(validator.ValidationErrors) {
+			log.Printf("Error validating user: %s\n", e)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 	}
 
 	password, err := generateRandomPassword()
