@@ -145,9 +145,6 @@ func main() {
 		serversConfigure(),
 	)
 
-	// wait while other containers will be ready
-	time.Sleep(5 * time.Second)
-
 	// Firstly, identify the working servers
 	log.Println("Configured! Now setting up the first health check...")
 	for _, server := range loadBalancer.Pool().Servers() {
