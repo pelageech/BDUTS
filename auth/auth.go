@@ -14,8 +14,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-const passwordLength = 25
-const saltLength = 20
+const (
+	passwordLength = 25
+	saltLength     = 20
+	minUsername    = 4
+	maxUsername    = 20
+)
 
 var db *sql.DB
 
@@ -80,8 +84,9 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(user.Username) < 4 || len(user.Username) > 50 {
-		http.Error(w, "Username must be between 4 and 50 characters", http.StatusBadRequest)
+	if len(user.Username) < minUsername || len(user.Username) > maxUsername {
+		msg := fmt.Sprintf("Username must be between %d and %d characters", minUsername, maxUsername)
+		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
 
