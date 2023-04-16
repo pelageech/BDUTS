@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/pelageech/BDUTS/backend"
@@ -241,20 +242,45 @@ func setLogPrefixBDUTS() {
 }
 
 func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodPost {
-		http.Error(rw, "Only POST requests are supported", http.StatusMethodNotAllowed)
-		return
-	}
+	switch req.Method {
+	case http.MethodPost:
+		if err := req.ParseForm(); err != nil {
+			http.Error(rw, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		url := req.FormValue("url")
+		if lb.Pool().FindServerByUrl(url) != nil {
+			http.Error(rw, "Server already exists", http.StatusPreconditionFailed)
+			return
+		}
 
-	var server config.ServerConfig
-	err := json.NewDecoder(req.Body).Decode(&server)
-	if err != nil {
-		http.Error(rw, err.Error(), http.StatusBadRequest)
-		return
+		timeout, err := strconv.Atoi(req.FormValue("healthCheckTcpTimeout"))
+		if err != nil {
+			http.Error(rw, "Bad Request: numbers are only permitted", http.StatusBadRequest)
+			return
+		}
+
+		maxReq, err := strconv.Atoi(req.FormValue("maximalRequests"))
+		if err != nil {
+			http.Error(rw, "Bad Request: numbers are only permitted", http.StatusBadRequest)
+			return
+		}
+
+		server := config.ServerConfig{
+			URL:                   url,
+			HealthCheckTcpTimeout: int64(timeout),
+			MaximalRequests:       int32(maxReq),
+		}
+		b := backend.NewBackendConfig(server)
+		lb.pool.AddServer(b)
+		lb.healthCheckFunc(b)
+		_, _ = rw.Write([]byte("Success!"))
+		rw.WriteHeader(http.StatusCreated)
+	case http.MethodGet:
+		http.ServeFile(rw, req, "views/add.html")
+	default:
+		http.Error(rw, "Only POST requests are supported", http.StatusMethodNotAllowed)
 	}
-	b := backend.NewBackendConfig(server)
-	lb.pool.AddServer(b)
-	lb.healthCheckFunc(b)
 }
 
 func (lb *LoadBalancer) RemoveServer(rw http.ResponseWriter, req *http.Request) {
