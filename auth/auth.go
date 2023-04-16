@@ -95,14 +95,12 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	fmt.Println("Password: " + password)
 
 	salt, err := generateSalt()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	fmt.Println("Salt: " + salt)
 
 	// Hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(password+salt), bcrypt.DefaultCost)
@@ -114,7 +112,6 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 
 	// Convert the hashed password to a string
 	hashString := string(hash)
-	fmt.Println("Hash: " + hashString)
 
 	stmt, err := db.Prepare("INSERT INTO users_credentials (username, salt, hash) VALUES ($1, $2, $3)")
 	if err != nil {
