@@ -2,11 +2,12 @@ package lb
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -312,12 +313,19 @@ func (lb *LoadBalancer) GetServers(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "Only GET requests are supported", http.StatusMethodNotAllowed)
 		return
 	}
+	var b []byte
+	header, _ := os.ReadFile("views/header.html")
 
-	urls := lb.pool.ServersURLs()
+	b = append(b, header...)
+	footer, _ := os.ReadFile("views/footer.html")
 
-	err := json.NewEncoder(rw).Encode(urls)
-	if err != nil {
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		return
+	urls := lb.Pool().Servers()
+
+	for k, v := range urls {
+		b = append(b, []byte(
+			fmt.Sprintf("<tr><td>%d</td><td>%s</td><td>%d</td><td>%t</td></tr>", k+1, v.URL(), v.HealthCheckTcpTimeout().Milliseconds(), v.Alive()),
+		)...)
 	}
+	b = append(b, footer...)
+	fmt.Println(string(b))
 }
