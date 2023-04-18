@@ -260,12 +260,21 @@ func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
 			http.Error(rw, "Bad Request: numbers are only permitted", http.StatusBadRequest)
 			return
 		}
+		if timeout <= 0 {
+			http.Error(rw, "Bad Request: timeout is below zero or equal", http.StatusBadRequest)
+			return
+		}
 
 		maxReq, err := strconv.Atoi(req.FormValue("maximalRequests"))
 		if err != nil {
 			http.Error(rw, "Bad Request: numbers are only permitted", http.StatusBadRequest)
 			return
 		}
+		if maxReq <= 0 {
+			http.Error(rw, "Bad Request: maxReq is below zero or equal", http.StatusBadRequest)
+			return
+		}
+		maxReq %= 1 << 31 // int32
 
 		server := config.ServerConfig{
 			URL:                   url,
