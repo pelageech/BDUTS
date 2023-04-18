@@ -72,6 +72,15 @@ func (p *ServerPool) AddServer(b *Backend) {
 	p.servers = append(p.servers, b)
 }
 
+func (p *ServerPool) FindServerByUrl(url string) *Backend {
+	for _, v := range p.servers {
+		if v.URL().String() == url {
+			return v
+		}
+	}
+	return nil
+}
+
 func (p *ServerPool) RemoveServerByUrl(url string) error {
 	p.Lock()
 	defer p.Unlock()
