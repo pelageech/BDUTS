@@ -182,6 +182,8 @@ func main() {
 		}
 	}()
 
+	// prometheus part
+
 	server := http.Server{
 		Addr:    ":8081",
 		Handler: promhttp.Handler(),
