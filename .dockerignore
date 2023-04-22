@@ -11,3 +11,4 @@ logo
 .dockerignore
 docker-compose.yml
 LICENSE
+grafana

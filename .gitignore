@@ -6,3 +6,4 @@ resources/Key.key
 .DS_Store
 backends
 data
+grafana
