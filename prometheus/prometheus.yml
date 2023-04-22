@@ -9,4 +9,4 @@ rule_files:
 scrape_configs:
   - job_name: metrics
     static_configs:
-      - targets: ['localhost:8081']
+      - targets: ['192.168.0.3:8081']
