@@ -24,6 +24,11 @@ var (
 func (p *CachingProperties) InsertPageInCache(key []byte, req *http.Request, resp *http.Response, page *Page) error {
 	var err error
 
+	size := int64(len(page.Body))
+	if p.Size+size > p.Cleaner().maxFileSize {
+		return errors.New("maximum size cache exceeded")
+	}
+
 	requestDirectives := loadRequestDirectives(req.Header)
 	responseDirectives := loadResponseDirectives(resp.Header)
 

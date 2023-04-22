@@ -3,6 +3,7 @@ package cache
 import (
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
 	"sort"
@@ -31,12 +32,22 @@ func (p *CachingProperties) Observe() {
 	for {
 		<-p.cleaner.frequency.C
 		if p.isSizeExceeded() {
-			if size := p.deleteExpiredCache(); size > 0 {
+			func() {
+				size, err := p.deleteExpiredCache()
+				if err != nil {
+					log.Println(err)
+					return
+				}
 				log.Printf("Removed %d bytes of expired pages from cache\n", size)
-			}
-			if size := p.deletePagesLRU(); size > 0 {
+			}()
+			func() {
+				size, err := p.deletePagesLRU()
+				if err != nil {
+					log.Println(err)
+					return
+				}
 				log.Printf("Removed %d bytes of the least recently used pages from cache\n", size)
-			}
+			}()
 		}
 	}
 }
@@ -45,14 +56,18 @@ func (p *CachingProperties) isSizeExceeded() bool {
 	return float64(p.Size) > float64(p.cleaner.maxFileSize)*p.cleaner.fillFactor
 }
 
-func (p *CachingProperties) deleteExpiredCache() int64 {
+// deletes cache if its max-age is expired. For page's metadata the page is
+// considered expired iff time.Now > PageMetadata.ResponseDirectives.MaxAge
+// returns error if boltdb view throws an error or there's no page to delete, in
+// other words return size is zero.
+func (p *CachingProperties) deleteExpiredCache() (int64, error) {
 	type expiredItem struct {
 		key  []byte
 		size int64
 	}
 
 	size := int64(0)
-	expiredKeys := make([]expiredItem, 0)
+	expiredKeys := make([]expiredItem, 0, 1024)
 
 	addExpiredKeys := func(name []byte, b *bolt.Bucket) error {
 		v := b.Get([]byte(pageMetadataKey))
@@ -75,6 +90,7 @@ func (p *CachingProperties) deleteExpiredCache() int64 {
 	})
 	if err != nil {
 		log.Printf("Error while viewing cache in CacheCleaner: %v", err)
+		return -1, err
 	}
 
 	// deleting expired data
@@ -82,23 +98,31 @@ func (p *CachingProperties) deleteExpiredCache() int64 {
 		meta, err := p.RemovePageFromCache(item.key)
 		if err != nil {
 			log.Println(err)
+			continue
 		}
 		size += meta.Size
 	}
 
-	return size
+	if size == 0 {
+		return -1, errors.New("null size")
+	}
+
+	return size, nil
 }
 
-func (p *CachingProperties) deletePagesLRU() int64 {
+func (p *CachingProperties) deletePagesLRU() (int64, error) {
 	type lruItem struct {
 		key  []byte
 		uses uint32
 	}
 
 	var lruItems []lruItem
-	_ = p.db.View(func(tx *bolt.Tx) error {
+	err := p.db.View(func(tx *bolt.Tx) error {
 		return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
 			bytes := b.Get([]byte(usesKey))
+			if bytes == nil {
+				return errors.New("cannot access to uses")
+			}
 
 			newLruItems := lruItem{
 				key:  make([]byte, len(name)),
@@ -111,6 +135,10 @@ func (p *CachingProperties) deletePagesLRU() int64 {
 		})
 	})
 
+	if err != nil {
+		return -1, err
+	}
+
 	sort.Slice(lruItems, func(i, j int) bool {
 		return lruItems[i].uses < lruItems[j].uses
 	})
@@ -120,9 +148,14 @@ func (p *CachingProperties) deletePagesLRU() int64 {
 		meta, err := p.RemovePageFromCache(lruItems[i].key)
 		if err != nil {
 			log.Println(err)
+			continue
 		}
 		size += meta.Size
 	}
 
-	return size
+	if size == 0 {
+		return -1, errors.New("null size")
+	}
+
+	return size, nil
 }
