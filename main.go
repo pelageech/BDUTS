@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"net/http"
 	"os"
@@ -175,7 +176,22 @@ func main() {
 	}
 
 	log.Printf("Load Balancer started at :%d\n", loadBalancer.Config().Port())
-	if err := http.Serve(ln, nil); err != nil {
-		log.Fatal(err)
+	go func() {
+		if err := http.Serve(ln, nil); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+
+	server := http.Server{
+		Addr:    ":8081",
+		Handler: promhttp.Handler(),
 	}
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+
+	select {}
 }
