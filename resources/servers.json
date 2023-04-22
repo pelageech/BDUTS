@@ -3,5 +3,10 @@
     "url" : "http://localhost:3031",
     "healthCheckTcpTimeout" : 2000,
     "maximalRequests" : 5
+  },
+  {
+    "url" : "http://192.168.0.5:3031",
+    "healthCheckTcpTimeout" : 2000,
+    "maximalRequests" : 5
   }
 ]
