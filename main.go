@@ -113,7 +113,7 @@ func main() {
 
 	// database
 	log.Println("Opening cache database")
-	if err := os.Mkdir(cache.DbDirectory, 0700); err != nil && os.IsExist(err) {
+	if err := os.Mkdir(cache.DbDirectory, 0700); err != nil && !os.IsExist(err) {
 		log.Fatalln("couldn't create a directory " + cache.DbDirectory + ": " + err.Error())
 	}
 	boltdb, err := cache.OpenDatabase(cache.DbDirectory + "/" + cache.DbName)
