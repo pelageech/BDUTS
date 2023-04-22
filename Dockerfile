@@ -1,11 +1,12 @@
 FROM golang:1.20.2-alpine AS build
 WORKDIR /app
-COPY . ./
+ADD go.mod .
+COPY . .
 
-RUN go build -o /app/lb
+RUN go build -o lb .
 
-FROM alpine:3.17.2
-WORKDIR /
-COPY --from=build /app/lb ./
+FROM alpine
+WORKDIR /app
+COPY --from=build /app/lb /app/lb
 COPY --from=build /app/resources resources
-CMD ["/lb"]
+CMD ["./lb/BDUTS"]
