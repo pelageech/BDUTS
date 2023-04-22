@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/pelageech/BDUTS/backend"
@@ -112,8 +113,8 @@ func main() {
 
 	// database
 	log.Println("Opening cache database")
-	if err := os.Mkdir(cache.DbDirectory, 0700); err != nil && err != os.ErrExist {
-		log.Fatalln("couldn't create a directory " + cache.DbDirectory)
+	if err := os.Mkdir(cache.DbDirectory, 0700); err != nil && os.IsExist(err) {
+		log.Fatalln("couldn't create a directory " + cache.DbDirectory + ": " + err.Error())
 	}
 	boltdb, err := cache.OpenDatabase(cache.DbDirectory + "/" + cache.DbName)
 	if err != nil {
@@ -178,11 +179,14 @@ func main() {
 		log.Fatal("There's problem with listening")
 	}
 
+	wg := sync.WaitGroup{}
+	wg.Add(2)
 	log.Printf("Load Balancer started at :%d\n", loadBalancer.Config().Port())
 	go func() {
 		if err := http.Serve(ln, nil); err != nil {
 			log.Fatalln(err)
 		}
+		wg.Done()
 	}()
 
 	// prometheus part
@@ -196,7 +200,8 @@ func main() {
 		if err := server.ListenAndServe(); err != nil {
 			log.Fatalln(err)
 		}
+		wg.Done()
 	}()
 
-	select {}
+	wg.Wait()
 }
