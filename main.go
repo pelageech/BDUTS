@@ -185,7 +185,11 @@ func main() {
 
 	// set up auth
 	validate := validator.New()
-	authSvc := auth.New(dbService, sender, validate)
+	signKey, found := os.LookupEnv("JWT_SIGNING_KEY")
+	if !found {
+		log.Fatalln("JWT signing key not found")
+	}
+	authSvc := auth.New(dbService, sender, validate, []byte(signKey))
 
 	// Serving
 	http.HandleFunc("/", loadBalancer.LoadBalancer)
@@ -194,6 +198,7 @@ func main() {
 	http.HandleFunc("/serverPool/remove", loadBalancer.RemoveServer)
 	http.HandleFunc("/serverPool", loadBalancer.GetServers)
 	http.HandleFunc("/admin/signup", authSvc.SignUp)
+	http.HandleFunc("/admin/signin", authSvc.SignIn)
 
 	// Config TLS: setting a pair crt-key
 	Crt, _ := tls.LoadX509KeyPair("resources/Cert.crt", "resources/Key.key")

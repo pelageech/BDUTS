@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/boltdb/bolt v1.3.1
 	github.com/go-playground/validator/v10 v10.12.0
+	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/lib/pq v1.10.8
 	golang.org/x/crypto v0.8.0
 )

@@ -119,3 +119,13 @@ func (s *Service) InsertUser(username, salt, hash, email string) (errs []error) 
 
 	return
 }
+
+func (s *Service) GetSaltAndHash(username string) (salt, hash string, err error) {
+	err = s.db.QueryRow("SELECT salt, hash FROM users_credentials WHERE username = $1", username).Scan(&salt, &hash)
+	if err != nil {
+		log.Printf("Error getting salt and hash: %s\n", err)
+		return
+	}
+
+	return
+}

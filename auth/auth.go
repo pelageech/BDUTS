@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/golang-jwt/jwt/v5"
 	_ "github.com/lib/pq"
 	"github.com/pelageech/BDUTS/db"
 	"github.com/pelageech/BDUTS/email"
@@ -32,19 +34,26 @@ type Service struct {
 	db        db.Service
 	sender    *email.Sender
 	validator *validator.Validate
+	signKey   []byte
 }
 
-func New(db db.Service, sender *email.Sender, validator *validator.Validate) *Service {
+func New(db db.Service, sender *email.Sender, validator *validator.Validate, signKey []byte) *Service {
 	return &Service{
 		db:        db,
 		sender:    sender,
 		validator: validator,
+		signKey:   signKey,
 	}
 }
 
 type SignUpUser struct {
 	Username string `json:"username" validate:"required,min=4,max=20,alphanum"`
 	Email    string `json:"email" validate:"required,email"`
+}
+
+type LogInUser struct {
+	Username string `json:"username" validate:"required,min=4,max=20,alphanum"`
+	Password string `json:"password" validate:"required"`
 }
 
 func generateRandomPassword() (password string, err error) {
@@ -132,4 +141,61 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *Service) generateToken(username string) (signedToken string, err error) {
+	expirationTime := time.Now().Add(20 * time.Minute)
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.MapClaims{
+		"username": username,
+		"exp":      expirationTime.Unix(),
+	})
+
+	signedToken, err = token.SignedString(s.signKey)
+	return
+}
+
+func (s *Service) SignIn(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var user LogInUser
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	err = s.validator.Struct(user)
+	if err != nil {
+		for _, e := range err.(validator.ValidationErrors) {
+			log.Printf("Error validating user: %s\n", e)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+	}
+
+	salt, hash, err := s.db.GetSaltAndHash(user.Username)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	// Compare the password with the hash
+	err = bcrypt.CompareHashAndPassword([]byte(hash), []byte(user.Password+salt))
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	token, err := s.generateToken(user.Username)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Authorization", "Bearer "+token)
+	w.WriteHeader(http.StatusOK)
 }
