@@ -29,14 +29,16 @@ const (
 )
 
 type Service struct {
-	db     db.Service
-	sender *email.Sender
+	db        db.Service
+	sender    *email.Sender
+	validator *validator.Validate
 }
 
-func New(db db.Service, sender *email.Sender) *Service {
+func New(db db.Service, sender *email.Sender, validator *validator.Validate) *Service {
 	return &Service{
-		db:     db,
-		sender: sender,
+		db:        db,
+		sender:    sender,
+		validator: validator,
 	}
 }
 
@@ -80,8 +82,7 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v := validator.New()
-	err = v.Struct(user)
+	err = s.validator.Struct(user)
 	if err != nil {
 		for _, e := range err.(validator.ValidationErrors) {
 			log.Printf("Error validating user: %s\n", e)

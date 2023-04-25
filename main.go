@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/pelageech/BDUTS/auth"
 	"github.com/pelageech/BDUTS/backend"
 	"github.com/pelageech/BDUTS/cache"
@@ -183,7 +184,8 @@ func main() {
 	sender := email.New(smtpUser, smtpPassword, smtpHost, smtpPort)
 
 	// set up auth
-	authSvc := auth.New(dbService, sender)
+	validate := validator.New()
+	authSvc := auth.New(dbService, sender, validate)
 
 	// Serving
 	http.HandleFunc("/", loadBalancer.LoadBalancer)
