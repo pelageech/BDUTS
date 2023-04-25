@@ -197,7 +197,7 @@ func main() {
 	http.Handle("/serverPool/add", authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.AddServer)))
 	http.Handle("/serverPool/remove", authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.RemoveServer)))
 	http.Handle("/serverPool", authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.GetServers)))
-	http.HandleFunc("/admin/signup", authSvc.SignUp)
+	http.Handle("/admin/signup", authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.SignUp)))
 	http.HandleFunc("/admin/signin", authSvc.SignIn)
 
 	// Config TLS: setting a pair crt-key
