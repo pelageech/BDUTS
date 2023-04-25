@@ -40,7 +40,7 @@ func New(db db.Service, sender *email.Sender) *Service {
 	}
 }
 
-type User struct {
+type SignUpUser struct {
 	Username string `json:"username" validate:"required,min=4,max=20,alphanum"`
 	Email    string `json:"email" validate:"required,email"`
 }
@@ -73,7 +73,7 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user User
+	var user SignUpUser
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
