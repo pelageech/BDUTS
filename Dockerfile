@@ -1,12 +1,12 @@
 FROM golang:1.20.2-alpine AS build
 WORKDIR /app
+ADD go.mod .
 COPY . .
 
-RUN go build -o /app/lb
+RUN go build -o lb .
 
-FROM alpine:3.17.2
+FROM alpine
 WORKDIR /app
-COPY --from=build /app/lb .
+COPY --from=build /app/lb /app/lb
 COPY --from=build /app/resources resources
-COPY --from=build /app/MyCertificate.crt /app/MyKey.key .
-CMD ["./lb"]
+CMD ["./lb/BDUTS"]

@@ -2,12 +2,14 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"github.com/pelageech/BDUTS/config"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -119,12 +121,9 @@ func (b *Backend) SendRequestToBackend(req *http.Request) (*http.Response, error
 	// send it to the backend
 	r := b.prepareRequest(req)
 	resp, respError := b.makeRequest(r)
-
 	if respError != nil {
 		return nil, respError.err
 	}
-
-	log.Printf("[%s] returned %s\n", b.URL(), resp.Status)
 
 	return resp, nil
 }
@@ -184,11 +183,15 @@ func (b *Backend) makeRequest(req *http.Request) (*http.Response, *responseError
 		}
 		return nil, respError
 	}
+
 	status := originServerResponse.StatusCode
 	if status >= 500 && status < 600 &&
 		status != http.StatusHTTPVersionNotSupported &&
 		status != http.StatusNotImplemented {
 		respError.statusCode = status
+		respError.err = errors.New("Error: " + strconv.Itoa(originServerResponse.StatusCode))
+		originServerResponse.Body.Close()
+
 		return nil, respError
 	}
 	return originServerResponse, nil

@@ -1,6 +1,14 @@
 Dockerfile
-Graphics-exe.exe
 README.md
 backends
-locallibrary
-nginx_server
+cache-data
+data
+logo
+.github
+.git?
+.golangci.yml
+.idea
+.dockerignore
+docker-compose.yml
+LICENSE
+grafana
