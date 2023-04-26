@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"net/http"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"github.com/pelageech/BDUTS/db"
 	"github.com/pelageech/BDUTS/email"
 	"github.com/pelageech/BDUTS/lb"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
