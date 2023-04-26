@@ -10,9 +10,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-playground/validator/v10"
+	"github.com/pelageech/BDUTS/auth"
 	"github.com/pelageech/BDUTS/backend"
 	"github.com/pelageech/BDUTS/cache"
 	"github.com/pelageech/BDUTS/config"
+	"github.com/pelageech/BDUTS/db"
+	"github.com/pelageech/BDUTS/email"
 	"github.com/pelageech/BDUTS/lb"
 )
 
@@ -149,9 +153,6 @@ func main() {
 		serversConfigure(),
 	)
 
-	// wait while other containers will be ready
-	time.Sleep(5 * time.Second)
-
 	// Firstly, identify the working servers
 	log.Println("Configured! Now setting up the first health check...")
 	for _, server := range loadBalancer.Pool().Servers() {
@@ -163,12 +164,46 @@ func main() {
 	go loadBalancer.HealthChecker()
 	go loadBalancer.CacheProps().Observe()
 
+	// connect to lb_admins database
+	postgresUser := os.Getenv("POSTGRES_USER")
+	password := os.Getenv("USER_PASSWORD")
+	host := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbName := os.Getenv("DB_NAME")
+	dbService := db.Service{}
+	err = dbService.Connect(postgresUser, password, host, dbPort, dbName)
+	if err != nil {
+		log.Fatalf("Unable to connect to database: %s\n", err)
+	}
+	defer func(dbService *db.Service) {
+		// Do not log the error since it has already been logged in dbService.Close()
+		// However, return the error in case someone wants to implement multiple attempts to close the database
+		_ = dbService.Close()
+	}(&dbService)
+
+	// set up email
+	smtpUser := os.Getenv("SMTP_USER")
+	smtpPassword := os.Getenv("SMTP_PASSWORD")
+	smtpHost := os.Getenv("SMTP_HOST")
+	smtpPort := os.Getenv("SMTP_PORT")
+	sender := email.New(smtpUser, smtpPassword, smtpHost, smtpPort)
+
+	// set up auth
+	validate := validator.New()
+	signKey, found := os.LookupEnv("JWT_SIGNING_KEY")
+	if !found {
+		log.Fatalln("JWT signing key not found")
+	}
+	authSvc := auth.New(dbService, sender, validate, []byte(signKey))
+
 	// Serving
 	http.HandleFunc("/", loadBalancer.LoadBalancer)
 	http.HandleFunc("/favicon.ico", http.NotFound)
-	http.HandleFunc("/serverPool/add", loadBalancer.AddServer)
-	http.HandleFunc("/serverPool/remove", loadBalancer.RemoveServer)
-	http.HandleFunc("/serverPool", loadBalancer.GetServers)
+	http.Handle("/serverPool/add", authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.AddServer)))
+	http.Handle("/serverPool/remove", authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.RemoveServer)))
+	http.Handle("/serverPool", authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.GetServers)))
+	http.Handle("/admin/signup", authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.SignUp)))
+	http.HandleFunc("/admin/signin", authSvc.SignIn)
 
 	// Config TLS: setting a pair crt-key
 	Crt, _ := tls.LoadX509KeyPair("resources/Cert.crt", "resources/Key.key")
