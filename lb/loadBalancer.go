@@ -216,9 +216,11 @@ ChooseServer:
 		log.Printf("[%s] %s", server.URL(), err)
 		return
 	} else if err != nil {
+		log.Printf("[%s] %s", server.URL(), err)
 		server.SetAlive(false) // СДЕЛАТЬ СЧЁТЧИК ИЛИ ПОЧИТАТЬ КАК У НДЖИНКС
 		goto ChooseServer
 	}
+	log.Printf("[%s] returned %s\n", server.URL(), resp.Status)
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {

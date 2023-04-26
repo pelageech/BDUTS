@@ -5,3 +5,5 @@ resources/Key.key
 .idea
 .DS_Store
 backends
+data
+grafana
