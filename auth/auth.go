@@ -265,6 +265,9 @@ func (s *Service) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	// TODO: Send email to user notifying them of password change
+
 	w.WriteHeader(http.StatusOK)
 }
 
