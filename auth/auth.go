@@ -173,10 +173,7 @@ func (s *Service) isAuthorized(username, password string) bool {
 
 	// Compare the password with the hash
 	err = bcrypt.CompareHashAndPassword([]byte(hash), []byte(password+salt))
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 func (s *Service) SignIn(w http.ResponseWriter, r *http.Request) {
