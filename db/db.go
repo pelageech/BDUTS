@@ -129,3 +129,8 @@ func (s *Service) GetSaltAndHash(username string) (salt, hash string, err error)
 
 	return
 }
+
+func (s *Service) ChangePassword(username, salt, hash string) (err error) {
+	_, err = s.db.Exec("UPDATE users_credentials SET salt = $1, hash = $2 WHERE username = $3", salt, hash, username)
+	return
+}

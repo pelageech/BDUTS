@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -22,8 +23,8 @@ const (
 	passwordLength = 25
 	saltLength     = 20
 
-	subject     = "Your credentials for BDUTS load balancer"
-	msgTemplate = "Your username: %s\n" +
+	subjectNewUser = "Your credentials for BDUTS load balancer"
+	msgNewUser     = "Your username: %s\n" +
 		"Your password: %s\n\n" +
 		"Please log in and change your password.\n" +
 		"By changing your temporary password, you're helping to ensure that your account is secure " +
@@ -37,6 +38,8 @@ type Service struct {
 	validator *validator.Validate
 	signKey   []byte
 }
+
+type userKey struct{}
 
 func New(db db.Service, sender *email.Sender, validator *validator.Validate, signKey []byte) *Service {
 	return &Service{
@@ -55,6 +58,12 @@ type SignUpUser struct {
 type LogInUser struct {
 	Username string `json:"username" validate:"required,min=4,max=20,alphanum"`
 	Password string `json:"password" validate:"required"`
+}
+
+type ChangePasswordUser struct {
+	OldPassword        string `json:"oldPassword" validate:"required"`
+	NewPassword        string `json:"newPassword" validate:"required,min=10,max=25"`
+	NewPasswordConfirm string `json:"newPasswordConfirm" validate:"required,eqfield=NewPassword"`
 }
 
 func generateRandomPassword() (password string, err error) {
@@ -130,10 +139,10 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg := fmt.Sprintf(msgTemplate, user.Username, password)
+	msg := fmt.Sprintf(msgNewUser, user.Username, password)
 	if err := s.sender.Send(
 		user.Email,
-		subject,
+		subjectNewUser,
 		msg,
 	); err != nil {
 		log.Printf("Error sending email: %s\n", err)
@@ -154,6 +163,20 @@ func (s *Service) generateToken(username string) (signedToken string, err error)
 
 	signedToken, err = token.SignedString(s.signKey)
 	return
+}
+
+func (s *Service) isAuthorized(username, password string) bool {
+	salt, hash, err := s.db.GetSaltAndHash(username)
+	if err != nil {
+		return false
+	}
+
+	// Compare the password with the hash
+	err = bcrypt.CompareHashAndPassword([]byte(hash), []byte(password+salt))
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 func (s *Service) SignIn(w http.ResponseWriter, r *http.Request) {
@@ -178,15 +201,7 @@ func (s *Service) SignIn(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	salt, hash, err := s.db.GetSaltAndHash(user.Username)
-	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	// Compare the password with the hash
-	err = bcrypt.CompareHashAndPassword([]byte(hash), []byte(user.Password+salt))
-	if err != nil {
+	if !s.isAuthorized(user.Username, user.Password) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -198,6 +213,61 @@ func (s *Service) SignIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Authorization", "Bearer "+token)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Service) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var user ChangePasswordUser
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	err = s.validator.Struct(user)
+	if err != nil {
+		for _, e := range err.(validator.ValidationErrors) {
+			log.Printf("Error validating change password request: %s\n", e)
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			return
+		}
+	}
+
+	username, ok := r.Context().Value(userKey{}).(string)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if !s.isAuthorized(username, user.OldPassword) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	salt, err := generateSalt()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(user.NewPassword+salt), bcrypt.DefaultCost)
+	if err != nil {
+		log.Printf("Error hashing password: %s\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	hashString := string(hash)
+
+	err = s.db.ChangePassword(username, salt, hashString)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -220,7 +290,6 @@ func (s *Service) AuthenticationMiddleware(next http.Handler) http.Handler {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
 
-			// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
 			return s.signKey, nil
 		}, jwt.WithValidMethods([]string{jwt.SigningMethodHS512.Name}))
 		if err != nil {
@@ -228,11 +297,15 @@ func (s *Service) AuthenticationMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		if !token.Valid {
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !token.Valid || !ok {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
-		next.ServeHTTP(w, r)
+		// Store the authenticated user's username in the request context
+		ctx := context.WithValue(r.Context(), userKey{}, claims["username"])
+
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
