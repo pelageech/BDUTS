@@ -13,7 +13,6 @@ linters:
     - bidichk
     - containedctx
     - contextcheck
-      #    - cyclop
     - decorder
     - dogsled
     - dupl
