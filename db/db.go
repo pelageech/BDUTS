@@ -134,3 +134,12 @@ func (s *Service) ChangePassword(username, salt, hash string) (err error) {
 	_, err = s.db.Exec("UPDATE users_credentials SET salt = $1, hash = $2 WHERE username = $3", salt, hash, username)
 	return
 }
+
+func (s *Service) GetEmail(username string) (email string, err error) {
+	err = s.db.QueryRow("SELECT email FROM users_info WHERE username = $1", username).Scan(&email)
+	if err != nil {
+		log.Printf("Error getting email: %s\n", err)
+		return
+	}
+	return
+}

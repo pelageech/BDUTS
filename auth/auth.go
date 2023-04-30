@@ -30,6 +30,10 @@ const (
 		"By changing your temporary password, you're helping to ensure that your account is secure " +
 		"and that only you have access to it. It's also an opportunity to choose a password " +
 		"that's easy for you to remember, but difficult for others to guess."
+
+	subjectPasswordChanged = "Your password has been changed"
+	msgPasswordChanged     = "Your password has been changed.\nIf" +
+		" you did not change your password, please contact the administrator."
 )
 
 type Service struct {
@@ -266,7 +270,17 @@ func (s *Service) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Send email to user notifying them of password change
+	emailAddress, err := s.db.GetEmail(username)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	err = s.sender.Send(emailAddress, subjectPasswordChanged, msgPasswordChanged)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
 	w.WriteHeader(http.StatusOK)
 }
