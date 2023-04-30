@@ -51,11 +51,9 @@ func Init() {
 	go func() {
 		t := time.NewTicker(timeObserve)
 		for {
-			select {
-			case <-t.C:
-				p, _ := cpu.Percent(0, false)
-				GlobalMetrics.CPU.Set(p[0])
-			}
+			<-t.C
+			p, _ := cpu.Percent(0, false)
+			GlobalMetrics.CPU.Set(p[0])
 		}
 	}()
 }
