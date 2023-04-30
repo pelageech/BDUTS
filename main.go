@@ -3,7 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/pelageech/BDUTS/metrics"
 	"log"
 	"net/http"
 	"os"
@@ -225,10 +225,10 @@ func main() {
 	}()
 
 	// prometheus part
-
+	metrics.Init()
 	server := http.Server{
 		Addr:    ":8081",
-		Handler: promhttp.Handler(),
+		Handler: metrics.Handler(),
 	}
 
 	go func() {
