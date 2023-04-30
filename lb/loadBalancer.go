@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/pelageech/BDUTS/metrics"
 	"io"
 	"log"
 	"net/http"
@@ -208,6 +209,9 @@ ChooseServer:
 	var backendTime *time.Duration
 	req, backendTime = timer.MakeRequestTimeTracker(req)
 
+	metrics.GlobalMetrics.Requests.Inc()
+	metrics.GlobalMetrics.RequestsNow.Inc()
+	defer metrics.GlobalMetrics.RequestsNow.Dec()
 	resp, err := server.SendRequestToBackend(req)
 	server.Free()
 
