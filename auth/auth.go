@@ -34,6 +34,8 @@ const (
 	subjectPasswordChanged = "Your password has been changed"
 	msgPasswordChanged     = "Your password has been changed.\nIf" +
 		" you did not change your password, please contact the administrator."
+
+	changePasswordError = "Password length must be between 10 and 25 characters. New password and new password confirmation must match."
 )
 
 type Service struct {
@@ -235,6 +237,7 @@ func (s *Service) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		for _, e := range err.(validator.ValidationErrors) {
 			log.Printf("Error validating change password request: %s\n", e)
 			w.WriteHeader(http.StatusUnprocessableEntity)
+			_, _ = w.Write([]byte(changePasswordError))
 			return
 		}
 	}
