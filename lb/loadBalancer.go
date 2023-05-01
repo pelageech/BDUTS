@@ -76,6 +76,7 @@ func NewLoadBalancer(
 	cachingProperties *cache.CachingProperties,
 	healthChecker func(*backend.Backend),
 ) *LoadBalancer {
+	setLogPrefixBDUTS()
 	return &LoadBalancer{
 		config:          config,
 		pool:            backend.NewServerPool(),
