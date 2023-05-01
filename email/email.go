@@ -8,13 +8,14 @@ import (
 )
 
 type Sender struct {
-	auth smtp.Auth
-	from string
-	host string
-	port string
+	auth   smtp.Auth
+	from   string
+	host   string
+	port   string
+	logger *log.Logger
 }
 
-func New(username, password, host, port string) *Sender {
+func New(username, password, host, port string, logger *log.Logger) *Sender {
 	return &Sender{
 		auth: smtp.PlainAuth(
 			"",
@@ -22,9 +23,10 @@ func New(username, password, host, port string) *Sender {
 			password,
 			host,
 		),
-		from: username,
-		host: host,
-		port: port,
+		from:   username,
+		host:   host,
+		port:   port,
+		logger: logger,
 	}
 }
 
@@ -33,7 +35,7 @@ func (s *Sender) Send(to, subject, body string) (err error) {
 	addr := fmt.Sprintf("%s:%s", s.host, s.port)
 
 	if err = smtp.SendMail(addr, s.auth, s.from, []string{to}, []byte(msg)); err != nil {
-		log.Error("Failed to send email", "err", err)
+		s.logger.Error("Failed to send email", "err", err)
 	}
 	return
 }
