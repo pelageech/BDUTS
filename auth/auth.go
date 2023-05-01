@@ -23,18 +23,6 @@ const (
 	passwordLength = 25
 	saltLength     = 20
 
-	subjectNewUser = "Your credentials for BDUTS load balancer"
-	msgNewUser     = "Your username: %s\n" +
-		"Your password: %s\n\n" +
-		"Please log in and change your password.\n" +
-		"By changing your temporary password, you're helping to ensure that your account is secure " +
-		"and that only you have access to it. It's also an opportunity to choose a password " +
-		"that's easy for you to remember, but difficult for others to guess."
-
-	subjectPasswordChanged = "Your password has been changed"
-	msgPasswordChanged     = "Your password has been changed.\nIf" +
-		" you did not change your password, please contact the administrator."
-
 	changePasswordError = "Password length must be between 10 and 25 characters. New password and new password confirmation must match."
 )
 
@@ -148,12 +136,7 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg := fmt.Sprintf(msgNewUser, user.Username, password)
-	if err := s.sender.Send(
-		user.Email,
-		subjectNewUser,
-		msg,
-	); err != nil {
+	if err := s.sender.SendSignUpEmail(user.Email, user.Username, password); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -284,7 +267,7 @@ func (s *Service) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = s.sender.Send(emailAddress, subjectPasswordChanged, msgPasswordChanged)
+	err = s.sender.SendChangedPasswordEmail(emailAddress)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
