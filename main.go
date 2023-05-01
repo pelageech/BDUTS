@@ -210,6 +210,12 @@ func main() {
 			// Add CORS headers to the response
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 
+			// If the request method is OPTIONS, return a successful response with no body
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+
 			// Call the next handler function in the chain
 			h.ServeHTTP(w, r)
 		})
