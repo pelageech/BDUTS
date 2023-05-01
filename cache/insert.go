@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"github.com/pelageech/BDUTS/metrics"
 	"log"
 	"net/http"
 	"os"
@@ -48,7 +49,6 @@ func (p *CachingProperties) InsertPageInCache(key []byte, req *http.Request, res
 	}
 
 	log.Println("Successfully saved, page's size = ", meta.Size)
-
 	return nil
 }
 
@@ -74,6 +74,7 @@ func (p *CachingProperties) insertPageMetadataToDB(key []byte, meta *PageMetadat
 
 	if err == nil {
 		p.IncrementSize(meta.Size)
+		metrics.UpdateCachePagesCount(1)
 	}
 	if err == bolt.ErrBucketExists {
 		return nil
@@ -87,18 +88,7 @@ func writePageToDisk(key []byte, page *Page) error {
 		return err
 	}
 
-	subhashLength := hashLength / subHashCount
-
-	var subHashes [][]byte
-	for i := 0; i < subHashCount; i++ {
-		subHashes = append(subHashes, key[i*subhashLength:(i+1)*subhashLength])
-	}
-
-	path := PagesPath
-	for _, v := range subHashes {
-		path += "/" + string(v)
-	}
-
+	path := makePath(key, subHashCount)
 	if err := os.MkdirAll(path, 0770); err != nil {
 		return err
 	}

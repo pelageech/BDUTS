@@ -14,6 +14,7 @@ import (
 	"github.com/pelageech/BDUTS/metrics"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -107,6 +108,14 @@ func (p *CachingProperties) CalculateSize() {
 	size := int64(0)
 	pagesCount := 0
 
+	checkDisk := func(hash []byte) error {
+		path := makePath(hash, subHashCount)
+		path += "/" + string(hash)
+
+		_, err := os.Stat(path)
+		return err
+	}
+
 	err := p.db.View(func(tx *bolt.Tx) error {
 		return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
 			metaBytes := b.Get([]byte(pageMetadataKey))
@@ -119,13 +128,18 @@ func (p *CachingProperties) CalculateSize() {
 				return errors.New("Non-persistent json-data, clear the cache! " + err.Error())
 			}
 
+			if err := checkDisk(name); err != nil {
+				log.Println(err)
+				return nil
+			}
+
 			size += m.Size
 			pagesCount++
 			return nil
 		})
 	})
 	if err != nil {
-		log.Fatalln(err)
+		panic(err)
 	}
 	p.Size = size
 	p.PagesCount = pagesCount
