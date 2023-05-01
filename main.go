@@ -204,15 +204,26 @@ func main() {
 	}
 	authSvc := auth.New(dbService, sender, validate, []byte(signKey), logger)
 
+	// Create a CORS middleware handler function
+	cors := func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Add CORS headers to the response
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+
+			// Call the next handler function in the chain
+			h.ServeHTTP(w, r)
+		})
+	}
+
 	// Serving
 	http.HandleFunc("/", loadBalancer.LoadBalancer)
 	http.HandleFunc("/favicon.ico", http.NotFound)
-	http.Handle("/serverPool/add", authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.AddServer)))
-	http.Handle("/serverPool/remove", authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.RemoveServer)))
-	http.Handle("/serverPool", authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.GetServers)))
-	http.Handle("/admin/signup", authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.SignUp)))
-	http.Handle("/admin/password", authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.ChangePassword)))
-	http.HandleFunc("/admin/signin", authSvc.SignIn)
+	http.Handle("/serverPool/add", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.AddServer))))
+	http.Handle("/serverPool/remove", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.RemoveServer))))
+	http.Handle("/serverPool", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.GetServers))))
+	http.Handle("/admin/signup", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.SignUp))))
+	http.Handle("/admin/password", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.ChangePassword))))
+	http.Handle("/admin/signin", cors(http.HandlerFunc(authSvc.SignIn)))
 
 	// Config TLS: setting a pair crt-key
 	Crt, _ := tls.LoadX509KeyPair("resources/Cert.crt", "resources/Key.key")
