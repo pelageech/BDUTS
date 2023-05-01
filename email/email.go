@@ -2,8 +2,9 @@ package email
 
 import (
 	"fmt"
-	"log"
 	"net/smtp"
+
+	"github.com/charmbracelet/log"
 )
 
 type Sender struct {
@@ -32,7 +33,7 @@ func (s *Sender) Send(to, subject, body string) (err error) {
 	addr := fmt.Sprintf("%s:%s", s.host, s.port)
 
 	if err = smtp.SendMail(addr, s.auth, s.from, []string{to}, []byte(msg)); err != nil {
-		log.Printf("Error sending email: %s\n", err)
+		log.Error("Failed to send email", "err", err)
 	}
 	return
 }

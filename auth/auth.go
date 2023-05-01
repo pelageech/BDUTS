@@ -6,11 +6,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/log"
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v5"
 	_ "github.com/lib/pq"
@@ -43,16 +43,18 @@ type Service struct {
 	sender    *email.Sender
 	validator *validator.Validate
 	signKey   []byte
+	logger    *log.Logger
 }
 
 type userKey struct{}
 
-func New(db db.Service, sender *email.Sender, validator *validator.Validate, signKey []byte) *Service {
+func New(db db.Service, sender *email.Sender, validator *validator.Validate, signKey []byte, logger *log.Logger) *Service {
 	return &Service{
 		db:        db,
 		sender:    sender,
 		validator: validator,
 		signKey:   signKey,
+		logger:    logger,
 	}
 }
 
@@ -72,22 +74,22 @@ type ChangePasswordUser struct {
 	NewPasswordConfirm string `json:"newPasswordConfirm" validate:"required,eqfield=NewPassword"`
 }
 
-func generateRandomPassword() (password string, err error) {
+func (s *Service) generateRandomPassword() (password string, err error) {
 	passwordBytes := make([]byte, passwordLength)
 	_, err = rand.Read(passwordBytes)
 	if err != nil {
-		log.Printf("Error generating random password: %s", err)
+		s.logger.Error("Failed to generate random password for new user", "err", err)
 		return
 	}
 	password = base64.URLEncoding.EncodeToString(passwordBytes)
 	return
 }
 
-func generateSalt() (salt string, err error) {
+func (s *Service) generateSalt() (salt string, err error) {
 	saltBytes := make([]byte, saltLength)
 	_, err = rand.Read(saltBytes)
 	if err != nil {
-		log.Printf("Error generating salt: %s", err)
+		s.logger.Error("Failed to generate salt", "err", err)
 		return
 	}
 	salt = base64.URLEncoding.EncodeToString(saltBytes)
@@ -103,6 +105,7 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 	var user SignUpUser
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
+		s.logger.Warn("Failed to decode SignUpUser", "err", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -110,19 +113,19 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 	err = s.validator.Struct(user)
 	if err != nil {
 		for _, e := range err.(validator.ValidationErrors) {
-			log.Printf("Error validating user: %s\n", e)
+			s.logger.Warn("Failed validation of SignUpUser", "err", e)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 	}
 
-	password, err := generateRandomPassword()
+	password, err := s.generateRandomPassword()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	salt, err := generateSalt()
+	salt, err := s.generateSalt()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -131,7 +134,7 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 	// Hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(password+salt), bcrypt.DefaultCost)
 	if err != nil {
-		log.Printf("Error hashing password: %s\n", err)
+		s.logger.Error("Error hashing password with salt", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -151,7 +154,6 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 		subjectNewUser,
 		msg,
 	); err != nil {
-		log.Printf("Error sending email: %s\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -198,7 +200,7 @@ func (s *Service) SignIn(w http.ResponseWriter, r *http.Request) {
 	err = s.validator.Struct(user)
 	if err != nil {
 		for _, e := range err.(validator.ValidationErrors) {
-			log.Printf("Error validating user: %s\n", e)
+			s.logger.Warn("Error validating user", "err", e)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -228,6 +230,7 @@ func (s *Service) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	var user ChangePasswordUser
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
+		s.logger.Warn("Failed to decode change password request", "err", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -235,7 +238,7 @@ func (s *Service) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	err = s.validator.Struct(user)
 	if err != nil {
 		for _, e := range err.(validator.ValidationErrors) {
-			log.Printf("Error validating change password request: %s\n", e)
+			s.logger.Warn("Error validating change password request", "err", e)
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			_, _ = w.Write([]byte(changePasswordError))
 			return
@@ -244,16 +247,18 @@ func (s *Service) ChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	username, ok := r.Context().Value(userKey{}).(string)
 	if !ok {
+		s.logger.Warn("Failed to get username from context")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	if !s.isAuthorized(username, user.OldPassword) {
+		s.logger.Warn("User is not authorized to change password", "user", username)
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	salt, err := generateSalt()
+	salt, err := s.generateSalt()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -261,7 +266,7 @@ func (s *Service) ChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(user.NewPassword+salt), bcrypt.DefaultCost)
 	if err != nil {
-		log.Printf("Error hashing password: %s\n", err)
+		s.logger.Error("Error hashing password", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
