@@ -153,6 +153,111 @@ Date: Mon, 01 May 2023 06:35:17 GMT
 Connection: close
 ```
 
+## Change password
+### Request
+```http request
+PATCH /admin/password HTTP/1.1
+Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODI5MzA3MDIsInVzZXJuYW1lIjoidXNlcm5hbWUifQ.34xSq2PUd5B1yDL0XTHpe4MdTcDoryZScNkJpwQJpWyyW45XK64ZAVaXGtL32__aKl1XR1Re-E5NcoqWeYtmXw
+Content-Type: application/json; charset=utf-8
+Host: localhost:8080
+Connection: close
+
+{"oldPassword":"578XPW76uXa5kqfzv_T6nJhwM30MyRVAOw==","newPassword":"1234567890asdf12","newPasswordConfirm":"1234567890asdf12"}
+```
+
+### Response
+```http request
+HTTP/1.1 200 OK
+Date: Mon, 01 May 2023 08:27:30 GMT
+Connection: close
+```
+
+## Add server to server pool
+### Request
+```http request
+POST /serverPool/add HTTP/1.1
+Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODI5MjkxMDAsInVzZXJuYW1lIjoidXNlcm5hbWUifQ.USR-I-M62r_QTNrr_z-4frwSrGIQRCDyZFOnrqL-3mkRciPh8BUAJk8C0Z58ugUHV3bPrD2jwr4O3qDiwbhXyQ
+Content-Type: application/json; charset=utf-8
+Host: localhost:8080
+Connection: close
+
+{"url":"http://localhost:3038","healthCheckTcpTimeout":2000,"maximalRequests":5}
+```
+
+### Response
+```http request
+HTTP/1.1 200 OK
+Date: Mon, 01 May 2023 07:58:46 GMT
+Content-Type: text/plain; charset=utf-8
+Connection: close
+
+Success!
+```
+
+## Get servers in server pool
+### Request
+```http request
+GET /serverPool HTTP/1.1
+Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODI5MjkxMDAsInVzZXJuYW1lIjoidXNlcm5hbWUifQ.USR-I-M62r_QTNrr_z-4frwSrGIQRCDyZFOnrqL-3mkRciPh8BUAJk8C0Z58ugUHV3bPrD2jwr4O3qDiwbhXyQ
+Host: localhost:8080
+Connection: close
+```
+
+### Response
+```http request
+HTTP/1.1 200 OK
+Date: Mon, 01 May 2023 08:01:11 GMT
+Content-Type: text/html; charset=utf-8
+Connection: close
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Control | BDUTS</title>
+</head>
+<body>
+    <h1>Server Pool</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>URL</th>
+                <th>TCP Timeout</th>
+                <th>Alive</th>
+            </tr>
+        </thead>
+<tr><td>1</td><td>http://localhost:3031</td><td>2000</td><td>false</td></tr><tr><td>2</td><td>http://192.168.0.5:3031</td><td>2000</td><td>false</td></tr><tr><td>3</td><td>http://localhost:3037</td><td>2000</td><td>false</td></tr><tr><td>4</td><td>http://localhost:3038</td><td>2000</td><td>false</td></tr></table>
+<style>
+    table, th, td {
+        border: 1px solid black;
+    }
+</style>
+</body>
+</html>
+```
+
+## Delete server from server pool
+### Request
+```http request
+DELETE /serverPool/remove HTTP/1.1
+Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODI5MzA3MDIsInVzZXJuYW1lIjoidXNlcm5hbWUifQ.34xSq2PUd5B1yDL0XTHpe4MdTcDoryZScNkJpwQJpWyyW45XK64ZAVaXGtL32__aKl1XR1Re-E5NcoqWeYtmXw
+Content-Type: application/json; charset=utf-8
+Host: localhost:8080
+Connection: close
+
+{"url":"http://localhost:3037"}
+```
+
+### Response
+```http request
+HTTP/1.1 200 OK
+Date: Mon, 01 May 2023 08:25:12 GMT
+Content-Type: text/plain; charset=utf-8
+Connection: close
+
+Success!
+```
 <hr>
 
 #### Logo by <a href="https://kazachokolate.tumblr.com/">Kazachokolate</a>
