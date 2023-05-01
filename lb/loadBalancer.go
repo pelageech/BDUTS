@@ -284,6 +284,11 @@ func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
 			MaximalRequests:       int32(maxReq),
 		}
 		b := backend.NewBackendConfig(server)
+		if b == nil {
+			http.Error(rw, "Bad URL", http.StatusBadRequest)
+			return
+		}
+
 		lb.pool.AddServer(b)
 		lb.healthCheckFunc(b)
 		_, _ = rw.Write([]byte("Success!"))

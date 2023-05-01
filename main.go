@@ -3,13 +3,12 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"log"
 	"net/http"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/charmbracelet/log"
 	"github.com/go-playground/validator/v10"
 	"github.com/pelageech/BDUTS/auth"
 	"github.com/pelageech/BDUTS/backend"
@@ -18,6 +17,7 @@ import (
 	"github.com/pelageech/BDUTS/db"
 	"github.com/pelageech/BDUTS/email"
 	"github.com/pelageech/BDUTS/lb"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
@@ -27,21 +27,23 @@ const (
 	cacheConfigPath   = "./resources/cache_config.json"
 )
 
+var logger *log.Logger
+
 func loadBalancerConfigure() *config.LoadBalancerConfig {
 	loadBalancerReader, err := config.NewLoadBalancerReader(lbConfigPath)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("Failed to create LoadBalancerReader", "err", err)
 	}
 	defer func(loadBalancerReader *config.LoadBalancerReader) {
 		err := loadBalancerReader.Close()
 		if err != nil {
-			log.Fatal(err)
+			logger.Fatal("Failed to close LoadBalancerReader", "err", err)
 		}
 	}(loadBalancerReader)
 
 	lbConfig, err := loadBalancerReader.ReadLoadBalancerConfig()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("Failed to read LoadBalancerConfig", "err", err)
 	}
 	return lbConfig
 }
@@ -49,18 +51,18 @@ func loadBalancerConfigure() *config.LoadBalancerConfig {
 func cacheConfigure() *config.CacheConfig {
 	cacheReader, err := config.NewCacheReader(cacheConfigPath)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("Failed to create CacheReader", "err", err)
 	}
 	defer func(cacheReader *config.CacheReader) {
 		err := cacheReader.Close()
 		if err != nil {
-			log.Fatal(err)
+			logger.Fatal("Failed to close CacheReader", "err", err)
 		}
 	}(cacheReader)
 
 	cacheConfig, err := config.ReadCacheConfig(cacheReader)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("Failed to read CacheConfig", "err", err)
 	}
 	return cacheConfig
 }
@@ -68,18 +70,18 @@ func cacheConfigure() *config.CacheConfig {
 func serversConfigure() []config.ServerConfig {
 	serversReader, err := config.NewServersReader(serversConfigPath)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("Failed to create ServersReader", "err", err)
 	}
 	defer func(serversReader *config.ServersReader) {
 		err := serversReader.Close()
 		if err != nil {
-			log.Fatal(err)
+			logger.Fatal("Failed to close ServersReader", "err", err)
 		}
 	}(serversReader)
 
 	serversConfig, err := serversReader.ReadServersConfig()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("Failed to read ServersConfig", "err", err)
 	}
 	return serversConfig
 }
@@ -87,24 +89,29 @@ func serversConfigure() []config.ServerConfig {
 func cacheCleanerConfigure(dbControllerTicker *time.Ticker, maxCacheSize int64) *cache.CacheCleaner {
 	err := os.Mkdir(cache.DbDirectory, 0777)
 	if err != nil && !os.IsExist(err) {
-		log.Fatalln("Cache files directory creation error: ", err)
+		logger.Fatal("Cache files directory creation error", "err", err)
 	}
 
 	// create directory for cache files
 	err = os.Mkdir(cache.PagesPath, 0777)
 	if err != nil && !os.IsExist(err) {
-		log.Fatalln("DB files directory creation error: ", err)
+		logger.Fatal("DB files directory creation error", "err", err)
 	}
 
 	// open directory with cache files
 	dbDir, err := os.Open(cache.PagesPath)
 	if err != nil {
-		log.Fatalln("DB files opening error: ", err)
+		logger.Fatal("DB files opening error", "err", err)
 	}
 	return cache.NewCacheCleaner(dbDir, maxCacheSize, dbFillFactor, dbControllerTicker)
 }
 
 func main() {
+	logger = log.NewWithOptions(os.Stderr, log.Options{
+		ReportCaller:    true,
+		ReportTimestamp: true,
+	})
+
 	lbConfJSON := loadBalancerConfigure()
 	lbConfig := lb.NewLoadBalancerConfig(
 		lbConfJSON.Port,
@@ -116,13 +123,13 @@ func main() {
 	cacheConfig := cacheConfigure()
 
 	// database
-	log.Println("Opening cache database")
+	logger.Info("Opening cache database")
 	if err := os.Mkdir(cache.DbDirectory, 0700); err != nil && !os.IsExist(err) {
-		log.Fatalln("couldn't create a directory " + cache.DbDirectory + ": " + err.Error())
+		logger.Fatal("Couldn't create a directory "+cache.DbDirectory, "err", err)
 	}
 	boltdb, err := cache.OpenDatabase(cache.DbDirectory + "/" + cache.DbName)
 	if err != nil {
-		log.Fatalln("DB error: ", err)
+		logger.Fatal("Failed to open boltdb", "err", err)
 	}
 	defer cache.CloseDatabase(boltdb)
 
@@ -139,9 +146,9 @@ func main() {
 		alive := server.CheckIfAlive()
 		server.SetAlive(alive)
 		if alive {
-			log.Printf("[%s] is alive.\n", server.URL().Host)
+			logger.Infof("[%s] is alive.\n", server.URL().Host)
 		} else {
-			log.Printf("[%s] is down.\n", server.URL().Host)
+			logger.Warnf("[%s] is down.\n", server.URL().Host)
 		}
 	}
 
@@ -154,11 +161,11 @@ func main() {
 	)
 
 	// Firstly, identify the working servers
-	log.Println("Configured! Now setting up the first health check...")
+	logger.Info("Configured! Now setting up the first health check...")
 	for _, server := range loadBalancer.Pool().Servers() {
 		loadBalancer.HealthCheckFunc()(server)
 	}
-	log.Println("Ready!")
+	logger.Info("Ready!")
 
 	// set up health check
 	go loadBalancer.HealthChecker()
@@ -171,9 +178,10 @@ func main() {
 	dbPort := os.Getenv("DB_PORT")
 	dbName := os.Getenv("DB_NAME")
 	dbService := db.Service{}
+	dbService.SetLogger(logger)
 	err = dbService.Connect(postgresUser, password, host, dbPort, dbName)
 	if err != nil {
-		log.Fatalf("Unable to connect to database: %s\n", err)
+		logger.Fatal("Unable to connect to postgresql database", "err", err)
 	}
 	defer func(dbService *db.Service) {
 		// Do not log the error since it has already been logged in dbService.Close()
@@ -186,15 +194,15 @@ func main() {
 	smtpPassword := os.Getenv("SMTP_PASSWORD")
 	smtpHost := os.Getenv("SMTP_HOST")
 	smtpPort := os.Getenv("SMTP_PORT")
-	sender := email.New(smtpUser, smtpPassword, smtpHost, smtpPort)
+	sender := email.New(smtpUser, smtpPassword, smtpHost, smtpPort, logger)
 
 	// set up auth
 	validate := validator.New()
 	signKey, found := os.LookupEnv("JWT_SIGNING_KEY")
 	if !found {
-		log.Fatalln("JWT signing key not found")
+		logger.Fatal("JWT signing key is not found")
 	}
-	authSvc := auth.New(dbService, sender, validate, []byte(signKey))
+	authSvc := auth.New(dbService, sender, validate, []byte(signKey), logger)
 
 	// Serving
 	http.HandleFunc("/", loadBalancer.LoadBalancer)
@@ -203,6 +211,7 @@ func main() {
 	http.Handle("/serverPool/remove", authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.RemoveServer)))
 	http.Handle("/serverPool", authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.GetServers)))
 	http.Handle("/admin/signup", authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.SignUp)))
+	http.Handle("/admin/password", authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.ChangePassword)))
 	http.HandleFunc("/admin/signin", authSvc.SignIn)
 
 	// Config TLS: setting a pair crt-key
@@ -211,15 +220,15 @@ func main() {
 
 	ln, err := tls.Listen("tcp", fmt.Sprintf(":%d", loadBalancer.Config().Port()), tlsConfig)
 	if err != nil {
-		log.Fatal("There's problem with listening")
+		logger.Fatal("Failed to start tcp listener", "err", err)
 	}
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
-	log.Printf("Load Balancer started at :%d\n", loadBalancer.Config().Port())
+	logger.Infof("Load Balancer started at :%d\n", loadBalancer.Config().Port())
 	go func() {
 		if err := http.Serve(ln, nil); err != nil {
-			log.Fatalln(err)
+			logger.Fatal("Failed to serve tcp listener", "err", err)
 		}
 		wg.Done()
 	}()
@@ -233,7 +242,7 @@ func main() {
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
-			log.Fatalln(err)
+			logger.Fatal("Failed to start prometheus server", "err", err)
 		}
 		wg.Done()
 	}()
