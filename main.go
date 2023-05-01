@@ -236,7 +236,7 @@ func main() {
 	}()
 
 	// prometheus part
-	metrics.Init()
+	metrics.Init(loadBalancer.CacheProps().Size, loadBalancer.CacheProps().PagesCount)
 	server := http.Server{
 		Addr:    ":8081",
 		Handler: metrics.Handler(),
