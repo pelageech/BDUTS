@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/pelageech/BDUTS/metrics"
-
+	"log"
 	"net/http"
 	"os"
 	"sync"
@@ -19,6 +19,7 @@ import (
 	"github.com/pelageech/BDUTS/db"
 	"github.com/pelageech/BDUTS/email"
 	"github.com/pelageech/BDUTS/lb"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
