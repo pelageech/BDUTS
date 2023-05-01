@@ -3,6 +3,7 @@ package cache
 import (
 	"encoding/json"
 	"errors"
+	"github.com/pelageech/BDUTS/metrics"
 	"os"
 	"strings"
 
@@ -16,7 +17,9 @@ func (p *CachingProperties) RemovePageFromCache(key []byte) (*PageMetadata, erro
 	if err != nil {
 		return nil, errors.New("Error while deleting record from db: " + err.Error())
 	}
-	if err := removePageFromDisk(key); err != nil {
+
+	err = removePageFromDisk(key)
+	if err != nil {
 		return nil, errors.New("Error while deleting page from disk: " + err.Error())
 	}
 
@@ -45,6 +48,7 @@ func (p *CachingProperties) removePageMetadata(key []byte) (*PageMetadata, error
 		return nil, err
 	}
 	p.IncrementSize(-meta.Size)
+	metrics.UpdateCachePagesCount(-1)
 	return meta, nil
 }
 

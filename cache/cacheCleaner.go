@@ -35,7 +35,7 @@ func (p *CachingProperties) Observe() {
 			func() {
 				size, err := p.deleteExpiredCache()
 				if err != nil {
-					log.Println(err)
+					log.Println("Expired cache: ", err)
 					return
 				}
 				log.Printf("Removed %d bytes of expired pages from cache\n", size)
@@ -43,7 +43,7 @@ func (p *CachingProperties) Observe() {
 			func() {
 				size, err := p.deletePagesLRU()
 				if err != nil {
-					log.Println(err)
+					log.Println("LRU: ", err)
 					return
 				}
 				log.Printf("Removed %d bytes of the least recently used pages from cache\n", size)
