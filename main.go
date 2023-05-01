@@ -209,6 +209,8 @@ func main() {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Add CORS headers to the response
 			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
 
 			// If the request method is OPTIONS, return a successful response with no body
 			if r.Method == "OPTIONS" {
