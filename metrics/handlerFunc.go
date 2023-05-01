@@ -15,15 +15,11 @@ type Metrics struct {
 	CPU             prometheus.Gauge
 	MaxMemory       prometheus.Gauge
 	AllocatedMemory prometheus.Gauge
-	DiskSpaceMax    prometheus.Gauge
 	CacheSize       prometheus.Gauge
 	CachePagesCount prometheus.Gauge
-	Status200       prometheus.Summary
-	Status500       prometheus.Summary
 	RequestsNow     prometheus.Gauge
 	Requests        prometheus.Counter
-	AliveBackends   prometheus.Counter
-	AllBackends     prometheus.Gauge
+	RequestsByCache prometheus.Counter
 }
 
 func NewMetrics(reg prometheus.Registerer) *Metrics {
@@ -35,6 +31,10 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 		Requests: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "bduts_requests_were_processed",
 			Help: "How many requests were processed on the backends summary",
+		}),
+		RequestsByCache: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "bduts_requests_by_cache_were_processed",
+			Help: "How many requests were processed by the cache summary",
 		}),
 		RequestsNow: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "bduts_requests_are_being_processed",
@@ -58,6 +58,7 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 		m.AllocatedMemory,
 		m.CacheSize,
 		m.CachePagesCount,
+		m.RequestsByCache,
 	)
 	return m
 }
