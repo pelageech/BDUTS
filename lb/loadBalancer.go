@@ -2,13 +2,13 @@ package lb
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/pelageech/BDUTS/backend"
@@ -247,31 +247,30 @@ func setLogPrefixBDUTS() {
 func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodPost:
-		if err := req.ParseForm(); err != nil {
-			http.Error(rw, "Bad Request", http.StatusBadRequest)
-			return
+		type AddForm struct {
+			Url                   string
+			HealthCheckTcpTimeout int
+			MaximalRequests       int
 		}
-		url := req.FormValue("url")
+
+		add := AddForm{}
+		if err := json.NewDecoder(req.Body).Decode(&add); err != nil {
+			http.Error(rw, "Couldn't parse JSON", http.StatusBadRequest)
+		}
+
+		url := add.Url
 		if lb.Pool().FindServerByUrl(url) != nil {
 			http.Error(rw, "Server already exists", http.StatusPreconditionFailed)
 			return
 		}
 
-		timeout, err := strconv.Atoi(req.FormValue("healthCheckTcpTimeout"))
-		if err != nil {
-			http.Error(rw, "Bad Request: numbers are only permitted", http.StatusBadRequest)
-			return
-		}
+		timeout := add.HealthCheckTcpTimeout
 		if timeout <= 0 {
 			http.Error(rw, "Bad Request: timeout is below zero or equal", http.StatusBadRequest)
 			return
 		}
 
-		maxReq, err := strconv.Atoi(req.FormValue("maximalRequests"))
-		if err != nil {
-			http.Error(rw, "Bad Request: numbers are only permitted", http.StatusBadRequest)
-			return
-		}
+		maxReq := add.MaximalRequests
 		if maxReq <= 0 {
 			http.Error(rw, "Bad Request: maxReq is below zero or equal", http.StatusBadRequest)
 			return
@@ -292,7 +291,6 @@ func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
 		lb.pool.AddServer(b)
 		lb.healthCheckFunc(b)
 		_, _ = rw.Write([]byte("Success!"))
-		rw.WriteHeader(http.StatusCreated)
 	case http.MethodGet:
 		http.ServeFile(rw, req, "views/add.html")
 	default:
@@ -302,16 +300,18 @@ func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
 
 func (lb *LoadBalancer) RemoveServer(rw http.ResponseWriter, req *http.Request) {
 	switch req.Method {
-	case http.MethodPost:
-		if err := req.ParseForm(); err != nil {
-			http.Error(rw, "Bad Request", http.StatusBadRequest)
-			return
+	case http.MethodDelete:
+		type RemoveForm struct {
+			Url string
 		}
-		if err := req.ParseForm(); err != nil {
-			http.Error(rw, "Bad Request", http.StatusBadRequest)
-			return
+
+		rem := RemoveForm{}
+
+		if err := json.NewDecoder(req.Body).Decode(&rem); err != nil {
+			http.Error(rw, "Couldn't parse JSON", http.StatusBadRequest)
 		}
-		url := req.FormValue("url")
+
+		url := rem.Url
 		if err := lb.Pool().RemoveServerByUrl(url); err != nil {
 			http.Error(rw, "Server doesn't exist", http.StatusNotFound)
 			return
@@ -320,7 +320,7 @@ func (lb *LoadBalancer) RemoveServer(rw http.ResponseWriter, req *http.Request) 
 	case http.MethodGet:
 		http.ServeFile(rw, req, "views/remove.html")
 	default:
-		http.Error(rw, "Only POST and GET requests are supported", http.StatusMethodNotAllowed)
+		http.Error(rw, "Only DELETE and GET requests are supported", http.StatusMethodNotAllowed)
 	}
 }
 
