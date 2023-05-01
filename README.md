@@ -112,6 +112,47 @@ _Let we have a hash with 128 length:_<br>
 - Writing: the page will be saved into a specified directory and named<br>```:root:/cache-data/db/hash[0:31]/hash[32:63]/hash[64:95]/hash[96:127]/hash[:]```;
 - Reading: the balancer will use this hash for searching the page on a disk by the directory above.
 
+# Load balancer administration
+
+## Sign in
+
+### Request
+```http request
+POST /admin/signin HTTP/1.1
+Content-Type: application/json; charset=utf-8
+Host: localhost:8080
+Connection: close
+
+{"username":"username","password":"578XPW76uXa5kqfzv_T6nJhwM30MyRVAOw=="}
+```
+
+### Response
+```http request
+HTTP/1.1 200 OK
+Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODI5MjM5NDcsInVzZXJuYW1lIjoidXNlcm5hbWUifQ.WitBmLpO3gWJOHqVbEfNr6PdGi8B5ZnVaogISUTP_SJdYSgETxh4xarvd8FeTjwF2ZqpB0prN3c6tNRwzNHjIQ
+Date: Mon, 01 May 2023 06:32:27 GMT
+Connection: close
+```
+
+## Sign up
+Only existing users can sign up new users.
+### Request
+```http request
+POST /admin/signup HTTP/1.1
+Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODI5MjM5NDcsInVzZXJuYW1lIjoidXNlcm5hbWUifQ.WitBmLpO3gWJOHqVbEfNr6PdGi8B5ZnVaogISUTP_SJdYSgETxh4xarvd8FeTjwF2ZqpB0prN3c6tNRwzNHjIQ
+Content-Type: application/json; charset=utf-8
+Host: localhost:8080
+Connection: close
+
+{"username":"username1","email":"mail@gmail.com"}
+```
+### Response
+```http request
+HTTP/1.1 201 Created
+Date: Mon, 01 May 2023 06:35:17 GMT
+Connection: close
+```
+
 <hr>
 
 #### Logo by <a href="https://kazachokolate.tumblr.com/">Kazachokolate</a>
