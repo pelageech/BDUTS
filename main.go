@@ -211,6 +211,7 @@ func main() {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Methods", "*")
 			w.Header().Set("Access-Control-Allow-Headers", "*")
+			w.Header().Set("Access-Control-Expose-Headers", "Authorization")
 
 			// If the request method is OPTIONS, return a successful response with no body
 			if r.Method == "OPTIONS" {
