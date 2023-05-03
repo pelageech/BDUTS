@@ -11,8 +11,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/pelageech/BDUTS/metrics"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -66,6 +68,7 @@ type CachingProperties struct {
 	keyBuilderMap UrlToKeyBuilder
 	cleaner       *CacheCleaner
 	Size          int64
+	PagesCount    int
 }
 
 func NewCachingProperties(DB *bolt.DB, cacheConfig *config.CacheConfig, cleaner *CacheCleaner) *CachingProperties {
@@ -80,6 +83,7 @@ func NewCachingProperties(DB *bolt.DB, cacheConfig *config.CacheConfig, cleaner 
 		keyBuilderMap: keyBuilder,
 		cleaner:       cleaner,
 		Size:          0,
+		PagesCount:    0,
 	}
 }
 
@@ -97,10 +101,21 @@ func (p *CachingProperties) Cleaner() *CacheCleaner {
 
 func (p *CachingProperties) IncrementSize(delta int64) {
 	atomic.AddInt64(&p.Size, delta)
+	metrics.UpdateCacheSize(p.Size)
 }
 
 func (p *CachingProperties) CalculateSize() {
 	size := int64(0)
+	pagesCount := 0
+
+	checkDisk := func(hash []byte) error {
+		path := makePath(hash, subHashCount)
+		path += "/" + string(hash)
+
+		_, err := os.Stat(path)
+		return err
+	}
+
 	err := p.db.View(func(tx *bolt.Tx) error {
 		return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
 			metaBytes := b.Get([]byte(pageMetadataKey))
@@ -112,14 +127,22 @@ func (p *CachingProperties) CalculateSize() {
 			if err := json.Unmarshal(metaBytes, &m); err != nil {
 				return errors.New("Non-persistent json-data, clear the cache! " + err.Error())
 			}
+
+			if err := checkDisk(name); err != nil {
+				log.Println(err)
+				return nil
+			}
+
 			size += m.Size
+			pagesCount++
 			return nil
 		})
 	})
 	if err != nil {
-		log.Fatalln(err)
+		panic(err)
 	}
 	p.Size = size
+	p.PagesCount = pagesCount
 }
 
 // Page is a structure that is the cache unit storing on a disk.
@@ -219,6 +242,23 @@ func (p *CachingProperties) RequestHashKey(req *http.Request) []byte {
 func hash(value []byte) []byte {
 	bytes := sha1.Sum(value)
 	return []byte(hex.EncodeToString(bytes[:]))
+}
+
+func makePath(hash []byte, divide int) string {
+	var subHashes [][]byte
+
+	subhashLength := len(hash) / divide
+
+	for i := 0; i < divide; i++ {
+		subHashes = append(subHashes, hash[i*subhashLength:(i+1)*subhashLength])
+	}
+
+	path := PagesPath
+	for _, v := range subHashes {
+		path += "/" + string(v)
+	}
+
+	return path
 }
 
 // constructKeyFromRequest uses an array config.RequestKey
