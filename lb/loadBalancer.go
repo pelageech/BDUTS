@@ -153,6 +153,7 @@ func (lb *LoadBalancer) writePageIfIsInCache(rw http.ResponseWriter, req *http.R
 	if err != nil {
 		return err
 	}
+	metrics.UpdateResponseBodySize(float64(len(cacheItem.Body)))
 	log.Println("Transferred")
 
 	return nil
@@ -180,6 +181,7 @@ func (lb *LoadBalancer) LoadBalancer(rw http.ResponseWriter, req *http.Request) 
 	requestHash := lb.cacheProps.RequestHashKey(req)
 	*req = *req.WithContext(context.WithValue(req.Context(), cache.Hash, requestHash))
 
+	metrics.UpdateRequestBodySize(req)
 	// getting a response from cache
 	err := lb.writePageIfIsInCache(rw, req)
 	if err == nil {
@@ -238,6 +240,7 @@ ChooseServer:
 		return
 	}
 	metrics.GlobalMetrics.Requests.Inc()
+	metrics.UpdateResponseBodySize(float64(len(byteArray)))
 	go lb.SaveToCache(req, resp, byteArray)
 
 	finishRoundTrip := time.Since(start)

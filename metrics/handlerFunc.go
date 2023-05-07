@@ -4,6 +4,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/shirou/gopsutil/cpu"
+	"io"
+	"log"
 	"net/http"
 	"runtime"
 	"time"
@@ -12,14 +14,16 @@ import (
 const timeObserve = 1 * time.Second
 
 type Metrics struct {
-	CPU             prometheus.Gauge
-	MaxMemory       prometheus.Gauge
-	AllocatedMemory prometheus.Gauge
-	CacheSize       prometheus.Gauge
-	CachePagesCount prometheus.Gauge
-	RequestsNow     prometheus.Gauge
-	Requests        prometheus.Counter
-	RequestsByCache prometheus.Counter
+	CPU              prometheus.Gauge
+	MaxMemory        prometheus.Gauge
+	AllocatedMemory  prometheus.Gauge
+	CacheSize        prometheus.Gauge
+	CachePagesCount  prometheus.Gauge
+	RequestsNow      prometheus.Gauge
+	Requests         prometheus.Counter
+	RequestsByCache  prometheus.Counter
+	RequestBodySize  prometheus.Histogram
+	ResponseBodySize prometheus.Histogram
 }
 
 func NewMetrics(reg prometheus.Registerer) *Metrics {
@@ -50,6 +54,14 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 			Name: "bduts_cache_pages_count",
 			Help: "How many pages are stored in cache now?",
 		}),
+		RequestBodySize: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name:    "request_body_size",
+			Buckets: []float64{0.5, 0.9, 0.99},
+		}),
+		ResponseBodySize: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name:    "response_body_size",
+			Buckets: []float64{0.5, 0.9, 0.99},
+		}),
 	}
 	reg.MustRegister(
 		m.CPU,
@@ -59,6 +71,8 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 		m.CacheSize,
 		m.CachePagesCount,
 		m.RequestsByCache,
+		m.RequestBodySize,
+		m.ResponseBodySize,
 	)
 	return m
 }
@@ -85,6 +99,19 @@ func UpdateCacheSize(size int64) {
 
 func UpdateCachePagesCount(delta int) {
 	GlobalMetrics.CachePagesCount.Add(float64(delta))
+}
+
+func UpdateRequestBodySize(req *http.Request) {
+	b, err := io.ReadAll(req.Body)
+	if err != nil {
+		return
+	}
+	GlobalMetrics.RequestBodySize.Observe(float64(len(b)))
+}
+
+func UpdateResponseBodySize(size float64) {
+	GlobalMetrics.ResponseBodySize.Observe(size)
+	log.Println("logged ", size)
 }
 
 func Init(initCacheSize int64, initPagesCount int) {
