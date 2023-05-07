@@ -5,7 +5,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/shirou/gopsutil/cpu"
 	"io"
-	"log"
 	"net/http"
 	"runtime"
 	"time"
@@ -111,7 +110,6 @@ func UpdateRequestBodySize(req *http.Request) {
 
 func UpdateResponseBodySize(size float64) {
 	GlobalMetrics.ResponseBodySize.Observe(size)
-	log.Println("logged ", size)
 }
 
 func Init(initCacheSize int64, initPagesCount int) {
