@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	log2 "github.com/charmbracelet/log"
 	"github.com/pelageech/BDUTS/backend"
 	"github.com/pelageech/BDUTS/cache"
 	"github.com/pelageech/BDUTS/metrics"
@@ -14,6 +15,7 @@ import (
 )
 
 func (lb *LoadBalancer) LoadBalancerHandler(rw http.ResponseWriter, req *http.Request) {
+	log2.Info("HFUHIUSDHFIUSDHFISDU")
 	if err := timer.MakeRequestTimeTracker(lb.loadBalancerHandler, timer.SaveTimeFullTrip, true)(rw, req); err != nil {
 		log.Println(err)
 	}
@@ -42,8 +44,7 @@ func (lb *LoadBalancer) loadBalancerHandler(rw http.ResponseWriter, req *http.Re
 	}
 
 	// on cache miss make request to backend
-	err = timer.MakeRequestTimeTracker(lb.backendHandler, timer.SaveTimeDataBackend, false)(rw, req)
-	return err
+	return lb.backendHandler(rw, req)
 }
 
 // uses balancer db for taking the page from cache and writing it to http.ResponseWriter
@@ -80,6 +81,7 @@ ChooseServer:
 		return err
 	}
 	if ok := server.AssignRequest(); !ok {
+		log.Println("pzdc")
 		goto ChooseServer
 	}
 
@@ -87,8 +89,13 @@ ChooseServer:
 	defer metrics.GlobalMetrics.RequestsNow.Dec()
 	defer metrics.GlobalMetrics.Requests.Inc()
 
-	resp, err := server.SendRequestToBackend(req)
-	server.Free()
+	var resp *http.Response
+	err = timer.MakeRequestTimeTracker(func(rw http.ResponseWriter, req *http.Request) error {
+		var err error
+		resp, err = server.SendRequestToBackend(req)
+		server.Free()
+		return err
+	}, timer.SaveTimeDataBackend, false)(rw, req)
 
 	// on cancellation
 	if err == context.Canceled {
