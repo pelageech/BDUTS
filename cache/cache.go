@@ -32,10 +32,6 @@ const (
 	OnlyIfCachedKey = Key(iota)
 
 	Hash
-
-	// OnlyIfCachedError is used for sending to the client an error about
-	// missing cache while 'only-if-cached' is specified in Cache-Control.
-	OnlyIfCachedError = "HTTP 504 Unsatisfiable Request (only-if-cached)"
 )
 
 const (
@@ -59,6 +55,12 @@ const (
 
 const (
 	bufferSize = 128 << 10
+)
+
+var (
+	// OnlyIfCachedError is used for sending to the client an error about
+	// missing cache while 'only-if-cached' is specified in Cache-Control.
+	OnlyIfCachedError = errors.New("HTTP 504 Unsatisfiable Request (only-if-cached)")
 )
 
 type UrlToKeyBuilder map[string][]func(r *http.Request) string

@@ -225,7 +225,7 @@ func main() {
 	}
 
 	// Serving
-	http.HandleFunc("/", loadBalancer.LoadBalancer)
+	http.HandleFunc("/", loadBalancer.LoadBalancerHandler)
 	http.HandleFunc("/favicon.ico", http.NotFound)
 	http.Handle("/serverPool/add", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.AddServer))))
 	http.Handle("/serverPool/remove", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.RemoveServer))))
