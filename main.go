@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/pelageech/BDUTS/metrics"
 	"net/http"
 	"os"
 	"sync"
@@ -17,7 +18,6 @@ import (
 	"github.com/pelageech/BDUTS/db"
 	"github.com/pelageech/BDUTS/email"
 	"github.com/pelageech/BDUTS/lb"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
@@ -204,15 +204,35 @@ func main() {
 	}
 	authSvc := auth.New(dbService, sender, validate, []byte(signKey), logger)
 
+	// Create a CORS middleware handler function
+	cors := func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Add CORS headers to the response
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			w.Header().Set("Access-Control-Expose-Headers", "Authorization")
+
+			// If the request method is OPTIONS, return a successful response with no body
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+
+			// Call the next handler function in the chain
+			h.ServeHTTP(w, r)
+		})
+	}
+
 	// Serving
 	http.HandleFunc("/", loadBalancer.LoadBalancer)
 	http.HandleFunc("/favicon.ico", http.NotFound)
-	http.Handle("/serverPool/add", authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.AddServer)))
-	http.Handle("/serverPool/remove", authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.RemoveServer)))
-	http.Handle("/serverPool", authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.GetServers)))
-	http.Handle("/admin/signup", authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.SignUp)))
-	http.Handle("/admin/password", authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.ChangePassword)))
-	http.HandleFunc("/admin/signin", authSvc.SignIn)
+	http.Handle("/serverPool/add", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.AddServer))))
+	http.Handle("/serverPool/remove", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.RemoveServer))))
+	http.Handle("/serverPool", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.GetServers))))
+	http.Handle("/admin/signup", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.SignUp))))
+	http.Handle("/admin/password", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.ChangePassword))))
+	http.Handle("/admin/signin", cors(http.HandlerFunc(authSvc.SignIn)))
 
 	// Config TLS: setting a pair crt-key
 	Crt, _ := tls.LoadX509KeyPair("resources/Cert.crt", "resources/Key.key")
@@ -234,10 +254,10 @@ func main() {
 	}()
 
 	// prometheus part
-
+	metrics.Init(loadBalancer.CacheProps().Size, loadBalancer.CacheProps().PagesCount)
 	server := http.Server{
 		Addr:    ":8081",
-		Handler: promhttp.Handler(),
+		Handler: metrics.Handler(),
 	}
 
 	go func() {
@@ -246,6 +266,5 @@ func main() {
 		}
 		wg.Done()
 	}()
-
 	wg.Wait()
 }

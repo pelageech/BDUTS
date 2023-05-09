@@ -99,17 +99,7 @@ func (p *CachingProperties) getPageMetadata(key []byte) (*PageMetadata, error) {
 
 // Reads a page from disk
 func readPageFromDisk(key []byte) (*Page, error) {
-	subhashLength := hashLength / subHashCount
-
-	var subHashes [][]byte
-	for i := 0; i < subHashCount; i++ {
-		subHashes = append(subHashes, key[i*subhashLength:(i+1)*subhashLength])
-	}
-
-	path := PagesPath
-	for _, v := range subHashes {
-		path += "/" + string(v)
-	}
+	path := makePath(key, subHashCount)
 	path += "/" + string(key[:])
 
 	file, err := os.Open(path)
