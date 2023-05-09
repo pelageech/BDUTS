@@ -35,7 +35,7 @@ func (p *CachingProperties) Observe() {
 			func() {
 				size, err := p.deleteExpiredCache()
 				if err != nil {
-					logger.Warnf("Expired cache: %w", err)
+					logger.Warnf("Expired cache: %v", err)
 					return
 				}
 				log.Printf("Removed %d bytes of expired pages from cache\n", size)
@@ -43,7 +43,7 @@ func (p *CachingProperties) Observe() {
 			func() {
 				size, err := p.deletePagesLRU()
 				if err != nil {
-					log.Warnf("LRU: %w", err)
+					log.Warnf("LRU: %v", err)
 					return
 				}
 				log.Printf("Removed %d bytes of the least recently used pages from cache\n", size)
@@ -97,7 +97,7 @@ func (p *CachingProperties) deleteExpiredCache() (int64, error) {
 	for _, item := range expiredKeys {
 		meta, err := p.RemovePageFromCache(item.key)
 		if err != nil {
-			logger.Errorf("Failed to remove page: ", err)
+			logger.Errorf("Failed to remove page: %v", err)
 			continue
 		}
 		size += meta.Size
@@ -147,7 +147,7 @@ func (p *CachingProperties) deletePagesLRU() (int64, error) {
 	for i := 0; p.isSizeExceeded() && i < len(lruItems); i++ {
 		meta, err := p.RemovePageFromCache(lruItems[i].key)
 		if err != nil {
-			logger.Errorf("Failed to remove page: ", err)
+			logger.Errorf("Failed to remove page: %v", err)
 			continue
 		}
 		size += meta.Size
