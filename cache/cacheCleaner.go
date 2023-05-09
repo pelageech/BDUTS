@@ -4,12 +4,12 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"github.com/charmbracelet/log"
 	"os"
 	"sort"
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/charmbracelet/log"
 )
 
 type CacheCleaner struct {

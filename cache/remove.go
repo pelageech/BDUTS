@@ -3,11 +3,11 @@ package cache
 import (
 	"encoding/json"
 	"errors"
-	"github.com/pelageech/BDUTS/metrics"
 	"os"
 	"strings"
 
 	"github.com/boltdb/bolt"
+	"github.com/pelageech/BDUTS/metrics"
 )
 
 // RemovePageFromCache removes the page from disk if it exists

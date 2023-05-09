@@ -4,12 +4,12 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"github.com/pelageech/BDUTS/metrics"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/pelageech/BDUTS/metrics"
 )
 
 var (

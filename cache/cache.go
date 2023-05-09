@@ -11,8 +11,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"github.com/charmbracelet/log"
-	"github.com/pelageech/BDUTS/metrics"
 	"net/http"
 	"os"
 	"strconv"
@@ -21,7 +19,9 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/charmbracelet/log"
 	"github.com/pelageech/BDUTS/config"
+	"github.com/pelageech/BDUTS/metrics"
 )
 
 type Key int
