@@ -11,8 +11,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"github.com/pelageech/BDUTS/metrics"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -21,7 +19,9 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/charmbracelet/log"
 	"github.com/pelageech/BDUTS/config"
+	"github.com/pelageech/BDUTS/metrics"
 )
 
 type Key int
@@ -32,10 +32,6 @@ const (
 	OnlyIfCachedKey = Key(iota)
 
 	Hash
-
-	// OnlyIfCachedError is used for sending to the client an error about
-	// missing cache while 'only-if-cached' is specified in Cache-Control.
-	OnlyIfCachedError = "HTTP 504 Unsatisfiable Request (only-if-cached)"
 )
 
 const (
@@ -61,6 +57,17 @@ const (
 	bufferSize = 128 << 10
 )
 
+var (
+	// OnlyIfCachedError is used for sending to the client an error about
+	// missing cache while 'only-if-cached' is specified in Cache-Control.
+	OnlyIfCachedError = errors.New("HTTP 504 Unsatisfiable Request (only-if-cached)")
+
+	logger = log.NewWithOptions(os.Stderr, log.Options{
+		ReportTimestamp: true,
+		ReportCaller:    true,
+	})
+)
+
 type UrlToKeyBuilder map[string][]func(r *http.Request) string
 
 type CachingProperties struct {
@@ -69,6 +76,10 @@ type CachingProperties struct {
 	cleaner       *CacheCleaner
 	Size          int64
 	PagesCount    int
+}
+
+func LoggerConfig(prefix string) {
+	logger.SetPrefix(prefix)
 }
 
 func NewCachingProperties(DB *bolt.DB, cacheConfig *config.CacheConfig, cleaner *CacheCleaner) *CachingProperties {
@@ -129,7 +140,7 @@ func (p *CachingProperties) CalculateSize() {
 			}
 
 			if err := checkDisk(name); err != nil {
-				log.Println(err)
+				logger.Info("Checking page on the disk: ", "err", err)
 				return nil
 			}
 
@@ -213,24 +224,9 @@ func OpenDatabase(path string) (*bolt.DB, error) {
 func CloseDatabase(db *bolt.DB) {
 	err := db.Close()
 	if err != nil {
-		log.Fatalln(err)
+		logger.Fatal("Closing Bolt database: ", "err", err)
 	}
 }
-
-// Сохраняет копию базы данных в файл
-/*func MakeSnapshot(db *bolt.DB, filename string) error {
-	f, err := os.Open(filename)
-	if err != nil {
-		return err
-	}
-
-	err = db.View(func(tx *bolt.Tx) error {
-		_, err := tx.WriteTo(f)
-		return err
-	})
-
-	return err
-}*/
 
 func (p *CachingProperties) RequestHashKey(req *http.Request) []byte {
 	return hash([]byte(

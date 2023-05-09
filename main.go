@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/pelageech/BDUTS/metrics"
 	"net/http"
 	"os"
 	"sync"
@@ -18,6 +17,8 @@ import (
 	"github.com/pelageech/BDUTS/db"
 	"github.com/pelageech/BDUTS/email"
 	"github.com/pelageech/BDUTS/lb"
+	"github.com/pelageech/BDUTS/metrics"
+	"github.com/pelageech/BDUTS/timer"
 )
 
 const (
@@ -25,6 +26,12 @@ const (
 	lbConfigPath      = "./resources/config.json"
 	serversConfigPath = "./resources/servers.json"
 	cacheConfigPath   = "./resources/cache_config.json"
+
+	loggerPrefixMain  = "BDUTS"
+	loggerPrefixCache = "BDUTS_CACHE"
+	loggerPrefixLB    = "BDUTS_LB"
+	loggerPrefixTimer = "BDUTS_TIMER"
+	loggerPrefixPool  = "BDUTS_POOL"
 )
 
 var logger *log.Logger
@@ -111,6 +118,11 @@ func main() {
 		ReportCaller:    true,
 		ReportTimestamp: true,
 	})
+	logger.SetPrefix(loggerPrefixMain)
+	cache.LoggerConfig(loggerPrefixCache)
+	backend.LoggerConfig(loggerPrefixPool)
+	timer.LoggerConfig(loggerPrefixTimer)
+	lb.LoggerConfig(loggerPrefixLB)
 
 	lbConfJSON := loadBalancerConfigure()
 	lbConfig := lb.NewLoadBalancerConfig(
@@ -225,7 +237,7 @@ func main() {
 	}
 
 	// Serving
-	http.HandleFunc("/", loadBalancer.LoadBalancer)
+	http.HandleFunc("/", loadBalancer.LoadBalancerHandler)
 	http.HandleFunc("/favicon.ico", http.NotFound)
 	http.Handle("/serverPool/add", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.AddServer))))
 	http.Handle("/serverPool/remove", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.RemoveServer))))

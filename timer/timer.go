@@ -1,44 +1,58 @@
 package timer
 
 import (
-	"log"
 	"net/http"
-	"net/http/httptrace"
+	"os"
 	"time"
+
+	"github.com/charmbracelet/log"
 )
+
+var (
+	logger = log.NewWithOptions(os.Stderr, log.Options{
+		ReportTimestamp: true,
+		ReportCaller:    true,
+	})
+)
+
+func LoggerConfig(prefix string) {
+	logger.SetPrefix(prefix)
+}
 
 // MakeRequestTimeTracker sticks functions to the request that is called while
 // the request processes. Functions put some time points for calculating backend time
 // and full-trip time.
-func MakeRequestTimeTracker(req *http.Request) (*http.Request, *time.Duration) {
-	var start time.Time
-	var finishBackend time.Duration
+func MakeRequestTimeTracker(
+	handler func(rw http.ResponseWriter, req *http.Request) error,
+	saver func(t time.Duration),
+	saveOnError bool,
+) func(rw http.ResponseWriter, req *http.Request) error {
 
-	trace := &httptrace.ClientTrace{
-		WroteHeaders: func() {
-			start = time.Now()
-		},
+	return func(rw http.ResponseWriter, req *http.Request) error {
+		start := time.Now()
+		err := handler(rw, req)
+		if err == nil || saveOnError {
+			saver(time.Since(start))
+		}
 
-		GotFirstResponseByte: func() {
-			finishBackend = time.Since(start)
-		},
+		return err
 	}
-
-	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
-
-	return req, &finishBackend
 }
 
 // SaveTimerDataGotFromCache uses a pointer at time for saving it to some DB
 // if the response is got from cache.
 // Pointer is used for saving calling in `defer` functions.
-func SaveTimerDataGotFromCache(cacheTime *time.Duration) {
-	log.Println("Full transferring time: ", *cacheTime)
+func SaveTimerDataGotFromCache(cacheTime time.Duration) {
+	logger.Infof("Full transferring time: %v", cacheTime)
 }
 
-// SaveTimeDataBackend is used for saving backend and full-trip time to some DB.
+// SaveTimeDataBackend is used for saving backend to DB.
 // Uses pointer for using in functions with `defer` prefix.
-func SaveTimeDataBackend(backendTime *time.Duration, fullTime *time.Duration) {
-	log.Println("Backend time: ", *backendTime)
-	log.Println("Full round trip time: ", *fullTime)
+func SaveTimeDataBackend(backendTime time.Duration) {
+	logger.Infof("Backend time: %v", backendTime)
+
+}
+
+func SaveTimeFullTrip(fullTime time.Duration) {
+	logger.Infof("Full round trip time: %v", fullTime)
 }

@@ -1,12 +1,13 @@
 package metrics
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/shirou/gopsutil/cpu"
 	"net/http"
 	"runtime"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/shirou/gopsutil/cpu"
 )
 
 const timeObserve = 1 * time.Second

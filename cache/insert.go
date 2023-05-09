@@ -4,13 +4,12 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"github.com/pelageech/BDUTS/metrics"
-	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/pelageech/BDUTS/metrics"
 )
 
 var (
@@ -48,7 +47,6 @@ func (p *CachingProperties) InsertPageInCache(key []byte, req *http.Request, res
 		return err
 	}
 
-	log.Println("Successfully saved, page's size = ", meta.Size)
 	return nil
 }
 
