@@ -72,7 +72,7 @@ func (b *Backend) AssignRequest() bool {
 	select {
 	case b.requestChan <- true:
 		return true
-	default:
+	case <-time.After(100 * time.Millisecond):
 		return false
 	}
 }
