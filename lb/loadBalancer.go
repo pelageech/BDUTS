@@ -262,8 +262,7 @@ func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
 			http.Error(rw, "Couldn't parse JSON", http.StatusBadRequest)
 		}
 
-		url := add.Url
-		if lb.Pool().FindServerByUrl(url) != nil {
+		if lb.Pool().FindServerByUrl(add.Url) != nil {
 			http.Error(rw, "Server already exists", http.StatusPreconditionFailed)
 			return
 		}
@@ -282,7 +281,7 @@ func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
 		maxReq %= 1 << 31 // int32
 
 		server := config.ServerConfig{
-			URL:                   url,
+			URL:                   add.Url,
 			HealthCheckTcpTimeout: int64(timeout),
 			MaximalRequests:       int32(maxReq),
 		}
@@ -315,8 +314,7 @@ func (lb *LoadBalancer) RemoveServer(rw http.ResponseWriter, req *http.Request) 
 			http.Error(rw, "Couldn't parse JSON", http.StatusBadRequest)
 		}
 
-		url := rem.Url
-		if err := lb.Pool().RemoveServerByUrl(url); err != nil {
+		if err := lb.Pool().RemoveServerByUrl(rem.Url); err != nil {
 			http.Error(rw, "Server doesn't exist", http.StatusNotFound)
 			return
 		}
@@ -333,21 +331,21 @@ func (lb *LoadBalancer) GetServers(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "Only GET requests are supported", http.StatusMethodNotAllowed)
 		return
 	}
-	var b []byte
+	var pageHTML []byte
 	header, _ := os.ReadFile("views/header.html")
 
-	b = append(b, header...)
+	pageHTML = append(pageHTML, header...)
 	footer, _ := os.ReadFile("views/footer.html")
 
 	urls := lb.Pool().Servers()
 
 	for k, v := range urls {
-		b = append(b, []byte(
+		pageHTML = append(pageHTML, []byte(
 			fmt.Sprintf("<tr><td>%d</td><td>%s</td><td>%d</td><td>%t</td></tr>", k+1, v.URL(), v.HealthCheckTcpTimeout().Milliseconds(), v.Alive()),
 		)...)
 	}
-	b = append(b, footer...)
-	if _, err := rw.Write(b); err != nil {
+	pageHTML = append(pageHTML, footer...)
+	if _, err := rw.Write(pageHTML); err != nil {
 		http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
