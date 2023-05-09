@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"errors"
-	"github.com/pelageech/BDUTS/config"
 	"io"
 	"log"
 	"net"
@@ -12,8 +11,12 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/pelageech/BDUTS/config"
 )
 
+// Backend is a struct that contains all the configuration
+// of the backend server.
 type Backend struct {
 	url                   *url.URL
 	healthCheckTcpTimeout time.Duration
@@ -22,6 +25,7 @@ type Backend struct {
 	requestChan           chan bool
 }
 
+// NewBackend creates a new Backend.
 func NewBackend(url *url.URL, healthCheckTimeout time.Duration, maxRequests int32) *Backend {
 	c := make(chan bool, maxRequests)
 	return &Backend{
@@ -33,6 +37,7 @@ func NewBackend(url *url.URL, healthCheckTimeout time.Duration, maxRequests int3
 	}
 }
 
+// NewBackendConfig creates a new Backend from config.ServerConfig.
 func NewBackendConfig(server config.ServerConfig) *Backend {
 	parsed, err := url.Parse(server.URL)
 	if err != nil {
@@ -46,22 +51,27 @@ func NewBackendConfig(server config.ServerConfig) *Backend {
 	return NewBackend(u, h, max)
 }
 
+// URL returns the URL of the backend.
 func (b *Backend) URL() *url.URL {
 	return b.url
 }
 
+// HealthCheckTcpTimeout returns the timeout of the health check.
 func (b *Backend) HealthCheckTcpTimeout() time.Duration {
 	return b.healthCheckTcpTimeout
 }
 
+// Lock are used to lock the backend.
 func (b *Backend) Lock() {
 	b.mux.Lock()
 }
 
+// Unlock are used to unlock the backend.
 func (b *Backend) Unlock() {
 	b.mux.Unlock()
 }
 
+// Alive is used to check if the backend is alive.
 func (b *Backend) Alive() bool {
 	return b.alive
 }
@@ -92,12 +102,14 @@ type responseError struct {
 	err        error
 }
 
+// SetAlive sets the backend to alive or not alive.
 func (b *Backend) SetAlive(alive bool) {
 	b.Lock()
 	b.alive = alive
 	b.Unlock()
 }
 
+// CheckIfAlive checks if the backend is alive.
 func (b *Backend) CheckIfAlive() bool {
 	conn, err := net.DialTimeout("tcp", b.URL().Host, b.HealthCheckTcpTimeout())
 	if err != nil {
@@ -128,6 +140,7 @@ func (b *Backend) SendRequestToBackend(req *http.Request) (*http.Response, error
 	return resp, nil
 }
 
+// WriteBodyAndReturn writes response to the client and returns the response body.
 func WriteBodyAndReturn(rw http.ResponseWriter, resp *http.Response) ([]byte, error) {
 	for key, values := range resp.Header {
 		for _, value := range values {

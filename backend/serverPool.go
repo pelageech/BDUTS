@@ -2,17 +2,21 @@ package backend
 
 import (
 	"errors"
-	"github.com/pelageech/BDUTS/config"
 	"log"
 	"sync"
+
+	"github.com/pelageech/BDUTS/config"
 )
 
+// ServerPool is a struct that contains all the configuration
+// of the backend servers.
 type ServerPool struct {
 	mux     sync.Mutex
 	servers []*Backend
 	current int32
 }
 
+// NewServerPool creates a new ServerPool.
 func NewServerPool() *ServerPool {
 	var s []*Backend
 	return &ServerPool{
@@ -22,6 +26,7 @@ func NewServerPool() *ServerPool {
 	}
 }
 
+// ConfigureServerPool creates a new ServerPool from config.ServerConfig.
 func (p *ServerPool) ConfigureServerPool(servers []config.ServerConfig) {
 	for _, server := range servers {
 		log.Printf("%v", server)
@@ -31,22 +36,27 @@ func (p *ServerPool) ConfigureServerPool(servers []config.ServerConfig) {
 	}
 }
 
+// Lock is used to lock the server pool.
 func (p *ServerPool) Lock() {
 	p.mux.Lock()
 }
 
+// Unlock is used to unlock the server pool.
 func (p *ServerPool) Unlock() {
 	p.mux.Unlock()
 }
 
+// Servers returns the servers of the server pool.
 func (p *ServerPool) Servers() []*Backend {
 	return p.servers
 }
 
+// Current returns the index of the current server.
 func (p *ServerPool) Current() int32 {
 	return p.current
 }
 
+// IncrementCurrent increments the current server index.
 func (p *ServerPool) IncrementCurrent() {
 	p.current++
 	if p.current == int32(len(p.Servers())) {
@@ -54,6 +64,7 @@ func (p *ServerPool) IncrementCurrent() {
 	}
 }
 
+// DecrementCurrent decrements the current server index.
 func (p *ServerPool) DecrementCurrent() {
 	p.current--
 	if p.current == 0 {
@@ -61,10 +72,12 @@ func (p *ServerPool) DecrementCurrent() {
 	}
 }
 
+// GetCurrentServer returns the current server.
 func (p *ServerPool) GetCurrentServer() *Backend {
 	return p.servers[p.current]
 }
 
+// AddServer adds a new server to the server pool.
 func (p *ServerPool) AddServer(b *Backend) {
 	p.Lock()
 	defer p.Unlock()
@@ -72,6 +85,7 @@ func (p *ServerPool) AddServer(b *Backend) {
 	p.servers = append(p.servers, b)
 }
 
+// FindServerByUrl finds a server by its URL.
 func (p *ServerPool) FindServerByUrl(url string) *Backend {
 	for _, v := range p.servers {
 		if v.URL().String() == url {
@@ -81,6 +95,7 @@ func (p *ServerPool) FindServerByUrl(url string) *Backend {
 	return nil
 }
 
+// RemoveServerByUrl removes a server by its URL.
 func (p *ServerPool) RemoveServerByUrl(url string) error {
 	p.Lock()
 	defer p.Unlock()
@@ -94,6 +109,7 @@ func (p *ServerPool) RemoveServerByUrl(url string) error {
 	return errors.New("server not found")
 }
 
+// GetNextPeer returns the next server in the server pool.
 func (p *ServerPool) GetNextPeer() (*Backend, error) {
 	p.Lock()
 	defer p.Unlock()
@@ -109,6 +125,7 @@ func (p *ServerPool) GetNextPeer() (*Backend, error) {
 	return nil, errors.New("all backends are turned down")
 }
 
+// ServersURLs returns the URLs of the servers in the server pool.
 func (p *ServerPool) ServersURLs() []string {
 	var urls []string
 	for _, v := range p.Servers() {

@@ -1,3 +1,4 @@
+// Package db implements a service for interacting with the database.
 package db
 
 import (
@@ -7,11 +8,13 @@ import (
 	"github.com/charmbracelet/log"
 )
 
+// Service is a service that interacts with the database.
 type Service struct {
 	db     *sql.DB
 	logger *log.Logger
 }
 
+// Connect connects to the database.
 func (s *Service) Connect(user, password, host, port, dbName string) (err error) {
 	dataSource := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", user, password, host, port, dbName)
 
@@ -31,6 +34,7 @@ func (s *Service) Connect(user, password, host, port, dbName string) (err error)
 	return
 }
 
+// Close closes the database connection.
 func (s *Service) Close() (err error) {
 	err = s.db.Close()
 	if err != nil {
@@ -41,10 +45,12 @@ func (s *Service) Close() (err error) {
 	return
 }
 
+// SetLogger sets the logger.
 func (s *Service) SetLogger(logger *log.Logger) {
 	s.logger = logger
 }
 
+// InsertUser inserts a new user into the database.
 func (s *Service) InsertUser(username, salt, hash, email string) (errs []error) {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -125,6 +131,7 @@ func (s *Service) InsertUser(username, salt, hash, email string) (errs []error) 
 	return
 }
 
+// GetSaltAndHash gets the salt and hash for a given username.
 func (s *Service) GetSaltAndHash(username string) (salt, hash string, err error) {
 	err = s.db.QueryRow("SELECT salt, hash FROM users_credentials WHERE username = $1", username).Scan(&salt, &hash)
 	if err != nil {
@@ -135,6 +142,7 @@ func (s *Service) GetSaltAndHash(username string) (salt, hash string, err error)
 	return
 }
 
+// ChangePassword changes the password for a given username.
 func (s *Service) ChangePassword(username, salt, hash string) (err error) {
 	_, err = s.db.Exec("UPDATE users_credentials SET salt = $1, hash = $2 WHERE username = $3", salt, hash, username)
 	if err != nil {
@@ -144,6 +152,7 @@ func (s *Service) ChangePassword(username, salt, hash string) (err error) {
 	return
 }
 
+// GetEmail gets the email address for a given username.
 func (s *Service) GetEmail(username string) (email string, err error) {
 	err = s.db.QueryRow("SELECT email FROM users_info WHERE username = $1", username).Scan(&email)
 	if err != nil {
