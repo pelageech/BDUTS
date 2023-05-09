@@ -1,10 +1,11 @@
 package lb
 
 import (
-	"log"
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/charmbracelet/log"
 	"github.com/pelageech/BDUTS/backend"
 	"github.com/pelageech/BDUTS/cache"
 	"github.com/pelageech/BDUTS/config"
@@ -17,6 +18,17 @@ type LoadBalancerConfig struct {
 	healthCheckPeriod time.Duration
 	maxCacheSize      int64
 	observeFrequency  time.Duration
+}
+
+var (
+	logger = log.NewWithOptions(os.Stderr, log.Options{
+		ReportCaller:    true,
+		ReportTimestamp: true,
+	})
+)
+
+func LoggerConfig(prefix string) {
+	logger.SetPrefix(prefix)
 }
 
 func NewLoadBalancerConfig(
@@ -64,7 +76,6 @@ func NewLoadBalancer(
 	cachingProperties *cache.CachingProperties,
 	healthChecker func(*backend.Backend),
 ) *LoadBalancer {
-	setLogPrefixBDUTS()
 	return &LoadBalancer{
 		config:          config,
 		pool:            backend.NewServerPool(),
@@ -111,11 +122,11 @@ func (lb *LoadBalancer) HealthChecker() {
 
 	for {
 		<-ticker.C
-		log.Println("Health Check has been started!")
+		logger.Info("Health Check has been started!")
 		for _, server := range lb.Pool().Servers() {
 			lb.healthCheckFunc(server)
 		}
-		log.Println("All the checks has been completed!")
+		logger.Info("All the checks has been completed!")
 	}
 }
 
@@ -128,8 +139,4 @@ func isHTTPVersionSupported(req *http.Request) bool {
 		}
 	}
 	return false
-}
-
-func setLogPrefixBDUTS() {
-	log.SetPrefix("[BDUTS] ")
 }

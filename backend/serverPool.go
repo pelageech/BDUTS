@@ -2,11 +2,23 @@ package backend
 
 import (
 	"errors"
-	"log"
+	"os"
 	"sync"
 
+	"github.com/charmbracelet/log"
 	"github.com/pelageech/BDUTS/config"
 )
+
+var (
+	logger = log.NewWithOptions(os.Stderr, log.Options{
+		ReportTimestamp: true,
+		ReportCaller:    true,
+	})
+)
+
+func LoggerConfig(prefix string) {
+	logger.SetPrefix(prefix)
+}
 
 // ServerPool is a struct that contains all the configuration
 // of the backend servers.
@@ -29,7 +41,6 @@ func NewServerPool() *ServerPool {
 // ConfigureServerPool creates a new ServerPool from config.ServerConfig.
 func (p *ServerPool) ConfigureServerPool(servers []config.ServerConfig) {
 	for _, server := range servers {
-		log.Printf("%v", server)
 		if b := NewBackendConfig(server); b != nil {
 			p.AddServer(b)
 		}
@@ -81,7 +92,7 @@ func (p *ServerPool) GetCurrentServer() *Backend {
 func (p *ServerPool) AddServer(b *Backend) {
 	p.Lock()
 	defer p.Unlock()
-	log.Printf("Adding server: %s\n", b.URL().String())
+	logger.Infof("Adding server: %s\n", b.URL().String())
 	p.servers = append(p.servers, b)
 }
 
@@ -102,7 +113,7 @@ func (p *ServerPool) RemoveServerByUrl(url string) error {
 	for k, v := range p.servers {
 		if v.URL().String() == url {
 			p.servers = append(p.servers[:k], p.servers[k+1:]...)
-			log.Printf("[%s] removed from server pool\n", url)
+			logger.Infof("[%s] removed from server pool\n", url)
 			return nil
 		}
 	}

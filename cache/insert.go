@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/pelageech/BDUTS/metrics"
-	"log"
 	"net/http"
 	"os"
 	"time"
@@ -48,7 +47,6 @@ func (p *CachingProperties) InsertPageInCache(key []byte, req *http.Request, res
 		return err
 	}
 
-	log.Println("Successfully saved, page's size = ", meta.Size)
 	return nil
 }
 

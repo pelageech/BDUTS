@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -41,7 +40,7 @@ func NewBackend(url *url.URL, healthCheckTimeout time.Duration, maxRequests int3
 func NewBackendConfig(server config.ServerConfig) *Backend {
 	parsed, err := url.Parse(server.URL)
 	if err != nil {
-		log.Printf("Failed to parse server URL: %s\n", err)
+		logger.Errorf("Failed to parse server URL: %s\n", err)
 		return nil
 	}
 
@@ -113,14 +112,14 @@ func (b *Backend) SetAlive(alive bool) {
 func (b *Backend) CheckIfAlive() bool {
 	conn, err := net.DialTimeout("tcp", b.URL().Host, b.HealthCheckTcpTimeout())
 	if err != nil {
-		log.Println("Connection problem: ", err)
+		logger.Warnf("Connection problem: %v", err)
 		return false
 	}
 
 	defer func(conn net.Conn) {
 		err := conn.Close()
 		if err != nil {
-			log.Println("Failed to close connection: ", err)
+			logger.Errorf("Failed to close connection: %v", err)
 		}
 	}(conn)
 	return true
@@ -128,7 +127,7 @@ func (b *Backend) CheckIfAlive() bool {
 
 // SendRequestToBackend returns error if there is an error on backend side.
 func (b *Backend) SendRequestToBackend(req *http.Request) (*http.Response, error) {
-	log.Printf("[%s] received a request\n", b.URL())
+	logger.Infof("[%s] received a request\n", b.URL())
 
 	// send it to the backend
 	r := b.prepareRequest(req)

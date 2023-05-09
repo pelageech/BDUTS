@@ -2,11 +2,12 @@ package lb
 
 import (
 	"fmt"
-	"github.com/pelageech/BDUTS/backend"
-	"github.com/pelageech/BDUTS/config"
 	"net/http"
 	"os"
 	"strconv"
+
+	"github.com/pelageech/BDUTS/backend"
+	"github.com/pelageech/BDUTS/config"
 )
 
 func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {

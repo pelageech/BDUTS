@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/pelageech/BDUTS/metrics"
+	"github.com/pelageech/BDUTS/timer"
 	"net/http"
 	"os"
 	"sync"
@@ -111,6 +112,11 @@ func main() {
 		ReportCaller:    true,
 		ReportTimestamp: true,
 	})
+	logger.SetPrefix("BDUTS")
+	cache.LoggerConfig("BDUTS_CACHE")
+	backend.LoggerConfig("BDUTS_POOL")
+	timer.LoggerConfig("BDUTS_TIMER")
+	lb.LoggerConfig("BDUTS_LB")
 
 	lbConfJSON := loadBalancerConfigure()
 	lbConfig := lb.NewLoadBalancerConfig(
