@@ -1,3 +1,4 @@
+// Package auth implements a service for user authentication.
 package auth
 
 import (
@@ -26,6 +27,7 @@ const (
 	changePasswordError = "Password length must be between 10 and 25 characters. New password and new password confirmation must match."
 )
 
+// Service is a service for user authentication.
 type Service struct {
 	db        db.Service
 	sender    *email.Sender
@@ -36,6 +38,7 @@ type Service struct {
 
 type userKey struct{}
 
+// New creates a new Service.
 func New(db db.Service, sender *email.Sender, validator *validator.Validate, signKey []byte, logger *log.Logger) *Service {
 	return &Service{
 		db:        db,
@@ -46,16 +49,19 @@ func New(db db.Service, sender *email.Sender, validator *validator.Validate, sig
 	}
 }
 
+// SignUpUser is a user that signs up.
 type SignUpUser struct {
 	Username string `json:"username" validate:"required,min=4,max=20,alphanum"`
 	Email    string `json:"email" validate:"required,email"`
 }
 
+// LogInUser is a user that logs in.
 type LogInUser struct {
 	Username string `json:"username" validate:"required,min=4,max=20,alphanum"`
 	Password string `json:"password" validate:"required"`
 }
 
+// ChangePasswordUser is a user that changes password.
 type ChangePasswordUser struct {
 	OldPassword        string `json:"oldPassword" validate:"required"`
 	NewPassword        string `json:"newPassword" validate:"required,min=10,max=25"`
@@ -84,6 +90,7 @@ func (s *Service) generateSalt() (salt string, err error) {
 	return
 }
 
+// SignUp signs up a user.
 func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -167,6 +174,7 @@ func (s *Service) isAuthorized(username, password string) bool {
 	return err == nil
 }
 
+// SignIn signs in a user.
 func (s *Service) SignIn(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -204,6 +212,7 @@ func (s *Service) SignIn(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// ChangePassword changes a user's password.
 func (s *Service) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPatch {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -276,6 +285,7 @@ func (s *Service) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// AuthenticationMiddleware is a middleware that checks if the user is authenticated.
 func (s *Service) AuthenticationMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authorizationHeader := r.Header.Get("Authorization")

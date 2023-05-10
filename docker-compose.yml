@@ -2,11 +2,22 @@ services:
   lb:
     build: .
     ports:
-      - "8080:8080"
+      - "443:8080"
       - "8081:8081"
     networks:
       mynetwork:
         ipv4_address: 192.168.0.3
+    environment:
+      - POSTGRES_USER=
+      - USER_PASSWORD=
+      - DB_HOST=
+      - DB_NAME=
+      - DB_PORT=
+      - SMTP_USER=
+      - SMTP_PASSWORD=
+      - SMTP_HOST=
+      - SMTP_PORT=
+      - JWT_SIGNING_KEY=
 
 
   prometheus:
