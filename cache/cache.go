@@ -82,7 +82,7 @@ func LoggerConfig(prefix string) {
 	logger.SetPrefix(prefix)
 }
 
-func NewCachingProperties(DB *bolt.DB, cacheConfig *config.CacheConfig, cleaner *CacheCleaner) *CachingProperties {
+func NewCachingProperties(db *bolt.DB, cacheConfig *config.CacheConfig, cleaner *CacheCleaner) *CachingProperties {
 	keyBuilder := make(UrlToKeyBuilder)
 
 	for _, v := range cacheConfig.Pairs() {
@@ -90,7 +90,7 @@ func NewCachingProperties(DB *bolt.DB, cacheConfig *config.CacheConfig, cleaner 
 	}
 
 	return &CachingProperties{
-		db:            DB,
+		db:            db,
 		keyBuilderMap: keyBuilder,
 		cleaner:       cleaner,
 		Size:          0,
