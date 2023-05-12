@@ -134,7 +134,6 @@ func (p *CachingProperties) deletePagesLRU() (int64, error) {
 			return nil
 		})
 	})
-
 	if err != nil {
 		return -1, err
 	}

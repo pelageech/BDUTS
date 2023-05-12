@@ -39,7 +39,6 @@ func (p *CachingProperties) removePageMetadata(key []byte) (*PageMetadata, error
 
 		return tx.DeleteBucket(key)
 	})
-
 	if err != nil {
 		return nil, err
 	}

@@ -213,7 +213,7 @@ type responseDirectives struct {
 
 // OpenDatabase opens a database file.
 func OpenDatabase(path string) (*bolt.DB, error) {
-	db, err := bolt.Open(path, 0600, nil)
+	db, err := bolt.Open(path, 0o600, nil)
 	if err != nil {
 		return nil, err
 	}

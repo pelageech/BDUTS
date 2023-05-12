@@ -64,8 +64,10 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 	return m
 }
 
-var reg *prometheus.Registry
-var GlobalMetrics *Metrics
+var (
+	reg           *prometheus.Registry
+	GlobalMetrics *Metrics
+)
 
 func UpdateCPU() {
 	p, err := cpu.Percent(0, false)

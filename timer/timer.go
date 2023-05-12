@@ -8,12 +8,10 @@ import (
 	"github.com/charmbracelet/log"
 )
 
-var (
-	logger = log.NewWithOptions(os.Stderr, log.Options{
-		ReportTimestamp: true,
-		ReportCaller:    true,
-	})
-)
+var logger = log.NewWithOptions(os.Stderr, log.Options{
+	ReportTimestamp: true,
+	ReportCaller:    true,
+})
 
 func LoggerConfig(prefix string) {
 	logger.SetPrefix(prefix)
@@ -27,7 +25,6 @@ func MakeRequestTimeTracker(
 	saver func(t time.Duration),
 	saveOnError bool,
 ) func(rw http.ResponseWriter, req *http.Request) error {
-
 	return func(rw http.ResponseWriter, req *http.Request) error {
 		start := time.Now()
 		err := handler(rw, req)
@@ -50,7 +47,6 @@ func SaveTimerDataGotFromCache(cacheTime time.Duration) {
 // Uses pointer for using in functions with `defer` prefix.
 func SaveTimeDataBackend(backendTime time.Duration) {
 	logger.Infof("Backend time: %v", backendTime)
-
 }
 
 func SaveTimeFullTrip(fullTime time.Duration) {

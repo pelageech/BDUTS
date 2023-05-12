@@ -20,12 +20,10 @@ type LoadBalancerConfig struct {
 	observeFrequency  time.Duration
 }
 
-var (
-	logger = log.NewWithOptions(os.Stderr, log.Options{
-		ReportCaller:    true,
-		ReportTimestamp: true,
-	})
-)
+var logger = log.NewWithOptions(os.Stderr, log.Options{
+	ReportCaller:    true,
+	ReportTimestamp: true,
+})
 
 func LoggerConfig(prefix string) {
 	logger.SetPrefix(prefix)
