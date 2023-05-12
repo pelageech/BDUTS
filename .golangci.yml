@@ -33,6 +33,8 @@ linters:
     - goconst
     - gocritic
     - godot
+    - gofmt
+    - gofumpt
 
 issues:
   exclude-rules:
