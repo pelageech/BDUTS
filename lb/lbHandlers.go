@@ -70,8 +70,13 @@ func (lb *LoadBalancer) getPageHandler(rw http.ResponseWriter, req *http.Request
 	}
 
 	_, err = rw.Write(cacheItem.Body)
+	if err != nil {
+		return err
+	}
 
-	return err
+	metrics.UpdateResponseBodySize(float64(len(cacheItem.Body)))
+
+	return nil
 }
 
 func (lb *LoadBalancer) backendHandler(rw http.ResponseWriter, req *http.Request) error {
@@ -118,6 +123,9 @@ ChooseServer:
 		return fmt.Errorf("[%s]: %w", server.URL(), err)
 	}
 
+	metrics.UpdateResponseBodySize(float64(len(byteArray)))
+
 	go lb.SaveToCache(req, resp, byteArray)
+
 	return nil
 }
