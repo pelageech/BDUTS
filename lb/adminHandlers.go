@@ -1,53 +1,53 @@
 package lb
 
 import (
+	"encoding/json"
 	"fmt"
-	"net/http"
-	"os"
-	"strconv"
-
 	"github.com/pelageech/BDUTS/backend"
 	"github.com/pelageech/BDUTS/config"
+	"net/http"
+	"os"
 )
+
+type AddForm struct {
+	Url                   string
+	HealthCheckTcpTimeout int
+	MaximalRequests       int
+}
+
+type RemoveForm struct {
+	Url string
+}
 
 func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodPost:
-		if err := req.ParseForm(); err != nil {
-			http.Error(rw, "Bad Request", http.StatusBadRequest)
-			return
+
+		add := AddForm{}
+		if err := json.NewDecoder(req.Body).Decode(&add); err != nil {
+			http.Error(rw, "Couldn't parse JSON", http.StatusBadRequest)
 		}
-		url := req.FormValue("url")
-		if lb.Pool().FindServerByUrl(url) != nil {
+
+		if lb.Pool().FindServerByUrl(add.Url) != nil {
 			http.Error(rw, "Server already exists", http.StatusPreconditionFailed)
 			return
 		}
 
-		timeout, err := strconv.Atoi(req.FormValue("healthCheckTcpTimeout"))
-		if err != nil {
-			http.Error(rw, "Bad Request: numbers are only permitted", http.StatusBadRequest)
-			return
-		}
-		if timeout <= 0 {
+		if add.HealthCheckTcpTimeout <= 0 {
 			http.Error(rw, "Bad Request: timeout is below zero or equal", http.StatusBadRequest)
 			return
 		}
 
-		maxReq, err := strconv.Atoi(req.FormValue("maximalRequests"))
-		if err != nil {
-			http.Error(rw, "Bad Request: numbers are only permitted", http.StatusBadRequest)
-			return
-		}
-		if maxReq <= 0 {
+		if add.MaximalRequests <= 0 {
 			http.Error(rw, "Bad Request: maxReq is below zero or equal", http.StatusBadRequest)
 			return
 		}
-		maxReq %= 1 << 31 // int32
+		add.MaximalRequests %= 1 << 31 // int32
 
 		server := config.ServerConfig{
-			URL:                   url,
-			HealthCheckTcpTimeout: int64(timeout),
-			MaximalRequests:       int32(maxReq),
+			URL:                   add.Url,
+			HealthCheckTcpTimeout: int64(add.HealthCheckTcpTimeout),
+			MaximalRequests:       int32(add.MaximalRequests),
 		}
 		b := backend.NewBackendConfig(server)
 		if b == nil {
@@ -58,7 +58,6 @@ func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
 		lb.pool.AddServer(b)
 		lb.healthCheckFunc(b)
 		_, _ = rw.Write([]byte("Success!"))
-		rw.WriteHeader(http.StatusCreated)
 	case http.MethodGet:
 		http.ServeFile(rw, req, "views/add.html")
 	default:
@@ -68,17 +67,14 @@ func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
 
 func (lb *LoadBalancer) RemoveServer(rw http.ResponseWriter, req *http.Request) {
 	switch req.Method {
-	case http.MethodPost:
-		if err := req.ParseForm(); err != nil {
-			http.Error(rw, "Bad Request", http.StatusBadRequest)
-			return
+	case http.MethodDelete:
+		rem := RemoveForm{}
+
+		if err := json.NewDecoder(req.Body).Decode(&rem); err != nil {
+			http.Error(rw, "Couldn't parse JSON", http.StatusBadRequest)
 		}
-		if err := req.ParseForm(); err != nil {
-			http.Error(rw, "Bad Request", http.StatusBadRequest)
-			return
-		}
-		url := req.FormValue("url")
-		if err := lb.Pool().RemoveServerByUrl(url); err != nil {
+
+		if err := lb.Pool().RemoveServerByUrl(rem.Url); err != nil {
 			http.Error(rw, "Server doesn't exist", http.StatusNotFound)
 			return
 		}
@@ -86,7 +82,7 @@ func (lb *LoadBalancer) RemoveServer(rw http.ResponseWriter, req *http.Request) 
 	case http.MethodGet:
 		http.ServeFile(rw, req, "views/remove.html")
 	default:
-		http.Error(rw, "Only POST and GET requests are supported", http.StatusMethodNotAllowed)
+		http.Error(rw, "Only DELETE and GET requests are supported", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -105,7 +101,12 @@ func (lb *LoadBalancer) GetServers(rw http.ResponseWriter, req *http.Request) {
 
 	for k, v := range urls {
 		b = append(b, []byte(
-			fmt.Sprintf("<tr><td>%d</td><td>%s</td><td>%d</td><td>%t</td></tr>", k+1, v.URL(), v.HealthCheckTcpTimeout().Milliseconds(), v.Alive()),
+			fmt.Sprintf("<tr>"+
+				"<td>%d</td>"+
+				"<td>%s</td>"+
+				"<td>%d</td>"+
+				"<td>%t</td>"+
+				"</tr>", k+1, v.URL(), v.HealthCheckTcpTimeout().Milliseconds(), v.Alive()),
 		)...)
 	}
 	b = append(b, footer...)
