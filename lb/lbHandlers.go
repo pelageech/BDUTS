@@ -14,14 +14,14 @@ import (
 	"github.com/pelageech/BDUTS/timer"
 )
 
-// LoadBalancerHandler is the main handler for load balancer
+// LoadBalancerHandler is the main handler for load balancer.
 func (lb *LoadBalancer) LoadBalancerHandler(rw http.ResponseWriter, req *http.Request) {
 	if err := timer.MakeRequestTimeTracker(lb.loadBalancerHandler, timer.SaveTimeFullTrip, true)(rw, req); err != nil {
 		logger.Error("Unsuccessful request processing: ", "err", err)
 	}
 }
 
-// LoadBalancerHandler is the main Handle func
+// LoadBalancerHandler is the main Handle func.
 func (lb *LoadBalancer) loadBalancerHandler(rw http.ResponseWriter, req *http.Request) error {
 	if !isHTTPVersionSupported(req) {
 		http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
@@ -47,8 +47,8 @@ func (lb *LoadBalancer) loadBalancerHandler(rw http.ResponseWriter, req *http.Re
 	return lb.backendHandler(rw, req)
 }
 
-// uses balancer db for taking the page from cache and writing it to http.ResponseWriter
-// if such a page is in cache
+// getPageHandler uses balancer db for taking the page from cache and writing it to http.ResponseWriter
+// if such a page is in cache.
 func (lb *LoadBalancer) getPageHandler(rw http.ResponseWriter, req *http.Request) error {
 	if lb.cacheProps == nil {
 		return errors.New("cache properties weren't set")

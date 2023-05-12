@@ -41,7 +41,7 @@ const (
 	// DbName is a name of the database.
 	DbName = "database.db"
 
-	// DefaultKey is used if there's no key parameter of cache for url
+	// DefaultKey is used if there's no key parameter of cache for url.
 	DefaultKey = "REQ_METHOD;REQ_HOST;REQ_URI"
 
 	// PagesPath is the directory where the pages are written to.
@@ -165,7 +165,7 @@ type Page struct {
 	Header http.Header
 }
 
-// PageMetadata is a struct of page metadata
+// PageMetadata is a struct of page metadata.
 type PageMetadata struct {
 	// Size is the response body size.
 	Size int64
@@ -211,7 +211,7 @@ type responseDirectives struct {
 	SMaxAge         time.Time
 }
 
-// OpenDatabase Открывает базу данных для дальнейшего использования
+// OpenDatabase opens a database file.
 func OpenDatabase(path string) (*bolt.DB, error) {
 	db, err := bolt.Open(path, 0600, nil)
 	if err != nil {
@@ -220,7 +220,7 @@ func OpenDatabase(path string) (*bolt.DB, error) {
 	return db, nil
 }
 
-// CloseDatabase Закрывает базу данных
+// CloseDatabase closes a database file.
 func CloseDatabase(db *bolt.DB) {
 	err := db.Close()
 	if err != nil {
@@ -234,7 +234,7 @@ func (p *CachingProperties) RequestHashKey(req *http.Request) []byte {
 	))
 }
 
-// Returns a hash-encode byte array of a value
+// Returns a hash-encode byte array of a value.
 func hash(value []byte) []byte {
 	bytes := sha1.Sum(value)
 	return []byte(hex.EncodeToString(bytes[:]))

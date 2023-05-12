@@ -7,7 +7,7 @@ import (
 )
 
 // SaveToCache takes all the necessary information about a response and saves it
-// in cache
+// in cache.
 func (lb *LoadBalancer) SaveToCache(req *http.Request, resp *http.Response, byteArray []byte) {
 	if !(resp.StatusCode >= 200 && resp.StatusCode < 400) {
 		return
