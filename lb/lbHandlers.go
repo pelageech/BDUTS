@@ -97,7 +97,7 @@ ChooseServer:
 	}, timer.SaveTimeDataBackend, false)(rw, req)
 
 	// on cancellation
-	if err == context.Canceled {
+	if errors.Is(err, context.Canceled) {
 		return fmt.Errorf("[%s]: %w", server.URL(), err)
 	} else if err != nil {
 		logger.Errorf("[%s] %s", server.URL(), err)
