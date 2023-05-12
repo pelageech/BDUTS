@@ -100,7 +100,7 @@ func (p *CachingProperties) getPageMetadata(key []byte) (*PageMetadata, error) {
 // Reads a page from disk
 func readPageFromDisk(key []byte) (*Page, error) {
 	path := makePath(key, subHashCount)
-	path += "/" + string(key[:])
+	path += "/" + string(key)
 
 	file, err := os.Open(path)
 	if err != nil {

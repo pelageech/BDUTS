@@ -91,7 +91,7 @@ func writePageToDisk(key []byte, page *Page) error {
 		return err
 	}
 
-	file, err := os.Create(path + "/" + string(key[:]))
+	file, err := os.Create(path + "/" + string(key))
 	if err != nil {
 		return err
 	}
