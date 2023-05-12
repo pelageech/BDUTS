@@ -35,6 +35,8 @@ linters:
     - godot
     - gofmt
     - gofumpt
+    - goheader
+    - goimports
 
 issues:
   exclude-rules:
