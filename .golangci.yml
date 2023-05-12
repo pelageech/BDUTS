@@ -18,3 +18,11 @@ linters:
     - dupl
     - dupword
     - durationcheck
+    - errname
+    - errorlint
+
+issues:
+  exclude-rules:
+    - path: 'backend/backend.go'
+      linters:
+        - errorlint

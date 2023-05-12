@@ -46,7 +46,7 @@ func (p *CachingProperties) GetPageFromCache(key []byte, req *http.Request) (*Pa
 	}
 
 	if page, err = readPageFromDisk(key); err != nil {
-		if err == os.ErrNotExist {
+		if errors.Is(err, os.ErrNotExist) {
 			_, _ = p.removePageMetadata(key)
 		}
 		return nil, err

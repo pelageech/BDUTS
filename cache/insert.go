@@ -58,10 +58,10 @@ func (p *CachingProperties) insertPageMetadataToDB(key []byte, meta *PageMetadat
 
 	err = p.db.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucket(key)
-		if err == bolt.ErrBucketExists {
+		if errors.Is(err, bolt.ErrBucketExists) {
 			b = tx.Bucket(key)
 		}
-		if err == nil || err == bolt.ErrBucketExists {
+		if err == nil || errors.Is(err, bolt.ErrBucketExists) {
 			_ = b.Put([]byte(pageMetadataKey), value)
 			bs := make([]byte, 4)
 			_ = b.Put([]byte(usesKey), bs)
@@ -74,7 +74,7 @@ func (p *CachingProperties) insertPageMetadataToDB(key []byte, meta *PageMetadat
 		p.IncrementSize(meta.Size)
 		metrics.UpdateCachePagesCount(1)
 	}
-	if err == bolt.ErrBucketExists {
+	if errors.Is(err, bolt.ErrBucketExists) {
 		return nil
 	}
 	return err
