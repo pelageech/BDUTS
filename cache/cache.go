@@ -344,33 +344,37 @@ func loadResponseDirectives(header http.Header) *responseDirectives {
 	cacheControlString := header.Get("cache-control")
 	cacheControl := strings.Split(cacheControlString, ";")
 	for _, v := range cacheControl {
-		if v == "must-revalidate" {
+		switch v {
+		case "must-revalidate":
 			result.MustRevalidate = true
-		} else if v == "no-cache" {
+		case "no-cache":
 			result.NoCache = true
-		} else if v == "no-store" {
+		case "no-store":
 			result.NoStore = true
-		} else if v == "no-transform" {
+		case "no-transform":
 			result.NoTransform = true
-		} else if v == "private" {
+		case "private":
 			result.Private = true
-		} else if v == "proxy-revalidate" {
+		case "proxy-revalidate":
 			result.ProxyRevalidate = true
-		} else if strings.Contains(v, "max-age") {
-			_, t, _ := strings.Cut(v, "=")
-			age, _ := strconv.Atoi(t)
-			if age == 0 {
-				result.MaxAge = infinityTime
-			} else {
-				result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
-			}
-		} else if strings.Contains(v, "s-maxage") {
-			_, t, _ := strings.Cut(v, "=")
-			age, _ := strconv.Atoi(t)
-			if age == 0 {
-				result.SMaxAge = nullTime
-			} else {
-				result.SMaxAge = time.Now().Add(time.Duration(age) * time.Second)
+		default:
+			switch {
+			case strings.Contains(v, "max-age"):
+				_, t, _ := strings.Cut(v, "=")
+				age, _ := strconv.Atoi(t)
+				if age == 0 {
+					result.MaxAge = infinityTime
+				} else {
+					result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
+				}
+			case strings.Contains(v, "s-maxage"):
+				_, t, _ := strings.Cut(v, "=")
+				age, _ := strconv.Atoi(t)
+				if age == 0 {
+					result.SMaxAge = nullTime
+				} else {
+					result.SMaxAge = time.Now().Add(time.Duration(age) * time.Second)
+				}
 			}
 		}
 	}
