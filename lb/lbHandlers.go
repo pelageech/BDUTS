@@ -14,14 +14,14 @@ import (
 	"github.com/pelageech/BDUTS/timer"
 )
 
-// LoadBalancerHandler is the main handler for load balancer
+// LoadBalancerHandler is the main handler for load balancer.
 func (lb *LoadBalancer) LoadBalancerHandler(rw http.ResponseWriter, req *http.Request) {
 	if err := timer.MakeRequestTimeTracker(lb.loadBalancerHandler, timer.SaveTimeFullTrip, true)(rw, req); err != nil {
 		logger.Error("Unsuccessful request processing: ", "err", err)
 	}
 }
 
-// LoadBalancerHandler is the main Handle func
+// LoadBalancerHandler is the main Handle func.
 func (lb *LoadBalancer) loadBalancerHandler(rw http.ResponseWriter, req *http.Request) error {
 	if !isHTTPVersionSupported(req) {
 		http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
@@ -38,7 +38,7 @@ func (lb *LoadBalancer) loadBalancerHandler(rw http.ResponseWriter, req *http.Re
 		return nil
 	} else {
 		logger.Infof("Checking cache unsuccessful: %v", err)
-		if r := req.Context().Value(cache.OnlyIfCachedKey).(bool); r {
+		if r, ok := req.Context().Value(cache.OnlyIfCachedKey).(bool); ok && r {
 			return cache.ErrOnlyIfCached
 		}
 	}
@@ -47,8 +47,8 @@ func (lb *LoadBalancer) loadBalancerHandler(rw http.ResponseWriter, req *http.Re
 	return lb.backendHandler(rw, req)
 }
 
-// uses balancer db for taking the page from cache and writing it to http.ResponseWriter
-// if such a page is in cache
+// getPageHandler uses balancer db for taking the page from cache and writing it to http.ResponseWriter
+// if such a page is in cache.
 func (lb *LoadBalancer) getPageHandler(rw http.ResponseWriter, req *http.Request) error {
 	if lb.cacheProps == nil {
 		return errors.New("cache properties weren't set")
@@ -56,7 +56,10 @@ func (lb *LoadBalancer) getPageHandler(rw http.ResponseWriter, req *http.Request
 
 	logger.Info("Trying to get a response from cache...")
 
-	key := req.Context().Value(cache.Hash).([]byte)
+	key, ok := req.Context().Value(cache.Hash).([]byte)
+	if !ok {
+		return errors.New("couldn't get a hash from request context")
+	}
 	cacheItem, err := lb.cacheProps.GetPageFromCache(key, req)
 	if err != nil {
 		return err

@@ -87,11 +87,11 @@ func writePageToDisk(key []byte, page *Page) error {
 	}
 
 	path := makePath(key, subHashCount)
-	if err := os.MkdirAll(path, 0770); err != nil {
+	if err := os.MkdirAll(path, 0o770); err != nil {
 		return err
 	}
 
-	file, err := os.Create(path + "/" + string(key[:]))
+	file, err := os.Create(path + "/" + string(key))
 	if err != nil {
 		return err
 	}

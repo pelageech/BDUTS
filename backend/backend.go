@@ -181,7 +181,6 @@ func (b *Backend) makeRequest(req *http.Request) (*http.Response, *responseError
 
 	// save the response from the origin b
 	originServerResponse, err := http.DefaultClient.Do(req)
-
 	// error handler
 	if err != nil {
 		if uerr, ok := err.(*url.Error); ok {

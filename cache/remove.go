@@ -11,7 +11,7 @@ import (
 )
 
 // RemovePageFromCache removes the page from disk if it exists
-// and its metadata from the database
+// and its metadata from the database.
 func (p *CachingProperties) RemovePageFromCache(key []byte) (*PageMetadata, error) {
 	meta, err := p.removePageMetadata(key)
 	if err != nil {
@@ -26,7 +26,7 @@ func (p *CachingProperties) RemovePageFromCache(key []byte) (*PageMetadata, erro
 	return meta, nil
 }
 
-// removePageMetadata удаляет cache.PageMetadata запись из базы данных
+// removePageMetadata deletes cache.PageMetadata from the database.
 func (p *CachingProperties) removePageMetadata(key []byte) (*PageMetadata, error) {
 	var m []byte
 	var meta *PageMetadata
@@ -39,7 +39,6 @@ func (p *CachingProperties) removePageMetadata(key []byte) (*PageMetadata, error
 
 		return tx.DeleteBucket(key)
 	})
-
 	if err != nil {
 		return nil, err
 	}

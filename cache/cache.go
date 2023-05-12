@@ -41,7 +41,7 @@ const (
 	// DbName is a name of the database.
 	DbName = "database.db"
 
-	// DefaultKey is used if there's no key parameter of cache for url
+	// DefaultKey is used if there's no key parameter of cache for url.
 	DefaultKey = "REQ_METHOD;REQ_HOST;REQ_URI"
 
 	// PagesPath is the directory where the pages are written to.
@@ -82,7 +82,7 @@ func LoggerConfig(prefix string) {
 	logger.SetPrefix(prefix)
 }
 
-func NewCachingProperties(DB *bolt.DB, cacheConfig *config.CacheConfig, cleaner *CacheCleaner) *CachingProperties {
+func NewCachingProperties(db *bolt.DB, cacheConfig *config.CacheConfig, cleaner *CacheCleaner) *CachingProperties {
 	keyBuilder := make(UrlToKeyBuilder)
 
 	for _, v := range cacheConfig.Pairs() {
@@ -90,7 +90,7 @@ func NewCachingProperties(DB *bolt.DB, cacheConfig *config.CacheConfig, cleaner 
 	}
 
 	return &CachingProperties{
-		db:            DB,
+		db:            db,
 		keyBuilderMap: keyBuilder,
 		cleaner:       cleaner,
 		Size:          0,
@@ -165,7 +165,7 @@ type Page struct {
 	Header http.Header
 }
 
-// PageMetadata is a struct of page metadata
+// PageMetadata is a struct of page metadata.
 type PageMetadata struct {
 	// Size is the response body size.
 	Size int64
@@ -211,16 +211,16 @@ type responseDirectives struct {
 	SMaxAge         time.Time
 }
 
-// OpenDatabase Открывает базу данных для дальнейшего использования
+// OpenDatabase opens a database file.
 func OpenDatabase(path string) (*bolt.DB, error) {
-	db, err := bolt.Open(path, 0600, nil)
+	db, err := bolt.Open(path, 0o600, nil)
 	if err != nil {
 		return nil, err
 	}
 	return db, nil
 }
 
-// CloseDatabase Закрывает базу данных
+// CloseDatabase closes a database file.
 func CloseDatabase(db *bolt.DB) {
 	err := db.Close()
 	if err != nil {
@@ -234,7 +234,7 @@ func (p *CachingProperties) RequestHashKey(req *http.Request) []byte {
 	))
 }
 
-// Returns a hash-encode byte array of a value
+// Returns a hash-encode byte array of a value.
 func hash(value []byte) []byte {
 	bytes := sha1.Sum(value)
 	return []byte(hex.EncodeToString(bytes[:]))
@@ -294,30 +294,35 @@ func loadRequestDirectives(header http.Header) *requestDirectives {
 	cacheControlString := header.Get("cache-control")
 	cacheControl := strings.Split(cacheControlString, ";")
 	for _, v := range cacheControl {
-		if v == "only-if-cached" {
+		switch v {
+		case "only-if-cached":
 			result.OnlyIfCached = true
-		} else if v == "no-cache" {
+		case "no-cache":
 			result.NoCache = true
-		} else if v == "no-store" {
+		case "no-store":
 			result.NoStore = true
-		} else if v == "no-transform" {
+		case "no-transform":
 			result.NoTransform = true
-		} else if strings.Contains(v, "max-age") {
-			_, t, _ := strings.Cut(v, "=")
-			age, _ := strconv.Atoi(t)
-			if age == 0 {
-				result.MaxAge = infinityTime
-			} else {
-				result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
+		default:
+			switch {
+			case strings.Contains(v, "max-age"):
+				_, t, _ := strings.Cut(v, "=")
+				age, _ := strconv.Atoi(t)
+				if age == 0 {
+					result.MaxAge = infinityTime
+				} else {
+					result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
+				}
+			case strings.Contains(v, "max-stale"):
+				_, t, _ := strings.Cut(v, "=")
+				age, _ := strconv.Atoi(t)
+				result.MaxStale = int64(age)
+			case strings.Contains(v, "min-fresh"):
+				_, t, _ := strings.Cut(v, "=")
+				age, _ := strconv.Atoi(t)
+				result.MinFresh = time.Now().Add(time.Duration(age) * time.Second)
+
 			}
-		} else if strings.Contains(v, "max-stale") {
-			_, t, _ := strings.Cut(v, "=")
-			age, _ := strconv.Atoi(t)
-			result.MaxStale = int64(age)
-		} else if strings.Contains(v, "min-fresh") {
-			_, t, _ := strings.Cut(v, "=")
-			age, _ := strconv.Atoi(t)
-			result.MinFresh = time.Now().Add(time.Duration(age) * time.Second)
 		}
 	}
 
@@ -339,33 +344,37 @@ func loadResponseDirectives(header http.Header) *responseDirectives {
 	cacheControlString := header.Get("cache-control")
 	cacheControl := strings.Split(cacheControlString, ";")
 	for _, v := range cacheControl {
-		if v == "must-revalidate" {
+		switch v {
+		case "must-revalidate":
 			result.MustRevalidate = true
-		} else if v == "no-cache" {
+		case "no-cache":
 			result.NoCache = true
-		} else if v == "no-store" {
+		case "no-store":
 			result.NoStore = true
-		} else if v == "no-transform" {
+		case "no-transform":
 			result.NoTransform = true
-		} else if v == "private" {
+		case "private":
 			result.Private = true
-		} else if v == "proxy-revalidate" {
+		case "proxy-revalidate":
 			result.ProxyRevalidate = true
-		} else if strings.Contains(v, "max-age") {
-			_, t, _ := strings.Cut(v, "=")
-			age, _ := strconv.Atoi(t)
-			if age == 0 {
-				result.MaxAge = infinityTime
-			} else {
-				result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
-			}
-		} else if strings.Contains(v, "s-maxage") {
-			_, t, _ := strings.Cut(v, "=")
-			age, _ := strconv.Atoi(t)
-			if age == 0 {
-				result.SMaxAge = nullTime
-			} else {
-				result.SMaxAge = time.Now().Add(time.Duration(age) * time.Second)
+		default:
+			switch {
+			case strings.Contains(v, "max-age"):
+				_, t, _ := strings.Cut(v, "=")
+				age, _ := strconv.Atoi(t)
+				if age == 0 {
+					result.MaxAge = infinityTime
+				} else {
+					result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
+				}
+			case strings.Contains(v, "s-maxage"):
+				_, t, _ := strings.Cut(v, "=")
+				age, _ := strconv.Atoi(t)
+				if age == 0 {
+					result.SMaxAge = nullTime
+				} else {
+					result.SMaxAge = time.Now().Add(time.Duration(age) * time.Second)
+				}
 			}
 		}
 	}

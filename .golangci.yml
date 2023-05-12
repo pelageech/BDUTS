@@ -18,8 +18,25 @@ linters:
     - dupl
     - dupword
     - durationcheck
+    - errchkjson
     - errname
     - errorlint
+    - execinquery
+    - exhaustive
+    - exportloopref
+    - forbidigo
+    - forcetypeassert
+    - gci
+    - ginkgolinter
+    - gocheckcompilerdirectives
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - godot
+    - gofmt
+    - gofumpt
+    - goheader
+    - goimports
 
 issues:
   exclude-rules:

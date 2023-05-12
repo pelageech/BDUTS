@@ -9,12 +9,10 @@ import (
 	"github.com/pelageech/BDUTS/config"
 )
 
-var (
-	logger = log.NewWithOptions(os.Stderr, log.Options{
-		ReportTimestamp: true,
-		ReportCaller:    true,
-	})
-)
+var logger = log.NewWithOptions(os.Stderr, log.Options{
+	ReportTimestamp: true,
+	ReportCaller:    true,
+})
 
 func LoggerConfig(prefix string) {
 	logger.SetPrefix(prefix)
