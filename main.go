@@ -32,6 +32,11 @@ const (
 	loggerPrefixLB    = "BDUTS_LB"
 	loggerPrefixTimer = "BDUTS_TIMER"
 	loggerPrefixPool  = "BDUTS_POOL"
+
+	readWriteExecuteOwnerGroupOthers = 0o777
+	readWriteExecuteOwner            = 0o700
+
+	goroutinesToWait = 2
 )
 
 var logger *log.Logger
@@ -94,13 +99,13 @@ func serversConfigure() []config.ServerConfig {
 }
 
 func cacheCleanerConfigure(dbControllerTicker *time.Ticker, maxCacheSize int64) *cache.CacheCleaner {
-	err := os.Mkdir(cache.DbDirectory, 0o777)
+	err := os.Mkdir(cache.DbDirectory, readWriteExecuteOwnerGroupOthers)
 	if err != nil && !os.IsExist(err) {
 		logger.Fatal("Cache files directory creation error", "err", err)
 	}
 
 	// create directory for cache files
-	err = os.Mkdir(cache.PagesPath, 0o777)
+	err = os.Mkdir(cache.PagesPath, readWriteExecuteOwnerGroupOthers)
 	if err != nil && !os.IsExist(err) {
 		logger.Fatal("DB files directory creation error", "err", err)
 	}
@@ -136,7 +141,7 @@ func main() {
 
 	// database
 	logger.Info("Opening cache database")
-	if err := os.Mkdir(cache.DbDirectory, 0o700); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(cache.DbDirectory, readWriteExecuteOwner); err != nil && !os.IsExist(err) {
 		logger.Fatal("Couldn't create a directory "+cache.DbDirectory, "err", err)
 	}
 	boltdb, err := cache.OpenDatabase(cache.DbDirectory + "/" + cache.DbName)
@@ -256,7 +261,7 @@ func main() {
 	}
 
 	wg := sync.WaitGroup{}
-	wg.Add(2)
+	wg.Add(goroutinesToWait)
 	logger.Infof("Load Balancer started at :%d\n", loadBalancer.Config().Port())
 	go func() {
 		if err := http.Serve(ln, nil); err != nil {

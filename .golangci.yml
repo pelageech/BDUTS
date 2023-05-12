@@ -37,6 +37,7 @@ linters:
     - gofumpt
     - goheader
     - goimports
+    - gomnd
 
 issues:
   exclude-rules:

@@ -57,6 +57,11 @@ const (
 	bufferSize = 128 << 10
 )
 
+const (
+	readWriteOwner             = 0o600
+	readWriteExecuteOwnerGroup = 0o770
+)
+
 var (
 	// ErrOnlyIfCached is used for sending to the client an error about
 	// missing cache while 'only-if-cached' is specified in Cache-Control.
@@ -213,7 +218,7 @@ type responseDirectives struct {
 
 // OpenDatabase opens a database file.
 func OpenDatabase(path string) (*bolt.DB, error) {
-	db, err := bolt.Open(path, 0o600, nil)
+	db, err := bolt.Open(path, readWriteOwner, nil)
 	if err != nil {
 		return nil, err
 	}

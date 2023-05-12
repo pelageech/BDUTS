@@ -24,6 +24,9 @@ const (
 	passwordLength = 25
 	saltLength     = 20
 
+	tokenExpirationTime = 20
+	tokenLen            = 2
+
 	changePasswordError   = "Password length must be between 10 and 25 characters. New password and new password confirmation must match."
 	signUpValidationError = "Username must be between 4 and 20 characters. Username must contain only letters and numbers. Email must be valid."
 	signInValidationError = "Username must be between 4 and 20 characters. Username must contain only letters and numbers. Password required."
@@ -152,7 +155,7 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) generateToken(username string) (signedToken string, err error) {
-	expirationTime := time.Now().Add(20 * time.Minute)
+	expirationTime := time.Now().Add(tokenExpirationTime * time.Minute)
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwt.MapClaims{
 		"username": username,
@@ -290,7 +293,7 @@ func (s *Service) AuthenticationMiddleware(next http.Handler) http.Handler {
 		}
 
 		bearerToken := strings.Split(authorizationHeader, " ")
-		if len(bearerToken) != 2 {
+		if len(bearerToken) != tokenLen {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
