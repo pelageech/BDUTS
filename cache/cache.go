@@ -294,30 +294,35 @@ func loadRequestDirectives(header http.Header) *requestDirectives {
 	cacheControlString := header.Get("cache-control")
 	cacheControl := strings.Split(cacheControlString, ";")
 	for _, v := range cacheControl {
-		if v == "only-if-cached" {
+		switch v {
+		case "only-if-cached":
 			result.OnlyIfCached = true
-		} else if v == "no-cache" {
+		case "no-cache":
 			result.NoCache = true
-		} else if v == "no-store" {
+		case "no-store":
 			result.NoStore = true
-		} else if v == "no-transform" {
+		case "no-transform":
 			result.NoTransform = true
-		} else if strings.Contains(v, "max-age") {
-			_, t, _ := strings.Cut(v, "=")
-			age, _ := strconv.Atoi(t)
-			if age == 0 {
-				result.MaxAge = infinityTime
-			} else {
-				result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
+		default:
+			switch {
+			case strings.Contains(v, "max-age"):
+				_, t, _ := strings.Cut(v, "=")
+				age, _ := strconv.Atoi(t)
+				if age == 0 {
+					result.MaxAge = infinityTime
+				} else {
+					result.MaxAge = time.Now().Add(time.Duration(age) * time.Second)
+				}
+			case strings.Contains(v, "max-stale"):
+				_, t, _ := strings.Cut(v, "=")
+				age, _ := strconv.Atoi(t)
+				result.MaxStale = int64(age)
+			case strings.Contains(v, "min-fresh"):
+				_, t, _ := strings.Cut(v, "=")
+				age, _ := strconv.Atoi(t)
+				result.MinFresh = time.Now().Add(time.Duration(age) * time.Second)
+
 			}
-		} else if strings.Contains(v, "max-stale") {
-			_, t, _ := strings.Cut(v, "=")
-			age, _ := strconv.Atoi(t)
-			result.MaxStale = int64(age)
-		} else if strings.Contains(v, "min-fresh") {
-			_, t, _ := strings.Cut(v, "=")
-			age, _ := strconv.Atoi(t)
-			result.MinFresh = time.Now().Add(time.Duration(age) * time.Second)
 		}
 	}
 
