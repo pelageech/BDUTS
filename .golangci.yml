@@ -20,6 +20,9 @@ linters:
     - durationcheck
     - errname
     - errorlint
+    - gci
+    - goconst
+    - gocritic
 
 issues:
   exclude-rules:
