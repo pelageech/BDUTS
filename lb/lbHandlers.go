@@ -38,7 +38,7 @@ func (lb *LoadBalancer) loadBalancerHandler(rw http.ResponseWriter, req *http.Re
 		return nil
 	} else {
 		logger.Infof("Checking cache unsuccessful: %v", err)
-		if r := req.Context().Value(cache.OnlyIfCachedKey).(bool); r {
+		if r, ok := req.Context().Value(cache.OnlyIfCachedKey).(bool); ok && r {
 			return cache.ErrOnlyIfCached
 		}
 	}
@@ -56,7 +56,10 @@ func (lb *LoadBalancer) getPageHandler(rw http.ResponseWriter, req *http.Request
 
 	logger.Info("Trying to get a response from cache...")
 
-	key := req.Context().Value(cache.Hash).([]byte)
+	key, ok := req.Context().Value(cache.Hash).([]byte)
+	if !ok {
+		return errors.New("couldn't get a hash from request context")
+	}
 	cacheItem, err := lb.cacheProps.GetPageFromCache(key, req)
 	if err != nil {
 		return err

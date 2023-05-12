@@ -20,7 +20,11 @@ func (lb *LoadBalancer) SaveToCache(req *http.Request, resp *http.Response, byte
 			Header: resp.Header,
 		}
 
-		key := req.Context().Value(cache.Hash).([]byte)
+		key, ok := req.Context().Value(cache.Hash).([]byte)
+		if !ok {
+			logger.Errorf("Couldn't get a hash from request context")
+			return
+		}
 		if err := lb.cacheProps.InsertPageInCache(key, req, resp, cacheItem); err != nil {
 			logger.Errorf("Unsuccessful saving: %v", err)
 			return
