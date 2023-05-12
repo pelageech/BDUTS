@@ -11,7 +11,7 @@ import (
 )
 
 // AddForm is a structure which is parsed from a POST-request
-// processed by AddServer handler.
+// processed by AddServerHandler.
 type AddForm struct {
 	Url                   string
 	HealthCheckTcpTimeout int
@@ -19,13 +19,13 @@ type AddForm struct {
 }
 
 // RemoveForm is a structure which is parsed from a POST-request
-// processed by RemoveServer handler.
+// processed by RemoveServerHandlerRemoveServer.
 type RemoveForm struct {
 	Url string
 }
 
-// AddServer handles adding a new backend into the server pool of the LoadBalancer.
-func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
+// AddServerHandler handles adding a new backend into the server pool of the LoadBalancer.
+func (lb *LoadBalancer) AddServerHandler(rw http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodPost:
 
@@ -71,8 +71,8 @@ func (lb *LoadBalancer) AddServer(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// RemoveServer handles removing a backend from the server pool of the LoadBalancer.
-func (lb *LoadBalancer) RemoveServer(rw http.ResponseWriter, req *http.Request) {
+// RemoveServerHandler handles removing a backend from the server pool of the LoadBalancer.
+func (lb *LoadBalancer) RemoveServerHandler(rw http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodDelete:
 		rem := RemoveForm{}
@@ -93,9 +93,9 @@ func (lb *LoadBalancer) RemoveServer(rw http.ResponseWriter, req *http.Request) 
 	}
 }
 
-// GetServers takes all the information about the backends from the server pool and puts
+// GetServersHandler takes all the information about the backends from the server pool and puts
 // an HTML page to http.ResponseWriter with the info in <table>...</table> tags.
-func (lb *LoadBalancer) GetServers(rw http.ResponseWriter, req *http.Request) {
+func (lb *LoadBalancer) GetServersHandler(rw http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
 		http.Error(rw, "Only GET requests are supported", http.StatusMethodNotAllowed)
 		return
