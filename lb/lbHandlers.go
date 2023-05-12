@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/charmbracelet/log"
 	"github.com/pelageech/BDUTS/backend"
 	"github.com/pelageech/BDUTS/cache"
 	"github.com/pelageech/BDUTS/metrics"
@@ -112,7 +111,7 @@ ChooseServer:
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			log.Printf("[%s] %s", server.URL(), err)
+			logger.Errorf("[%s] %s", server.URL(), err)
 		}
 	}(resp.Body)
 
