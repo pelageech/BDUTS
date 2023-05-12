@@ -39,7 +39,7 @@ func (lb *LoadBalancer) loadBalancerHandler(rw http.ResponseWriter, req *http.Re
 	} else {
 		logger.Infof("Checking cache unsuccessful: %v", err)
 		if r := req.Context().Value(cache.OnlyIfCachedKey).(bool); r {
-			return cache.OnlyIfCachedError
+			return cache.ErrOnlyIfCached
 		}
 	}
 

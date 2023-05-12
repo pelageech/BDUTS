@@ -58,9 +58,9 @@ const (
 )
 
 var (
-	// OnlyIfCachedError is used for sending to the client an error about
+	// ErrOnlyIfCached is used for sending to the client an error about
 	// missing cache while 'only-if-cached' is specified in Cache-Control.
-	OnlyIfCachedError = errors.New("HTTP 504 Unsatisfiable Request (only-if-cached)")
+	ErrOnlyIfCached = errors.New("HTTP 504 Unsatisfiable Request (only-if-cached)")
 
 	logger = log.NewWithOptions(os.Stderr, log.Options{
 		ReportTimestamp: true,

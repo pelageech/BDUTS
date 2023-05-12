@@ -18,3 +18,4 @@ linters:
     - dupl
     - dupword
     - durationcheck
+    - errname
