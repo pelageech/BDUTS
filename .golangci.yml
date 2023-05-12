@@ -27,9 +27,12 @@ linters:
     - forbidigo
     - forcetypeassert
     - gci
+    - ginkgolinter
+    - gocheckcompilerdirectives
+    - gochecknoinits
     - goconst
     - gocritic
-    - ginkgolinter
+    - godot
 
 issues:
   exclude-rules:
