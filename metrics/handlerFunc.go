@@ -1,7 +1,7 @@
 package metrics
 
 import (
-  "io"
+	"io"
 	"net/http"
 	"runtime"
 	"time"
