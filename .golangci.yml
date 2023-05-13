@@ -43,3 +43,6 @@ issues:
     - path: 'backend/backend.go'
       linters:
         - errorlint
+    - path: 'admin_app/main.go'
+      linters:
+        - forbidigo
