@@ -94,13 +94,13 @@ func serversConfigure() []config.ServerConfig {
 }
 
 func cacheCleanerConfigure(dbControllerTicker *time.Ticker, maxCacheSize int64) *cache.CacheCleaner {
-	err := os.Mkdir(cache.DbDirectory, 0777)
+	err := os.Mkdir(cache.DbDirectory, 0o777)
 	if err != nil && !os.IsExist(err) {
 		logger.Fatal("Cache files directory creation error", "err", err)
 	}
 
 	// create directory for cache files
-	err = os.Mkdir(cache.PagesPath, 0777)
+	err = os.Mkdir(cache.PagesPath, 0o777)
 	if err != nil && !os.IsExist(err) {
 		logger.Fatal("DB files directory creation error", "err", err)
 	}
@@ -136,7 +136,7 @@ func main() {
 
 	// database
 	logger.Info("Opening cache database")
-	if err := os.Mkdir(cache.DbDirectory, 0700); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(cache.DbDirectory, 0o700); err != nil && !os.IsExist(err) {
 		logger.Fatal("Couldn't create a directory "+cache.DbDirectory, "err", err)
 	}
 	boltdb, err := cache.OpenDatabase(cache.DbDirectory + "/" + cache.DbName)
@@ -239,9 +239,9 @@ func main() {
 	// Serving
 	http.HandleFunc("/", loadBalancer.LoadBalancerHandler)
 	http.HandleFunc("/favicon.ico", http.NotFound)
-	http.Handle("/serverPool/add", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.AddServer))))
-	http.Handle("/serverPool/remove", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.RemoveServer))))
-	http.Handle("/serverPool", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.GetServers))))
+	http.Handle("/serverPool/add", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.AddServerHandler))))
+	http.Handle("/serverPool/remove", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.RemoveServerHandler))))
+	http.Handle("/serverPool", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(loadBalancer.GetServersHandler))))
 	http.Handle("/admin/signup", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.SignUp))))
 	http.Handle("/admin/password", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.ChangePassword))))
 	http.Handle("/admin/signin", cors(http.HandlerFunc(authSvc.SignIn)))

@@ -15,7 +15,7 @@ import (
 
 // GetPageFromCache gets corresponding page and its metadata
 // and returns it if it exists. Uses some parameters for building
-// a request key, see in cache package and cacheConfig file
+// a request key, see in cache package and cacheConfig file.
 func (p *CachingProperties) GetPageFromCache(key []byte, req *http.Request) (*Page, error) {
 	var info *PageMetadata
 	var page *Page
@@ -46,7 +46,7 @@ func (p *CachingProperties) GetPageFromCache(key []byte, req *http.Request) (*Pa
 	}
 
 	if page, err = readPageFromDisk(key); err != nil {
-		if err == os.ErrNotExist {
+		if errors.Is(err, os.ErrNotExist) {
 			_, _ = p.removePageMetadata(key)
 		}
 		return nil, err
@@ -97,10 +97,10 @@ func (p *CachingProperties) getPageMetadata(key []byte) (*PageMetadata, error) {
 	return &meta, nil
 }
 
-// Reads a page from disk
+// Reads a page from disk.
 func readPageFromDisk(key []byte) (*Page, error) {
 	path := makePath(key, subHashCount)
-	path += "/" + string(key[:])
+	path += "/" + string(key)
 
 	file, err := os.Open(path)
 	if err != nil {

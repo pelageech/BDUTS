@@ -20,12 +20,10 @@ type LoadBalancerConfig struct {
 	observeFrequency  time.Duration
 }
 
-var (
-	logger = log.NewWithOptions(os.Stderr, log.Options{
-		ReportCaller:    true,
-		ReportTimestamp: true,
-	})
-)
+var logger = log.NewWithOptions(os.Stderr, log.Options{
+	ReportCaller:    true,
+	ReportTimestamp: true,
+})
 
 func LoggerConfig(prefix string) {
 	logger.SetPrefix(prefix)
@@ -70,7 +68,7 @@ type LoadBalancer struct {
 	healthCheckFunc func(*backend.Backend)
 }
 
-// NewLoadBalancer is the constructor of the load balancer
+// NewLoadBalancer is the constructor of the load balancer.
 func NewLoadBalancer(
 	config *LoadBalancerConfig,
 	cachingProperties *cache.CachingProperties,
@@ -116,7 +114,7 @@ func (lb *LoadBalancer) HealthCheckFunc() func(*backend.Backend) {
 	return lb.healthCheckFunc
 }
 
-// HealthChecker periodically checks all the backends in balancer pool
+// HealthChecker periodically checks all the backends in balancer pool.
 func (lb *LoadBalancer) HealthChecker() {
 	ticker := time.NewTicker(lb.config.healthCheckPeriod)
 
@@ -130,7 +128,7 @@ func (lb *LoadBalancer) HealthChecker() {
 	}
 }
 // the balancer supports only HTTP 1.1 version because
-// the backends use a common HTTP protocol
+// the backends use a common HTTP protocol.
 func isHTTPVersionSupported(req *http.Request) bool {
 	if maj, min, ok := http.ParseHTTPVersion(req.Proto); ok {
 		if maj == 1 && min == 1 {

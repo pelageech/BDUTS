@@ -148,7 +148,7 @@ func WriteBodyAndReturn(rw http.ResponseWriter, resp *http.Response) ([]byte, er
 	}
 
 	byteArray, err := io.ReadAll(resp.Body)
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
 		return nil, err
 	}
@@ -181,13 +181,12 @@ func (b *Backend) makeRequest(req *http.Request) (*http.Response, *responseError
 
 	// save the response from the origin b
 	originServerResponse, err := http.DefaultClient.Do(req)
-
 	// error handler
 	if err != nil {
 		if uerr, ok := err.(*url.Error); ok {
 			respError.err = uerr.Err
 
-			if uerr.Err == context.Canceled {
+			if errors.Is(uerr.Err, context.Canceled) {
 				respError.statusCode = -1
 			} else { // b error
 				respError.statusCode = http.StatusInternalServerError

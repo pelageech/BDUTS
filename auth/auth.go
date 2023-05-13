@@ -24,7 +24,9 @@ const (
 	passwordLength = 25
 	saltLength     = 20
 
-	changePasswordError = "Password length must be between 10 and 25 characters. New password and new password confirmation must match."
+	changePasswordError   = "Password length must be between 10 and 25 characters. New password and new password confirmation must match."
+	signUpValidationError = "Username must be between 4 and 20 characters. Username must contain only letters and numbers. Email must be valid."
+	signInValidationError = "Username must be between 4 and 20 characters. Username must contain only letters and numbers. Password required."
 )
 
 // Service is a service for user authentication.
@@ -55,8 +57,8 @@ type SignUpUser struct {
 	Email    string `json:"email" validate:"required,email"`
 }
 
-// LogInUser is a user that logs in.
-type LogInUser struct {
+// SignInUser is a user that logs in.
+type SignInUser struct {
 	Username string `json:"username" validate:"required,min=4,max=20,alphanum"`
 	Password string `json:"password" validate:"required"`
 }
@@ -107,11 +109,9 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 
 	err = s.validator.Struct(user)
 	if err != nil {
-		for _, e := range err.(validator.ValidationErrors) {
-			s.logger.Warn("Failed validation of SignUpUser", "err", e)
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+		s.logger.Warn("Failed validation of SignUpUser", "err", err)
+		http.Error(w, signUpValidationError, http.StatusBadRequest)
+		return
 	}
 
 	password, err := s.generateRandomPassword()
@@ -181,7 +181,7 @@ func (s *Service) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user LogInUser
+	var user SignInUser
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -190,11 +190,9 @@ func (s *Service) SignIn(w http.ResponseWriter, r *http.Request) {
 
 	err = s.validator.Struct(user)
 	if err != nil {
-		for _, e := range err.(validator.ValidationErrors) {
-			s.logger.Warn("Error validating user", "err", e)
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
+		s.logger.Warn("Error validating user", "err", err)
+		http.Error(w, signInValidationError, http.StatusBadRequest)
+		return
 	}
 
 	if !s.isAuthorized(user.Username, user.Password) {
@@ -229,12 +227,9 @@ func (s *Service) ChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	err = s.validator.Struct(user)
 	if err != nil {
-		for _, e := range err.(validator.ValidationErrors) {
-			s.logger.Warn("Error validating change password request", "err", e)
-			w.WriteHeader(http.StatusUnprocessableEntity)
-			_, _ = w.Write([]byte(changePasswordError))
-			return
-		}
+		s.logger.Warn("Error validating change password request", "err", err)
+		http.Error(w, changePasswordError, http.StatusUnprocessableEntity)
+		return
 	}
 
 	username, ok := r.Context().Value(userKey{}).(string)
