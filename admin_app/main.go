@@ -51,17 +51,20 @@ func addHandle() {
 		HealthCheckTcpTimeout: *timeout,
 		MaximalRequests:       *maxReq,
 	}
-	body, _ := json.Marshal(addStruct)
+	body, err := json.Marshal(addStruct)
+	if err != nil {
+		fmt.Println("Failed to marshal JSON: ", err)
+		os.Exit(1)
+	}
 
 	r := strings.NewReader(string(body))
 
 	req, err := http.NewRequest(http.MethodPost, proto+*host+addRequestPath, r)
-	req.Header.Add("Authorization", "Bearer "+*token)
-
 	if err != nil {
 		fmt.Println("An error occurred while creating a request: ", err)
 		os.Exit(1)
 	}
+	req.Header.Add("Authorization", "Bearer "+*token)
 
 	resp, err := c.Do(req)
 	if err != nil {
@@ -81,20 +84,22 @@ func removeHandle() {
 	removeStruct := RemoveRequestBodyJSON{
 		Url: *remove,
 	}
-	body, _ := json.Marshal(removeStruct)
+	body, err := json.Marshal(removeStruct)
+	if err != nil {
+		fmt.Println("Failed to marshal JSON: ", err)
+	}
 
 	r := strings.NewReader(string(body))
 
 	req, err := http.NewRequest(http.MethodDelete, proto+*host+removeRequestPath, r)
-	req.Header.Add("Authorization", "Bearer "+*token)
-
 	if err != nil {
 		fmt.Println("An error occurred while creating a request: ", err)
 		os.Exit(1)
 	}
 
-	resp, err := c.Do(req)
+	req.Header.Add("Authorization", "Bearer "+*token)
 
+	resp, err := c.Do(req)
 	if err != nil {
 		fmt.Println("An error occurred while processing the request: ", err)
 		os.Exit(1)
@@ -142,5 +147,4 @@ func main() {
 	if *remove != defaultUrl {
 		removeHandle()
 	}
-
 }
