@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"flag"
@@ -8,16 +9,15 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strings"
 )
 
-type AddRequestBodyJSON struct {
+type addRequestBodyJSON struct {
 	Url                   string
 	HealthCheckTcpTimeout int
 	MaximalRequests       int
 }
 
-type RemoveRequestBodyJSON struct {
+type removeRequestBodyJSON struct {
 	Url string
 }
 
@@ -34,19 +34,20 @@ const (
 )
 
 var (
-	host    = flag.String("h", defaultHost, "host:port of the load balancer for sending a request without protocol")
-	add     = flag.String("add", defaultUrl, "adds a new backend to server pool, requires URL")
-	remove  = flag.String("remove", defaultUrl, "remove the backend from server pool by URL")
-	timeout = flag.Int("tout", defaultTimeout, "tcp timeout for backend replying, ms")
+	host    = flag.String("h", defaultHost, "host:port of the load balancer for sending a request (without a protocol)")
+	add     = flag.String("add", defaultUrl, "adds a new backend to server pool, requires URL (-tout and -max are optional params)")
+	remove  = flag.String("remove", defaultUrl, "remove the backend from server pool, requires URL")
+	timeout = flag.Int("tout", defaultTimeout, "tcp timeout for backend replying in milliseconds")
 	maxReq  = flag.Int("max", defaultMaxReq, "amount of request able to be being processed in the same time")
-	token   = flag.String("t", defaultToken, `jwt token without "Bearer "`)
+	token   = flag.String("t", defaultToken, `jwt token without "Bearer " for an authorization`)
+	help    = flag.Bool("help", false, "show this message")
 
 	tr = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} // todo: configure tls in right way
 	c  = &http.Client{Transport: tr}
 )
 
 func addHandle() {
-	addStruct := AddRequestBodyJSON{
+	addStruct := addRequestBodyJSON{
 		Url:                   *add,
 		HealthCheckTcpTimeout: *timeout,
 		MaximalRequests:       *maxReq,
@@ -57,7 +58,7 @@ func addHandle() {
 		os.Exit(1)
 	}
 
-	r := strings.NewReader(string(body))
+	r := bytes.NewReader(body)
 
 	req, err := http.NewRequest(http.MethodPost, proto+*host+addRequestPath, r)
 	if err != nil {
@@ -81,7 +82,7 @@ func addHandle() {
 }
 
 func removeHandle() {
-	removeStruct := RemoveRequestBodyJSON{
+	removeStruct := removeRequestBodyJSON{
 		Url: *remove,
 	}
 	body, err := json.Marshal(removeStruct)
@@ -89,7 +90,7 @@ func removeHandle() {
 		fmt.Println("Failed to marshal JSON: ", err)
 	}
 
-	r := strings.NewReader(string(body))
+	r := bytes.NewReader(body)
 
 	req, err := http.NewRequest(http.MethodDelete, proto+*host+removeRequestPath, r)
 	if err != nil {
@@ -130,8 +131,7 @@ func handleResponse(resp *http.Response) error {
 func main() {
 	flag.Parse()
 
-	if *host == "" {
-		fmt.Println("Host is not defined!")
+	if *help {
 		flag.Usage()
 		return
 	}
