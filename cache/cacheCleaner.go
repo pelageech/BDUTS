@@ -12,8 +12,6 @@ import (
 	"github.com/charmbracelet/log"
 )
 
-const initMemorySliceSize = 1024
-
 type CacheCleaner struct {
 	dbFile      *os.File
 	maxFileSize int64

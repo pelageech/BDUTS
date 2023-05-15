@@ -13,8 +13,6 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-const sizeOfInt32 = 4
-
 // GetPageFromCache gets corresponding page and its metadata
 // and returns it if it exists. Uses some parameters for building
 // a request key, see in cache package and cacheConfig file.

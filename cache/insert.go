@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	infinityTime = time.Unix(0, 0).AddDate(7999, 12, 31)
+	infinityTime = time.Unix(0, 0).AddDate(infinityTimeYear, infinityTimeMonth, infinityTimeDay)
 	nullTime     = time.Time{}
 )
 
@@ -63,7 +63,7 @@ func (p *CachingProperties) insertPageMetadataToDB(key []byte, meta *PageMetadat
 		}
 		if err == nil || errors.Is(err, bolt.ErrBucketExists) {
 			_ = b.Put([]byte(pageMetadataKey), value)
-			bs := make([]byte, 4)
+			bs := make([]byte, sizeOfInt32)
 			_ = b.Put([]byte(usesKey), bs)
 		}
 
