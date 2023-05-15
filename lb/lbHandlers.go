@@ -18,6 +18,7 @@ func (lb *LoadBalancer) LoadBalancerHandler(rw http.ResponseWriter, req *http.Re
 	if err := timer.MakeRequestTimeTracker(lb.loadBalancerHandler, timer.SaveTimeFullTrip, true)(rw, req); err != nil {
 		logger.Error("Unsuccessful request processing: ", "err", err)
 	}
+	metrics.UpdateRequestBodySize(req)
 }
 
 // LoadBalancerHandler is the main Handle func.
@@ -72,8 +73,13 @@ func (lb *LoadBalancer) getPageHandler(rw http.ResponseWriter, req *http.Request
 	}
 
 	_, err = rw.Write(cacheItem.Body)
+	if err != nil {
+		return err
+	}
 
-	return err
+	metrics.UpdateResponseBodySize(float64(len(cacheItem.Body)))
+
+	return nil
 }
 
 func (lb *LoadBalancer) backendHandler(rw http.ResponseWriter, req *http.Request) error {
@@ -120,6 +126,9 @@ ChooseServer:
 		return fmt.Errorf("[%s]: %w", server.URL(), err)
 	}
 
+	metrics.UpdateResponseBodySize(float64(len(byteArray)))
+
 	go lb.SaveToCache(req, resp, byteArray)
+
 	return nil
 }
