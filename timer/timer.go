@@ -1,12 +1,12 @@
 package timer
 
 import (
-	"github.com/pelageech/BDUTS/metrics"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/pelageech/BDUTS/metrics"
 )
 
 var logger = log.NewWithOptions(os.Stderr, log.Options{
