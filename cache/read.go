@@ -13,6 +13,8 @@ import (
 	"github.com/boltdb/bolt"
 )
 
+const sizeOfInt32 = 4
+
 // GetPageFromCache gets corresponding page and its metadata
 // and returns it if it exists. Uses some parameters for building
 // a request key, see in cache package and cacheConfig file.
@@ -83,7 +85,7 @@ func (p *CachingProperties) getPageMetadata(key []byte) (*PageMetadata, error) {
 			return errors.New("value ot found")
 		}
 
-		incr := make([]byte, 4)
+		incr := make([]byte, sizeOfInt32)
 		binary.LittleEndian.PutUint32(incr, binary.LittleEndian.Uint32(bs)+uint32(1))
 		_ = b.Put([]byte(usesKey), incr)
 		return nil
