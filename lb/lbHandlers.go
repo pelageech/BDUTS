@@ -18,6 +18,7 @@ func (lb *LoadBalancer) LoadBalancerHandler(rw http.ResponseWriter, req *http.Re
 	if err := timer.MakeRequestTimeTracker(lb.loadBalancerHandler, timer.SaveTimeFullTrip, true)(rw, req); err != nil {
 		logger.Error("Unsuccessful request processing: ", "err", err)
 	}
+	metrics.UpdateRequestBodySize(req)
 }
 
 // LoadBalancerHandler is the main Handle func.

@@ -1,6 +1,7 @@
 package timer
 
 import (
+	"github.com/pelageech/BDUTS/metrics"
 	"net/http"
 	"os"
 	"time"
@@ -41,14 +42,17 @@ func MakeRequestTimeTracker(
 // Pointer is used for saving calling in `defer` functions.
 func SaveTimerDataGotFromCache(cacheTime time.Duration) {
 	logger.Infof("Full transferring time: %v", cacheTime)
+	metrics.UpdateCacheProcessingTime(float64(cacheTime.Milliseconds()))
 }
 
 // SaveTimeDataBackend is used for saving backend to DB.
 // Uses pointer for using in functions with `defer` prefix.
 func SaveTimeDataBackend(backendTime time.Duration) {
 	logger.Infof("Backend time: %v", backendTime)
+	metrics.UpdateBackendProcessingTime(float64(backendTime.Milliseconds()))
 }
 
 func SaveTimeFullTrip(fullTime time.Duration) {
 	logger.Infof("Full round trip time: %v", fullTime)
+	metrics.UpdateFullTripTime(float64(fullTime.Milliseconds()))
 }

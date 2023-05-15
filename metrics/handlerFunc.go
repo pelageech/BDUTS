@@ -14,16 +14,19 @@ import (
 const timeObserve = 1 * time.Second
 
 type Metrics struct {
-	CPU              prometheus.Gauge
-	MaxMemory        prometheus.Gauge
-	AllocatedMemory  prometheus.Gauge
-	CacheSize        prometheus.Gauge
-	CachePagesCount  prometheus.Gauge
-	RequestsNow      prometheus.Gauge
-	Requests         prometheus.Counter
-	RequestsByCache  prometheus.Counter
-	RequestBodySize  prometheus.Histogram
-	ResponseBodySize prometheus.Histogram
+	CPU                   prometheus.Gauge
+	MaxMemory             prometheus.Gauge
+	AllocatedMemory       prometheus.Gauge
+	CacheSize             prometheus.Gauge
+	CachePagesCount       prometheus.Gauge
+	RequestsNow           prometheus.Gauge
+	Requests              prometheus.Counter
+	RequestsByCache       prometheus.Counter
+	RequestBodySize       prometheus.Histogram
+	ResponseBodySize      prometheus.Histogram
+	BackendProcessingTime prometheus.Histogram
+	CacheProcessingTime   prometheus.Histogram
+	FullTripTime          prometheus.Summary
 }
 
 func NewMetrics(reg prometheus.Registerer) *Metrics {
@@ -46,21 +49,32 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 		}),
 		AllocatedMemory: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "bduts_allocated_memory",
+			Help: "How many memory is allocated now",
 		}),
 		CacheSize: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "bduts_cache_size_used",
+			Help: "The usage of cache. Shows its occupancy in bytes",
 		}),
 		CachePagesCount: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "bduts_cache_pages_count",
 			Help: "How many pages are stored in cache now?",
 		}),
 		RequestBodySize: prometheus.NewHistogram(prometheus.HistogramOpts{
-			Name:    "request_body_size",
-			Buckets: []float64{0.5, 0.9, 0.99},
+			Name: "bduts_request_body_size",
+			Help: "A histogram of request body sizes",
 		}),
 		ResponseBodySize: prometheus.NewHistogram(prometheus.HistogramOpts{
-			Name:    "response_body_size",
-			Buckets: []float64{0.5, 0.9, 0.99},
+			Name: "bduts_response_body_size",
+			Help: "A histogram of response body sizes",
+		}),
+		BackendProcessingTime: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name: "bduts_backend_processing_time",
+		}),
+		CacheProcessingTime: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name: "bduts_cache_processing_time",
+		}),
+		FullTripTime: prometheus.NewSummary(prometheus.SummaryOpts{
+			Name: "bduts_full_trip_time",
 		}),
 	}
 	reg.MustRegister(
@@ -73,6 +87,9 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 		m.RequestsByCache,
 		m.RequestBodySize,
 		m.ResponseBodySize,
+		m.BackendProcessingTime,
+		m.CacheProcessingTime,
+		m.FullTripTime,
 	)
 	return m
 }
@@ -113,6 +130,18 @@ func UpdateRequestBodySize(req *http.Request) {
 
 func UpdateResponseBodySize(size float64) {
 	GlobalMetrics.ResponseBodySize.Observe(size)
+}
+
+func UpdateBackendProcessingTime(time float64) {
+	GlobalMetrics.BackendProcessingTime.Observe(time)
+}
+
+func UpdateCacheProcessingTime(time float64) {
+	GlobalMetrics.CacheProcessingTime.Observe(time)
+}
+
+func UpdateFullTripTime(time float64) {
+	GlobalMetrics.FullTripTime.Observe(time)
 }
 
 func Init(initCacheSize int64, initPagesCount int) {
