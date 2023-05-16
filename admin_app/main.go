@@ -21,6 +21,11 @@ type removeRequestBodyJSON struct {
 	Url string
 }
 
+type authRequestBodyJSON struct {
+	Username string
+	Password string
+}
+
 const (
 	defaultHost    = "localhost"
 	defaultUrl     = ""
@@ -31,16 +36,27 @@ const (
 	proto             = "https://"
 	addRequestPath    = "/serverPool/add"
 	removeRequestPath = "/serverPool/remove"
+	authRequestPath   = "/admin/signin"
+
+	defaultLogin    = ""
+	defaultPassword = ""
 )
 
 var (
-	host    = flag.String("h", defaultHost, "host:port of the load balancer for sending a request (without a protocol)")
+	help = flag.Bool("help", false, "show this message")
+
+	host  = flag.String("H", defaultHost, "host:port of the load balancer for sending a request (without a protocol)")
+	token = flag.String("t", defaultToken, `jwt token without "Bearer " for an authorization`)
+
 	add     = flag.String("add", defaultUrl, "adds a new backend to server pool, requires URL (-tout and -max are optional params)")
-	remove  = flag.String("remove", defaultUrl, "remove the backend from server pool, requires URL")
 	timeout = flag.Int("tout", defaultTimeout, "tcp timeout for backend replying in milliseconds")
 	maxReq  = flag.Int("max", defaultMaxReq, "amount of request able to be being processed in the same time")
-	token   = flag.String("t", defaultToken, `jwt token without "Bearer " for an authorization`)
-	help    = flag.Bool("help", false, "show this message")
+
+	remove = flag.String("remove", defaultUrl, "remove the backend from server pool, requires URL")
+
+	getToken = flag.Bool("get-token", false, "get jwt-token, requires -login and -password")
+	login    = flag.String("login", defaultLogin, "login for getting jwt-token")
+	password = flag.String("password", defaultPassword, "password for getting jwt-token")
 
 	tr = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} // todo: configure tls in right way
 	c  = &http.Client{Transport: tr}
@@ -88,6 +104,7 @@ func removeHandle() {
 	body, err := json.Marshal(removeStruct)
 	if err != nil {
 		fmt.Println("Failed to marshal JSON: ", err)
+		os.Exit(1)
 	}
 
 	r := bytes.NewReader(body)
@@ -114,6 +131,43 @@ func removeHandle() {
 	fmt.Println("Successfully removed")
 }
 
+func getTokenHandle() {
+	authStruct := authRequestBodyJSON{
+		Username: *login,
+		Password: *password,
+	}
+	body, err := json.Marshal(authStruct)
+	if err != nil {
+		fmt.Println("Failed to marshal JSON: ", err)
+		os.Exit(1)
+	}
+
+	r := bytes.NewReader(body)
+
+	req, err := http.NewRequest(http.MethodPost, proto+*host+authRequestPath, r)
+	if err != nil {
+		fmt.Println("An error occurred while creating a request: ", err)
+		os.Exit(1)
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		fmt.Println("An error occurred while processing the request: ", err)
+		os.Exit(1)
+	}
+
+	token := resp.Header.Get("Authorization")
+	if token != "" {
+		fmt.Println(token)
+		return
+	}
+
+	err = handleResponse(resp)
+	if err != nil {
+		fmt.Println("Something went wrong: ", err)
+	}
+}
+
 func handleResponse(resp *http.Response) error {
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusUnauthorized {
@@ -133,6 +187,11 @@ func main() {
 
 	if *help {
 		flag.Usage()
+		return
+	}
+
+	if *getToken {
+		getTokenHandle()
 		return
 	}
 
