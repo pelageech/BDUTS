@@ -128,7 +128,9 @@ func (lb *LoadBalancer) HealthChecker() {
 	}
 }
 
-// the balancer supports only HTTP 1.1 version because
+// isHTTPVersionSupported checks if the HTTP version is supported.
+//
+// The balancer supports only HTTP 1.1 version because
 // the backends use a common HTTP protocol.
 func isHTTPVersionSupported(req *http.Request) bool {
 	if maj, min, ok := http.ParseHTTPVersion(req.Proto); ok {
