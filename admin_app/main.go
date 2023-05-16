@@ -186,7 +186,18 @@ func main() {
 	flag.Parse()
 
 	if *help {
+		fmt.Println("\t---| BDUTS Admin panel |---")
 		flag.Usage()
+		fmt.Println("\nThis app provides you with dealing with server pool of the balancer.\n" +
+			"Before it you must get a token which permits you adding and removing backends.\n" +
+			"A simple usage:\n" +
+			"\t-get-token -H localhost:8080 -login admin -password admin\n" +
+			"where, of course, your own host, login and password. There will be a bearer token.\n\n" +
+			"To add a new backend use this:\n" +
+			"\t-H localhost:8080 -add http://192.168.15.1:9090 -tout 1000 -max 10 -t <token>\n" +
+			"Notice that -tout and -max are optional.\n\n" +
+			"To remove a backend use this:\n" +
+			"\t-H localhost:8080 -remove http://192.168.15.1:9090 -t <token>")
 		return
 	}
 
