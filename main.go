@@ -219,7 +219,7 @@ func main() {
 	if !found {
 		logger.Fatal("JWT signing key is not found")
 	}
-	authSvc := auth.New(dbService, sender, validate, []byte(signKey), logger)
+	authSvc := auth.New(&dbService, sender, validate, []byte(signKey), logger)
 
 	// Create a CORS middleware handler function
 	cors := func(h http.Handler) http.Handler {

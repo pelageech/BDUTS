@@ -15,7 +15,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v5"
 	_ "github.com/lib/pq"
-	"github.com/pelageech/BDUTS/db"
 	"github.com/pelageech/BDUTS/email"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -34,17 +33,24 @@ const (
 
 // Service is a service for user authentication.
 type Service struct {
-	db        db.Service
+	db        Storer
 	sender    *email.Sender
 	validator *validator.Validate
 	signKey   []byte
 	logger    *log.Logger
 }
 
+type Storer interface {
+	InsertUser(username, salt, hash, email string) (errs []error)
+	ChangePassword(username, salt, hash string) (err error)
+	GetSaltAndHash(username string) (salt, hash string, err error)
+	GetEmail(username string) (email string, err error)
+}
+
 type userKey struct{}
 
 // New creates a new Service.
-func New(db db.Service, sender *email.Sender, validator *validator.Validate, signKey []byte, logger *log.Logger) *Service {
+func New(db Storer, sender *email.Sender, validator *validator.Validate, signKey []byte, logger *log.Logger) *Service {
 	return &Service{
 		db:        db,
 		sender:    sender,
