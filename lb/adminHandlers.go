@@ -10,6 +10,8 @@ import (
 	"github.com/pelageech/BDUTS/config"
 )
 
+const int32BitsAmount = 31 // int32, not uint32
+
 // AddForm is a structure which is parsed from a POST-request
 // processed by AddServerHandler.
 type AddForm struct {
@@ -48,7 +50,7 @@ func (lb *LoadBalancer) AddServerHandler(rw http.ResponseWriter, req *http.Reque
 			http.Error(rw, "Bad Request: maxReq is below zero or equal", http.StatusBadRequest)
 			return
 		}
-		add.MaximalRequests %= 1 << 31 // int32
+		add.MaximalRequests %= 1 << int32BitsAmount
 
 		server := config.ServerConfig{
 			URL:                   add.Url,

@@ -83,7 +83,7 @@ func (p *CachingProperties) getPageMetadata(key []byte) (*PageMetadata, error) {
 			return errors.New("value ot found")
 		}
 
-		incr := make([]byte, 4)
+		incr := make([]byte, sizeOfInt32)
 		binary.LittleEndian.PutUint32(incr, binary.LittleEndian.Uint32(bs)+uint32(1))
 		_ = b.Put([]byte(usesKey), incr)
 		return nil

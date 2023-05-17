@@ -9,6 +9,8 @@ import (
 	"github.com/pelageech/BDUTS/config"
 )
 
+const initCurrentBackend = -1
+
 var logger = log.NewWithOptions(os.Stderr, log.Options{
 	ReportTimestamp: true,
 	ReportCaller:    true,
@@ -32,7 +34,7 @@ func NewServerPool() *ServerPool {
 	return &ServerPool{
 		mux:     sync.Mutex{},
 		servers: s,
-		current: -1,
+		current: initCurrentBackend,
 	}
 }
 

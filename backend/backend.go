@@ -14,6 +14,8 @@ import (
 	"github.com/pelageech/BDUTS/config"
 )
 
+const holdUpAfterAssign = 100
+
 // Backend is a struct that contains all the configuration
 // of the backend server.
 type Backend struct {
@@ -81,7 +83,7 @@ func (b *Backend) AssignRequest() bool {
 	select {
 	case b.requestChan <- true:
 		return true
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(holdUpAfterAssign * time.Millisecond):
 		return false
 	}
 }

@@ -54,7 +54,17 @@ const (
 )
 
 const (
-	bufferSize = 128 << 10
+	bufferSize          = 128 << 10
+	infinityTimeYear    = 7999
+	infinityTimeMonth   = 12
+	infinityTimeDay     = 31
+	initMemorySliceSize = 1024
+	sizeOfInt32         = 4
+)
+
+const (
+	readWriteOwner             = 0o600
+	readWriteExecuteOwnerGroup = 0o770
 )
 
 var (
@@ -213,7 +223,7 @@ type responseDirectives struct {
 
 // OpenDatabase opens a database file.
 func OpenDatabase(path string) (*bolt.DB, error) {
-	db, err := bolt.Open(path, 0o600, nil)
+	db, err := bolt.Open(path, readWriteOwner, nil)
 	if err != nil {
 		return nil, err
 	}

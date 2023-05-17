@@ -67,7 +67,7 @@ func (p *CachingProperties) deleteExpiredCache() (int64, error) {
 	}
 
 	size := int64(0)
-	expiredKeys := make([]expiredItem, 0, 1024)
+	expiredKeys := make([]expiredItem, 0, initMemorySliceSize)
 
 	addExpiredKeys := func(name []byte, b *bolt.Bucket) error {
 		v := b.Get([]byte(pageMetadataKey))
