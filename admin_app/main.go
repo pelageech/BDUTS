@@ -36,9 +36,6 @@ type changeBodyJSON struct {
 	NewPassword        string
 	NewPasswordConfirm string
 }
-type deleteBodyJSON struct {
-	Username string
-}
 
 const (
 	empty          = ""
@@ -52,7 +49,7 @@ const (
 	signInRequestPath = "/admin/signin"
 	signUpRequestPath = "/admin/signup"
 	changeRequestPath = "/admin/password"
-	deleteRequestPath = "/admin/delete"
+	deleteRequestPath = "/admin"
 )
 
 var (
@@ -266,7 +263,11 @@ func deleteHandle() {
 		fmt.Println("An error occurred while creating a request: ", err)
 		os.Exit(1)
 	}
-	req.URL.Query().Set("username", *login)
+
+	q := req.URL.Query()
+	q.Add("username", *login)
+	req.URL.RawQuery = q.Encode()
+
 	req.Header.Add("Authorization", "Bearer "+*token)
 
 	resp, err := c.Do(req)
@@ -298,7 +299,7 @@ func handleResponse(resp *http.Response) error {
 
 func handleArgs() {
 	if *help {
-		fmt.Println("\n\t---| BDUTS Admin panel |---\n")
+		fmt.Printf("\n\t---| BDUTS Admin panel |---\n\n")
 		flag.Usage()
 		fmt.Println("\nThis app provides you with dealing with server pool of the balancer.\n" +
 			"Before it you must get a token which permits you adding and removing backends.\n" +
@@ -316,8 +317,7 @@ func handleArgs() {
 			"- Sign Up\n" +
 			"\t-signup -H localhost:8080 -login admin -email example@mail.ru -t <token>\n\n" +
 			"- Change Password\n" +
-			"\t-change -H localhost:8080 -old oldPass -new newPass -confirm newPass -t <token>\n" +
-			"Note: token must belong to user which password you'd like to change.\n\n" +
+			"\t-change -H localhost:8080 -old oldPass -new newPass -confirm newPass -t <token>\n\n" +
 			"- Delete user\n" +
 			"\t-del-user -H localhost:8080 -login admin -t <token>")
 		return
