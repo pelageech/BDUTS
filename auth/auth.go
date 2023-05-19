@@ -6,11 +6,13 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/boltdb/bolt"
 	"github.com/charmbracelet/log"
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v5"
@@ -147,6 +149,10 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 
 	err = s.db.InsertUser(user.Username, salt, hashString, user.Email)
 	if err != nil {
+		if errors.Is(err, bolt.ErrBucketExists) {
+			http.Error(w, "User already exists", http.StatusConflict)
+			return
+		}
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
