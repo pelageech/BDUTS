@@ -2,7 +2,9 @@ package main
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"sync"
@@ -121,6 +123,13 @@ func cacheCleanerConfigure(dbControllerTicker *time.Ticker, maxCacheSize int64) 
 	return cache.NewCacheCleaner(dbDir, maxCacheSize, dbFillFactor, dbControllerTicker)
 }
 
+func isFileExist(file string) bool {
+	if _, err := os.Stat(file); errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+	return true
+}
+
 func main() {
 	logger = log.NewWithOptions(os.Stderr, log.Options{
 		ReportCaller:    true,
@@ -193,11 +202,20 @@ func main() {
 
 	dbService := db.Service{}
 	dbService.SetLogger(logger)
+
+	// if users database doesn't exist, create it and add admin user
+	// with login "admin" and password "admin"
+	addDefaultUser := false
+	if !isFileExist(usersDB) {
+		addDefaultUser = true
+	}
+
 	err = dbService.Connect(usersDB, usersDBPermissions, nil)
 	if err != nil {
 		logger.Fatal("Unable to connect to users bolt database", "err", err)
 	}
 	logger.Info("Connected to users bolt database")
+
 	defer func(dbService *db.Service) {
 		err = dbService.Close()
 		if err != nil {
@@ -221,6 +239,13 @@ func main() {
 		logger.Fatal("JWT signing key is not found")
 	}
 	authSvc := auth.New(&dbService, sender, validate, []byte(signKey), logger)
+
+	if addDefaultUser {
+		err = authSvc.SignUpDefaultUser()
+		if err != nil {
+			logger.Fatal("Unable to add default user", "err", err)
+		}
+	}
 
 	// Create a CORS middleware handler function
 	cors := func(h http.Handler) http.Handler {

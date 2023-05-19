@@ -32,6 +32,9 @@ const (
 	changePasswordError   = "Password length must be between 10 and 25 characters. New password and new password confirmation must match."
 	signUpValidationError = "Username must be between 4 and 20 characters. Username must contain only letters and numbers. Email must be valid."
 	signInValidationError = "Username must be between 4 and 20 characters. Username must contain only letters and numbers. Password required."
+
+	defaultUser     = "admin"
+	defaultPassword = "verySecureAdminPassword12345"
 )
 
 // Service is a service for user authentication.
@@ -75,6 +78,30 @@ type ChangePasswordUser struct {
 	NewPasswordConfirm string `json:"newPasswordConfirm" validate:"required,eqfield=NewPassword"`
 }
 
+func (s *Service) SignUpDefaultUser() error {
+	salt, err := s.generateSalt()
+	if err != nil {
+		return fmt.Errorf("failed to generate salt: %w", err)
+	}
+
+	// Hash password
+	hash, err := bcrypt.GenerateFromPassword([]byte(defaultPassword+salt), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	// Convert the hashed password to a string
+	hashString := string(hash)
+
+	err = s.db.InsertUser(defaultUser, salt, hashString, "admin@localhost")
+	if err != nil {
+		return fmt.Errorf("failed to insert default user: %w", err)
+	}
+
+	s.logger.Info("Default user created")
+	return nil
+}
+
 func (s *Service) generateRandomPassword() (password string, err error) {
 	passwordBytes := make([]byte, passwordLength)
 	_, err = rand.Read(passwordBytes)
@@ -90,7 +117,6 @@ func (s *Service) generateSalt() (salt string, err error) {
 	saltBytes := make([]byte, saltLength)
 	_, err = rand.Read(saltBytes)
 	if err != nil {
-		s.logger.Error("Failed to generate salt", "err", err)
 		return
 	}
 	salt = base64.URLEncoding.EncodeToString(saltBytes)
