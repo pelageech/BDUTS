@@ -7,3 +7,5 @@ resources/Key.key
 backends
 data
 grafana
+db/users.db
+db/users.db.lock

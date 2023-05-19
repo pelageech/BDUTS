@@ -138,7 +138,7 @@ func (p *ServerPool) GetNextPeer() (*Backend, error) {
 
 // ServersURLs returns the URLs of the servers in the server pool.
 func (p *ServerPool) ServersURLs() []string {
-	var urls []string
+	urls := make([]string, 0, len(p.Servers()))
 	for _, v := range p.Servers() {
 		urls = append(urls, v.URL().String())
 	}

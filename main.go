@@ -2,7 +2,9 @@ package main
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"sync"
@@ -37,6 +39,9 @@ const (
 	readWriteExecuteOwner            = 0o700
 
 	goroutinesToWait = 2
+
+	usersDB            = "./db/users.db"
+	usersDBPermissions = 0o600
 )
 
 var logger *log.Logger
@@ -118,6 +123,13 @@ func cacheCleanerConfigure(dbControllerTicker *time.Ticker, maxCacheSize int64) 
 	return cache.NewCacheCleaner(dbDir, maxCacheSize, dbFillFactor, dbControllerTicker)
 }
 
+func isFileExist(file string) bool {
+	if _, err := os.Stat(file); errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+	return true
+}
+
 func main() {
 	logger = log.NewWithOptions(os.Stderr, log.Options{
 		ReportCaller:    true,
@@ -188,22 +200,29 @@ func main() {
 	go loadBalancer.HealthChecker()
 	go loadBalancer.CacheProps().Observe()
 
-	// connect to lb_admins database
-	postgresUser := os.Getenv("POSTGRES_USER")
-	password := os.Getenv("USER_PASSWORD")
-	host := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbName := os.Getenv("DB_NAME")
 	dbService := db.Service{}
 	dbService.SetLogger(logger)
-	err = dbService.Connect(postgresUser, password, host, dbPort, dbName)
-	if err != nil {
-		logger.Fatal("Unable to connect to postgresql database", "err", err)
+
+	// if users database doesn't exist, create it and add admin user
+	// with login "admin" and password "admin"
+	addDefaultUser := false
+	if !isFileExist(usersDB) {
+		addDefaultUser = true
 	}
+
+	err = dbService.Connect(usersDB, usersDBPermissions, nil)
+	if err != nil {
+		logger.Fatal("Unable to connect to users bolt database", "err", err)
+	}
+	logger.Info("Connected to users bolt database")
+
 	defer func(dbService *db.Service) {
-		// Do not log the error since it has already been logged in dbService.Close()
-		// However, return the error in case someone wants to implement multiple attempts to close the database
-		_ = dbService.Close()
+		err = dbService.Close()
+		if err != nil {
+			logger.Warn("Unable to close users bolt database", "err", err)
+			return
+		}
+		logger.Info("Users bolt database is closed")
 	}(&dbService)
 
 	// set up email
@@ -219,7 +238,14 @@ func main() {
 	if !found {
 		logger.Fatal("JWT signing key is not found")
 	}
-	authSvc := auth.New(dbService, sender, validate, []byte(signKey), logger)
+	authSvc := auth.New(&dbService, sender, validate, []byte(signKey), logger)
+
+	if addDefaultUser {
+		err = authSvc.SignUpDefaultUser()
+		if err != nil {
+			logger.Fatal("Unable to add default user", "err", err)
+		}
+	}
 
 	// Create a CORS middleware handler function
 	cors := func(h http.Handler) http.Handler {
@@ -250,6 +276,7 @@ func main() {
 	http.Handle("/admin/signup", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.SignUp))))
 	http.Handle("/admin/password", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.ChangePassword))))
 	http.Handle("/admin/signin", cors(http.HandlerFunc(authSvc.SignIn)))
+	http.Handle("/admin", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.DeleteUser))))
 
 	// Config TLS: setting a pair crt-key
 	Crt, _ := tls.LoadX509KeyPair("resources/Cert.crt", "resources/Key.key")
