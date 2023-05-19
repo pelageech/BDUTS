@@ -21,42 +21,59 @@ type removeRequestBodyJSON struct {
 	Url string
 }
 
-type authRequestBodyJSON struct {
+type signInBodyJSON struct {
 	Username string
 	Password string
 }
 
+type signUpBodyJSON struct {
+	Username string
+	Email    string
+}
+
+type changeBodyJSON struct {
+	OldPassword        string
+	NewPassword        string
+	NewPasswordConfirm string
+}
+
 const (
+	empty          = ""
 	defaultHost    = "localhost"
-	defaultUrl     = ""
 	defaultTimeout = 2000
 	defaultMaxReq  = 1
-	defaultToken   = ""
 
 	proto             = "https://"
 	addRequestPath    = "/serverPool/add"
 	removeRequestPath = "/serverPool/remove"
-	authRequestPath   = "/admin/signin"
-
-	defaultLogin    = ""
-	defaultPassword = ""
+	signInRequestPath = "/admin/signin"
+	signUpRequestPath = "/admin/signup"
+	changeRequestPath = "/admin/password"
 )
 
 var (
 	help = flag.Bool("help", false, "show this message")
 
 	host  = flag.String("H", defaultHost, "host:port of the load balancer for sending a request (without a protocol)")
-	token = flag.String("t", defaultToken, `jwt token without "Bearer " for an authorization`)
+	token = flag.String("t", empty, `jwt token without "Bearer " for an authorization`)
 
-	add     = flag.String("add", defaultUrl, "adds a new backend to server pool, requires URL (-tout and -max are optional params)")
-	timeout = flag.Int("tout", defaultTimeout, "tcp timeout for backend replying in milliseconds")
+	add     = flag.String("add", empty, "adds a new backend to server pool, requires URL (-tout and -max are optional params)")
+	timeout = flag.Int("timeout", defaultTimeout, "tcp timeout for backend replying in milliseconds")
 	maxReq  = flag.Int("max", defaultMaxReq, "amount of request able to be being processed in the same time")
 
-	remove = flag.String("remove", defaultUrl, "remove the backend from server pool, requires URL")
+	remove = flag.String("remove", empty, "remove the backend from server pool, requires URL")
 
-	getToken = flag.Bool("get-token", false, "get jwt-token, requires -login and -password")
-	login    = flag.String("login", defaultLogin, "login for getting jwt-token")
-	password = flag.String("password", defaultPassword, "password for getting jwt-token")
+	signIn   = flag.Bool("signin", false, "sign in and get jwt-token, requires -login and -password")
+	login    = flag.String("login", empty, "login for getting jwt-token")
+	password = flag.String("password", empty, "password for getting jwt-token")
+
+	signUp = flag.Bool("signup", false, "registers a new admin in a system, requires login and email")
+	email  = flag.String("email", empty, "email is required to sign up. You get a password there")
+
+	change  = flag.Bool("change", false, "a request for server to change password. Requires old, new and confirming passwords and token")
+	oldPass = flag.String("old", empty, "an old password")
+	newPass = flag.String("new", empty, "a new password")
+	confirm = flag.String("confirm", empty, "confirm a new password")
 
 	tr = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} // todo: configure tls in right way
 	c  = &http.Client{Transport: tr}
@@ -131,12 +148,12 @@ func removeHandle() {
 	fmt.Println("Successfully removed")
 }
 
-func getTokenHandle() {
-	authStruct := authRequestBodyJSON{
+func signInHandle() {
+	signInStruct := signInBodyJSON{
 		Username: *login,
 		Password: *password,
 	}
-	body, err := json.Marshal(authStruct)
+	body, err := json.Marshal(signInStruct)
 	if err != nil {
 		fmt.Println("Failed to marshal JSON: ", err)
 		os.Exit(1)
@@ -144,7 +161,7 @@ func getTokenHandle() {
 
 	r := bytes.NewReader(body)
 
-	req, err := http.NewRequest(http.MethodPost, proto+*host+authRequestPath, r)
+	req, err := http.NewRequest(http.MethodPost, proto+*host+signInRequestPath, r)
 	if err != nil {
 		fmt.Println("An error occurred while creating a request: ", err)
 		os.Exit(1)
@@ -168,6 +185,75 @@ func getTokenHandle() {
 	}
 }
 
+func signUpHandle() {
+	signUpStruct := signUpBodyJSON{
+		Username: *login,
+		Email:    *email,
+	}
+	body, err := json.Marshal(signUpStruct)
+	if err != nil {
+		fmt.Println("Failed to marshal JSON: ", err)
+		os.Exit(1)
+	}
+
+	r := bytes.NewReader(body)
+
+	req, err := http.NewRequest(http.MethodPost, proto+*host+signUpRequestPath, r)
+	if err != nil {
+		fmt.Println("An error occurred while creating a request: ", err)
+		os.Exit(1)
+	}
+
+	req.Header.Add("Authorization", "Bearer "+*token)
+
+	resp, err := c.Do(req)
+	if err != nil {
+		fmt.Println("An error occurred while processing the request: ", err)
+		os.Exit(1)
+	}
+
+	err = handleResponse(resp)
+	if err != nil {
+		fmt.Println("Something went wrong: ", err)
+		os.Exit(1)
+	}
+}
+
+func changeHandle() {
+	changeStruct := changeBodyJSON{
+		OldPassword:        *oldPass,
+		NewPassword:        *newPass,
+		NewPasswordConfirm: *confirm,
+	}
+	body, err := json.Marshal(changeStruct)
+	if err != nil {
+		fmt.Println("Failed to marshal JSON: ", err)
+		os.Exit(1)
+	}
+
+	r := bytes.NewReader(body)
+
+	req, err := http.NewRequest(http.MethodPatch, proto+*host+changeRequestPath, r)
+	if err != nil {
+		fmt.Println("An error occurred while creating a request: ", err)
+		os.Exit(1)
+	}
+
+	req.Header.Add("Authorization", "Bearer "+*token)
+
+	resp, err := c.Do(req)
+	if err != nil {
+		fmt.Println("An error occurred while processing the request: ", err)
+		os.Exit(1)
+	}
+
+	err = handleResponse(resp)
+	if err != nil {
+		fmt.Println("Something went wrong: ", err)
+		os.Exit(1)
+	}
+}
+
 func handleResponse(resp *http.Response) error {
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusUnauthorized {
@@ -182,9 +268,7 @@ func handleResponse(resp *http.Response) error {
 	return nil
 }
 
-func main() {
-	flag.Parse()
-
+func handleArgs() {
 	if *help {
 		fmt.Println("\t---| BDUTS Admin panel |---")
 		flag.Usage()
@@ -201,20 +285,38 @@ func main() {
 		return
 	}
 
-	if *getToken {
-		getTokenHandle()
+	if *signIn {
+		signInHandle()
 		return
 	}
 
-	if *token == defaultToken {
+	if *token == empty {
 		fmt.Println("Warning: you have not defined a bearer token. ")
 	}
 
-	if *add != defaultUrl {
+	if *add != empty {
 		addHandle()
+		return
 	}
 
-	if *remove != defaultUrl {
+	if *remove != empty {
 		removeHandle()
+		return
 	}
+
+	if *signUp {
+		signUpHandle()
+		return
+	}
+
+	if *change {
+		changeHandle()
+		return
+	}
+}
+
+func main() {
+	flag.Parse()
+
+	handleArgs()
 }
