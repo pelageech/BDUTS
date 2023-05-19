@@ -49,6 +49,7 @@ linters:
     - makezero
     - misspell
     - prealloc
+    - whitespace
 
 issues:
   exclude-rules:
