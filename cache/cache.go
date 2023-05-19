@@ -331,7 +331,6 @@ func loadRequestDirectives(header http.Header) *requestDirectives {
 				_, t, _ := strings.Cut(v, "=")
 				age, _ := strconv.Atoi(t)
 				result.MinFresh = time.Now().Add(time.Duration(age) * time.Second)
-
 			}
 		}
 	}

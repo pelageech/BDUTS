@@ -38,6 +38,18 @@ linters:
     - goheader
     - goimports
     - gomnd
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - grouper
+    - importas
+    - interfacebloat
+    - ireturn
+    - maintidx
+    - makezero
+    - misspell
+    - prealloc
+    - whitespace
 
 issues:
   exclude-rules:
