@@ -37,6 +37,9 @@ const (
 	readWriteExecuteOwner            = 0o700
 
 	goroutinesToWait = 2
+
+	usersDB            = "users.db"
+	usersDBPermissions = 0o600
 )
 
 var logger *log.Logger
@@ -188,22 +191,20 @@ func main() {
 	go loadBalancer.HealthChecker()
 	go loadBalancer.CacheProps().Observe()
 
-	// connect to lb_admins database
-	postgresUser := os.Getenv("POSTGRES_USER")
-	password := os.Getenv("USER_PASSWORD")
-	host := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbName := os.Getenv("DB_NAME")
 	dbService := db.Service{}
 	dbService.SetLogger(logger)
-	err = dbService.Connect(postgresUser, password, host, dbPort, dbName)
+	err = dbService.Connect(usersDB, usersDBPermissions, nil)
 	if err != nil {
-		logger.Fatal("Unable to connect to postgresql database", "err", err)
+		logger.Fatal("Unable to connect to users bolt database", "err", err)
 	}
+	logger.Info("Connected to users bolt database")
 	defer func(dbService *db.Service) {
-		// Do not log the error since it has already been logged in dbService.Close()
-		// However, return the error in case someone wants to implement multiple attempts to close the database
-		_ = dbService.Close()
+		err = dbService.Close()
+		if err != nil {
+			logger.Warn("Unable to close users bolt database", "err", err)
+			return
+		}
+		logger.Info("Users bolt database is closed")
 	}(&dbService)
 
 	// set up email

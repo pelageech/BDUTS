@@ -41,7 +41,7 @@ type Service struct {
 }
 
 type Storer interface {
-	InsertUser(username, salt, hash, email string) (errs []error)
+	InsertUser(username, salt, hash, email string) (err error)
 	ChangePassword(username, salt, hash string) (err error)
 	GetSaltAndHash(username string) (salt, hash string, err error)
 	GetEmail(username string) (email string, err error)
@@ -111,8 +111,7 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 	var user SignUpUser
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
-		s.logger.Warn("Failed to decode SignUpUser", "err", err)
-		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -146,8 +145,8 @@ func (s *Service) SignUp(w http.ResponseWriter, r *http.Request) {
 	// Convert the hashed password to a string
 	hashString := string(hash)
 
-	errs := s.db.InsertUser(user.Username, salt, hashString, user.Email)
-	if len(errs) != 0 {
+	err = s.db.InsertUser(user.Username, salt, hashString, user.Email)
+	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
