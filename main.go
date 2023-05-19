@@ -38,7 +38,7 @@ const (
 
 	goroutinesToWait = 2
 
-	usersDB            = "users.db"
+	usersDB            = "./db/users.db"
 	usersDBPermissions = 0o600
 )
 
