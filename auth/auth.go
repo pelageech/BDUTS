@@ -174,12 +174,17 @@ func (s *Service) generateToken(username string) (signedToken string, err error)
 func (s *Service) isAuthorized(username, password string) bool {
 	salt, hash, err := s.db.GetSaltAndHash(username)
 	if err != nil {
+		s.logger.Warn("Error getting salt and hash", "err", err)
 		return false
 	}
 
 	// Compare the password with the hash
 	err = bcrypt.CompareHashAndPassword([]byte(hash), []byte(password+salt))
-	return err == nil
+	if err != nil {
+		s.logger.Warn("Error comparing password and hash", "err", err)
+		return false
+	}
+	return true
 }
 
 // SignIn signs in a user.
