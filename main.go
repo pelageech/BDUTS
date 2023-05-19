@@ -276,6 +276,7 @@ func main() {
 	http.Handle("/admin/signup", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.SignUp))))
 	http.Handle("/admin/password", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.ChangePassword))))
 	http.Handle("/admin/signin", cors(http.HandlerFunc(authSvc.SignIn)))
+	http.Handle("/admin", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.DeleteUser))))
 
 	// Config TLS: setting a pair crt-key
 	Crt, _ := tls.LoadX509KeyPair("resources/Cert.crt", "resources/Key.key")

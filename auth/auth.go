@@ -36,7 +36,7 @@ const (
 	defaultUser     = "admin"
 	defaultPassword = "verySecureAdminPassword12345"
 
-	usernameKey = "user"
+	usernameKey = "username"
 )
 
 // Service is a service for user authentication.
