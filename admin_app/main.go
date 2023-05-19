@@ -36,6 +36,9 @@ type changeBodyJSON struct {
 	NewPassword        string
 	NewPasswordConfirm string
 }
+type deleteBodyJSON struct {
+	Username string
+}
 
 const (
 	empty          = ""
@@ -49,6 +52,7 @@ const (
 	signInRequestPath = "/admin/signin"
 	signUpRequestPath = "/admin/signup"
 	changeRequestPath = "/admin/password"
+	deleteRequestPath = "/admin/delete"
 )
 
 var (
@@ -74,6 +78,8 @@ var (
 	oldPass = flag.String("old", empty, "an old password")
 	newPass = flag.String("new", empty, "a new password")
 	confirm = flag.String("confirm", empty, "confirm a new password")
+
+	delUser = flag.Bool("del-user", false, "deletes a user, requires login and token")
 
 	tr = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} // todo: configure tls in right way
 	c  = &http.Client{Transport: tr}
@@ -254,6 +260,28 @@ func changeHandle() {
 	}
 }
 
+func deleteHandle() {
+	req, err := http.NewRequest(http.MethodDelete, proto+*host+deleteRequestPath, nil)
+	if err != nil {
+		fmt.Println("An error occurred while creating a request: ", err)
+		os.Exit(1)
+	}
+	req.URL.Query().Set("username", *login)
+	req.Header.Add("Authorization", "Bearer "+*token)
+
+	resp, err := c.Do(req)
+	if err != nil {
+		fmt.Println("An error occurred while processing the request: ", err)
+		os.Exit(1)
+	}
+
+	err = handleResponse(resp)
+	if err != nil {
+		fmt.Println("Something went wrong: ", err)
+		os.Exit(1)
+	}
+}
+
 func handleResponse(resp *http.Response) error {
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusUnauthorized {
@@ -270,18 +298,28 @@ func handleResponse(resp *http.Response) error {
 
 func handleArgs() {
 	if *help {
-		fmt.Println("\t---| BDUTS Admin panel |---")
+		fmt.Println("\n\t---| BDUTS Admin panel |---\n")
 		flag.Usage()
 		fmt.Println("\nThis app provides you with dealing with server pool of the balancer.\n" +
 			"Before it you must get a token which permits you adding and removing backends.\n" +
 			"A simple usage:\n" +
-			"\t-get-token -H localhost:8080 -login admin -password admin\n" +
+			"\t-signin -H localhost:8080 -login admin -password admin\n" +
 			"where, of course, your own host, login and password. There will be a bearer token.\n\n" +
 			"To add a new backend use this:\n" +
 			"\t-H localhost:8080 -add http://192.168.15.1:9090 -tout 1000 -max 10 -t <token>\n" +
 			"Notice that -tout and -max are optional.\n\n" +
 			"To remove a backend use this:\n" +
-			"\t-H localhost:8080 -remove http://192.168.15.1:9090 -t <token>")
+			"\t-H localhost:8080 -remove http://192.168.15.1:9090 -t <token>\n\n" +
+			"Administrating:\n" +
+			"- Sign In\n" +
+			"\t-signin -H localhost:8080 -login admin -password admin\n\n" +
+			"- Sign Up\n" +
+			"\t-signup -H localhost:8080 -login admin -email example@mail.ru -t <token>\n\n" +
+			"- Change Password\n" +
+			"\t-change -H localhost:8080 -old oldPass -new newPass -confirm newPass -t <token>\n" +
+			"Note: token must belong to user which password you'd like to change.\n\n" +
+			"- Delete user\n" +
+			"\t-del-user -H localhost:8080 -login admin -t <token>")
 		return
 	}
 
@@ -311,6 +349,11 @@ func handleArgs() {
 
 	if *change {
 		changeHandle()
+		return
+	}
+
+	if *delUser {
+		deleteHandle()
 		return
 	}
 }
