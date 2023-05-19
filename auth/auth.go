@@ -98,7 +98,7 @@ func (s *Service) SignUpDefaultUser() error {
 		return fmt.Errorf("failed to insert default user: %w", err)
 	}
 
-	s.logger.Info("Default user created")
+	s.logger.Info("Default user created", "username", defaultUser, "password", defaultPassword)
 	return nil
 }
 
