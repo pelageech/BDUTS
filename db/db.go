@@ -108,3 +108,14 @@ func (s *Service) GetEmail(username string) (email string, err error) {
 	})
 	return
 }
+
+func (s *Service) DeleteUser(username string) (err error) {
+	err = s.db.Update(func(tx *bolt.Tx) error {
+		err := tx.DeleteBucket([]byte(username))
+		if err != nil {
+			return fmt.Errorf("delete bucket \"%s\": %w", username, err)
+		}
+		return nil
+	})
+	return
+}

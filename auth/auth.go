@@ -35,6 +35,8 @@ const (
 
 	defaultUser     = "admin"
 	defaultPassword = "verySecureAdminPassword12345"
+
+	usernameKey = "user"
 )
 
 // Service is a service for user authentication.
@@ -359,42 +361,24 @@ func (s *Service) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// AuthenticationMiddleware is a middleware that checks if the user is authenticated.
-func (s *Service) AuthenticationMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authorizationHeader := r.Header.Get("Authorization")
-		if authorizationHeader == "" {
-			w.WriteHeader(http.StatusUnauthorized)
+func (s *Service) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	user := r.URL.Query().Get(usernameKey)
+
+	err := s.db.DeleteUser(user)
+	if err != nil {
+		if errors.Is(err, bolt.ErrBucketNotFound) {
+			w.WriteHeader(http.StatusNotFound)
 			return
 		}
+		w.WriteHeader(http.StatusInternalServerError)
+		s.logger.Error("Error deleting user", "err", err)
+		return
+	}
 
-		bearerToken := strings.Split(authorizationHeader, " ")
-		if len(bearerToken) != tokenLen {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		token, err := jwt.Parse(bearerToken[1], func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-			}
-
-			return s.signKey, nil
-		}, jwt.WithValidMethods([]string{jwt.SigningMethodHS512.Name}))
-		if err != nil {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !token.Valid || !ok {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		// Store the authenticated user's username in the request context
-		ctx := context.WithValue(r.Context(), userKey{}, claims["username"])
-
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+	w.WriteHeader(http.StatusNoContent)
 }
