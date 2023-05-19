@@ -153,6 +153,26 @@ Date: Mon, 01 May 2023 06:35:17 GMT
 Connection: close
 ```
 
+## Delete admin
+### Request
+```http request
+DELETE /admin?username=admin HTTP/1.1
+Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2ODQ1MDY5MzUsInVzZXJuYW1lIjoidXNlcm5hbWUifQ.1TIkZbm-YcoI_r1Z6gAxuQANBBAikeqaB2R7cvdwUO0DgQYwDrMHy8f6SJg66U0IKUPKFQVprAuftFA9Fjwc0Q
+Host: localhost:8080
+Connection: close
+```
+
+### Response
+```http request
+HTTP/1.1 204 No Content
+Access-Control-Allow-Headers: *
+Access-Control-Allow-Methods: *
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: Authorization
+Date: Fri, 19 May 2023 14:16:00 GMT
+Connection: close
+```
+
 ## Change password
 ### Request
 ```http request
