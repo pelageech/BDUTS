@@ -78,6 +78,46 @@ type ChangePasswordUser struct {
 	NewPasswordConfirm string `json:"newPasswordConfirm" validate:"required,eqfield=NewPassword"`
 }
 
+// AuthenticationMiddleware is a middleware that checks if the user is authenticated.
+func (s *Service) AuthenticationMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authorizationHeader := r.Header.Get("Authorization")
+		if authorizationHeader == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		bearerToken := strings.Split(authorizationHeader, " ")
+		if len(bearerToken) != tokenLen {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		token, err := jwt.Parse(bearerToken[1], func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+
+			return s.signKey, nil
+		}, jwt.WithValidMethods([]string{jwt.SigningMethodHS512.Name}))
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !token.Valid || !ok {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		// Store the authenticated user's username in the request context
+		ctx := context.WithValue(r.Context(), userKey{}, claims["username"])
+
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 func (s *Service) SignUpDefaultUser() error {
 	salt, err := s.generateSalt()
 	if err != nil {
