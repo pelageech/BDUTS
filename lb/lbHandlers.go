@@ -21,7 +21,7 @@ func (lb *LoadBalancer) LoadBalancerHandler(rw http.ResponseWriter, req *http.Re
 	metrics.UpdateRequestBodySize(req)
 }
 
-// LoadBalancerHandler is the main Handle func.
+// loadBalancerHandler is the main Handle func.
 func (lb *LoadBalancer) loadBalancerHandler(rw http.ResponseWriter, req *http.Request) error {
 	if !isHTTPVersionSupported(req) {
 		http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)

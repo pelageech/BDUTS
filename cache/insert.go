@@ -109,8 +109,7 @@ func writePageToDisk(key []byte, page *Page) error {
 	return w.Flush()
 }
 
-// Создаёт экземпляр структуры cache.PageMetadata, в которой хранится
-// информация о странице, помещаемой в кэш.
+// Creates a single item of cache.PageMetadata.
 func createCacheInfo(resp *http.Response, size int64) *PageMetadata {
 	meta := &PageMetadata{
 		Size:               size,

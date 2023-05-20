@@ -78,92 +78,21 @@ var (
 	})
 )
 
+// UrlToKeyBuilder is a map that contains parsers for each string.
+// The parser takes a part of URI by string from the request.
 type UrlToKeyBuilder map[string][]func(r *http.Request) string
 
+// CachingProperties takes over the cache and the pages there.
+// The structure of the cache reminds file systems in common operating systems.
+// The pages are stored on a disk and the driver is stored in memory.
+// The driver is a boltDB database containing buckets named by request hash.
+// Each of buckets has metadata struct and an amount of usage the page during its life.
 type CachingProperties struct {
 	db            *bolt.DB
 	keyBuilderMap UrlToKeyBuilder
 	cleaner       *CacheCleaner
 	Size          int64
 	PagesCount    int
-}
-
-func LoggerConfig(prefix string) {
-	logger.SetPrefix(prefix)
-}
-
-func NewCachingProperties(db *bolt.DB, cacheConfig *config.CacheConfig, cleaner *CacheCleaner) *CachingProperties {
-	keyBuilder := make(UrlToKeyBuilder)
-
-	for _, v := range cacheConfig.Pairs() {
-		keyBuilder[v.Location] = config.ParseRequestKey(v.RequestKey)
-	}
-
-	return &CachingProperties{
-		db:            db,
-		keyBuilderMap: keyBuilder,
-		cleaner:       cleaner,
-		Size:          0,
-		PagesCount:    0,
-	}
-}
-
-func (p *CachingProperties) DB() *bolt.DB {
-	return p.db
-}
-
-func (p *CachingProperties) KeyBuilderMap() UrlToKeyBuilder {
-	return p.keyBuilderMap
-}
-
-func (p *CachingProperties) Cleaner() *CacheCleaner {
-	return p.cleaner
-}
-
-func (p *CachingProperties) IncrementSize(delta int64) {
-	atomic.AddInt64(&p.Size, delta)
-	metrics.UpdateCacheSize(p.Size)
-}
-
-func (p *CachingProperties) CalculateSize() {
-	size := int64(0)
-	pagesCount := 0
-
-	checkDisk := func(hash []byte) error {
-		path := makePath(hash, subHashCount)
-		path += "/" + string(hash)
-
-		_, err := os.Stat(path)
-		return err
-	}
-
-	err := p.db.View(func(tx *bolt.Tx) error {
-		return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
-			metaBytes := b.Get([]byte(pageMetadataKey))
-			if metaBytes == nil {
-				return errors.New("all the buckets must have pageMetadataKey-value, you should clear the database and cache")
-			}
-
-			var m PageMetadata
-			if err := json.Unmarshal(metaBytes, &m); err != nil {
-				return errors.New("Non-persistent json-data, clear the cache! " + err.Error())
-			}
-
-			if err := checkDisk(name); err != nil {
-				logger.Info("Checking page on the disk: ", "err", err)
-				return nil
-			}
-
-			size += m.Size
-			pagesCount++
-			return nil
-		})
-	})
-	if err != nil {
-		panic(err)
-	}
-	p.Size = size
-	p.PagesCount = pagesCount
 }
 
 // Page is a structure that is the cache unit storing on a disk.
@@ -175,7 +104,8 @@ type Page struct {
 	Header http.Header
 }
 
-// PageMetadata is a struct of page metadata.
+// PageMetadata contains a metadata about the page
+// stored in a cache.
 type PageMetadata struct {
 	// Size is the response body size.
 	Size int64
@@ -221,6 +151,84 @@ type responseDirectives struct {
 	SMaxAge         time.Time
 }
 
+func NewCachingProperties(db *bolt.DB, cacheConfig *config.CacheConfig, cleaner *CacheCleaner) *CachingProperties {
+	keyBuilder := make(UrlToKeyBuilder)
+
+	for _, v := range cacheConfig.Pairs() {
+		keyBuilder[v.Location] = config.ParseRequestKey(v.RequestKey)
+	}
+
+	return &CachingProperties{
+		db:            db,
+		keyBuilderMap: keyBuilder,
+		cleaner:       cleaner,
+		Size:          0,
+		PagesCount:    0,
+	}
+}
+
+func (p *CachingProperties) DB() *bolt.DB {
+	return p.db
+}
+
+func (p *CachingProperties) KeyBuilderMap() UrlToKeyBuilder {
+	return p.keyBuilderMap
+}
+
+func (p *CachingProperties) Cleaner() *CacheCleaner {
+	return p.cleaner
+}
+
+func (p *CachingProperties) IncrementSize(delta int64) {
+	atomic.AddInt64(&p.Size, delta)
+	metrics.UpdateCacheSize(p.Size)
+}
+
+// CalculateSize counts how many pages are stored in a cache and puts
+// a total size of cache to CachingProperties.
+// The function runs through the boltDB and checks if the cache is stored
+// on a disk. If success, it adds its size to the counter.
+func (p *CachingProperties) CalculateSize() {
+	size := int64(0)
+	pagesCount := 0
+
+	checkDisk := func(hash []byte) error {
+		path := makePath(hash, subHashCount)
+		path += "/" + string(hash)
+
+		_, err := os.Stat(path)
+		return err
+	}
+
+	err := p.db.View(func(tx *bolt.Tx) error {
+		return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+			metaBytes := b.Get([]byte(pageMetadataKey))
+			if metaBytes == nil {
+				return errors.New("all the buckets must have pageMetadataKey-value, you should clear the database and cache")
+			}
+
+			var m PageMetadata
+			if err := json.Unmarshal(metaBytes, &m); err != nil {
+				return errors.New("Non-persistent json-data, clear the cache! " + err.Error())
+			}
+
+			if err := checkDisk(name); err != nil {
+				logger.Info("Checking page on the disk: ", "err", err)
+				return nil
+			}
+
+			size += m.Size
+			pagesCount++
+			return nil
+		})
+	})
+	if err != nil {
+		panic(err)
+	}
+	p.Size = size
+	p.PagesCount = pagesCount
+}
+
 // OpenDatabase opens a database file.
 func OpenDatabase(path string) (*bolt.DB, error) {
 	db, err := bolt.Open(path, readWriteOwner, nil)
@@ -238,10 +246,15 @@ func CloseDatabase(db *bolt.DB) {
 	}
 }
 
+// RequestHashKey returns hash of a request.
 func (p *CachingProperties) RequestHashKey(req *http.Request) []byte {
 	return hash([]byte(
 		p.constructKeyFromRequest(req),
 	))
+}
+
+func LoggerConfig(prefix string) {
+	logger.SetPrefix(prefix)
 }
 
 // Returns a hash-encode byte array of a value.
