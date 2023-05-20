@@ -191,13 +191,21 @@ func main() {
 
 	// Firstly, identify the working servers
 	logger.Info("Configured! Now setting up the first health check...")
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(loadBalancer.Pool().Servers()))
 	for _, server := range loadBalancer.Pool().Servers() {
-		loadBalancer.HealthCheckFunc()(server)
+		server := server
+		go func() {
+			loadBalancer.HealthCheckFunc()(server)
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 	logger.Info("Ready!")
 
 	// set up health check
-	go loadBalancer.HealthChecker()
+
 	go loadBalancer.CacheProps().Observe()
 
 	dbService := db.Service{}
@@ -287,7 +295,6 @@ func main() {
 		logger.Fatal("Failed to start tcp listener", "err", err)
 	}
 
-	wg := sync.WaitGroup{}
 	wg.Add(goroutinesToWait)
 	logger.Infof("Load Balancer started at :%d\n", loadBalancer.Config().Port())
 	go func() {
