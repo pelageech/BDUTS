@@ -3,6 +3,7 @@ package lb
 import (
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -117,13 +118,20 @@ func (lb *LoadBalancer) HealthCheckFunc() func(*backend.Backend) {
 // HealthChecker periodically checks all the backends in balancer pool.
 func (lb *LoadBalancer) HealthChecker() {
 	ticker := time.NewTicker(lb.config.healthCheckPeriod)
-
+	wg := sync.WaitGroup{}
 	for {
 		<-ticker.C
+		wg.Add(len(lb.pool.Servers()))
 		logger.Info("Health Check has been started!")
+
 		for _, server := range lb.Pool().Servers() {
-			lb.healthCheckFunc(server)
+			server := server
+			go func() {
+				lb.healthCheckFunc(server)
+				wg.Done()
+			}()
 		}
+		wg.Wait()
 		logger.Info("All the checks has been completed!")
 	}
 }
