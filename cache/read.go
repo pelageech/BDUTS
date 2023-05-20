@@ -109,7 +109,10 @@ func readPageFromDisk(key []byte) (*Page, error) {
 	defer file.Close()
 
 	r := bufio.NewReaderSize(file, bufferSize)
-	bytesPage, _ := r.ReadBytes(byte(0))
+	bytesPage, err := r.ReadBytes(byte(0))
+	if err != nil {
+		return nil, err
+	}
 
 	var page Page
 	if err := json.Unmarshal(bytesPage, &page); err != nil {
