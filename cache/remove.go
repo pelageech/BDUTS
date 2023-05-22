@@ -28,13 +28,17 @@ func (p *CachingProperties) RemovePageFromCache(key []byte) (*PageMetadata, erro
 
 // removePageMetadata deletes cache.PageMetadata from the database.
 func (p *CachingProperties) removePageMetadata(key []byte) (*PageMetadata, error) {
-	var m []byte
-	var meta *PageMetadata
+	var (
+		m    []byte
+		meta *PageMetadata
+	)
+
 	err := p.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(key)
 		if b == nil {
 			return errors.New("there's no page to delete")
 		}
+
 		m = b.Get([]byte(pageMetadataKey))
 
 		return tx.DeleteBucket(key)
@@ -48,6 +52,7 @@ func (p *CachingProperties) removePageMetadata(key []byte) (*PageMetadata, error
 	}
 	p.IncrementSize(-meta.Size)
 	metrics.UpdateCachePagesCount(-1)
+
 	return meta, nil
 }
 

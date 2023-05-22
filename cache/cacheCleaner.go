@@ -12,6 +12,12 @@ import (
 	"github.com/charmbracelet/log"
 )
 
+// CacheCleaner deals with cache and its size by deleting expired
+// or unnecessary pages. It goes in two steps: the first is removing
+// expired cache. The cleaner looks only a max-age directive.
+// The second step is removing unimportant pages: these are chosen
+// by LRU algorithm. Each of metadata of the pages contains an amount of
+// usage a particular page.
 type CacheCleaner struct {
 	dbFile      *os.File
 	maxFileSize int64
@@ -19,6 +25,7 @@ type CacheCleaner struct {
 	frequency   *time.Ticker
 }
 
+// NewCacheCleaner creates a single item of a cleaner.
 func NewCacheCleaner(dbFile *os.File, maxFileSize int64, fillFactor float64, frequency *time.Ticker) *CacheCleaner {
 	return &CacheCleaner{
 		dbFile:      dbFile,
@@ -28,6 +35,9 @@ func NewCacheCleaner(dbFile *os.File, maxFileSize int64, fillFactor float64, fre
 	}
 }
 
+// Observe occasionally sets up a cleaner's goroutine which
+// deletes expired and unnecessary pages from the cache.
+// The frequency is declared in CacheCleaner struct.
 func (p *CachingProperties) Observe() {
 	for {
 		<-p.cleaner.frequency.C

@@ -159,6 +159,7 @@ func WriteBodyAndReturn(rw http.ResponseWriter, resp *http.Response) ([]byte, er
 	_, err = rw.Write(byteArray)
 	if err != nil {
 		http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
+		return nil, err
 	}
 	return byteArray, nil
 }

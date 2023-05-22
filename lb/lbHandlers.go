@@ -21,10 +21,11 @@ func (lb *LoadBalancer) LoadBalancerHandler(rw http.ResponseWriter, req *http.Re
 	metrics.UpdateRequestBodySize(req)
 }
 
-// LoadBalancerHandler is the main Handle func.
+// loadBalancerHandler is the main Handle func.
 func (lb *LoadBalancer) loadBalancerHandler(rw http.ResponseWriter, req *http.Request) error {
 	if !isHTTPVersionSupported(req) {
 		http.Error(rw, "Expected HTTP/1.1", http.StatusHTTPVersionNotSupported)
+		return fmt.Errorf("expected HTTP/1.1")
 	}
 
 	requestHash := lb.cacheProps.RequestHashKey(req)
@@ -39,6 +40,7 @@ func (lb *LoadBalancer) loadBalancerHandler(rw http.ResponseWriter, req *http.Re
 	} else {
 		logger.Infof("Checking cache unsuccessful: %v", err)
 		if r, ok := req.Context().Value(cache.OnlyIfCachedKey).(bool); ok && r {
+			http.Error(rw, cache.ErrOnlyIfCached.Error(), http.StatusGatewayTimeout)
 			return cache.ErrOnlyIfCached
 		}
 	}
@@ -86,6 +88,7 @@ func (lb *LoadBalancer) backendHandler(rw http.ResponseWriter, req *http.Request
 ChooseServer:
 	server, err := lb.pool.GetNextPeer()
 	if err != nil {
+		http.Error(rw, err.Error(), http.StatusServiceUnavailable)
 		return err
 	}
 	if ok := server.AssignRequest(); !ok {

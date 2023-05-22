@@ -32,7 +32,7 @@ func (p *CachingProperties) InsertPageInCache(key []byte, req *http.Request, res
 	requestDirectives := loadRequestDirectives(req.Header)
 	responseDirectives := loadResponseDirectives(resp.Header)
 
-	if requestDirectives.NoStore || responseDirectives.NoStore {
+	if requestDirectives.NoStore || responseDirectives.NoStore || req.Method != http.MethodGet {
 		return errors.New("can't be stored in cache")
 	}
 
@@ -61,22 +61,26 @@ func (p *CachingProperties) insertPageMetadataToDB(key []byte, meta *PageMetadat
 		if errors.Is(err, bolt.ErrBucketExists) {
 			b = tx.Bucket(key)
 		}
+
 		if err == nil || errors.Is(err, bolt.ErrBucketExists) {
-			_ = b.Put([]byte(pageMetadataKey), value)
-			bs := make([]byte, sizeOfInt32)
-			_ = b.Put([]byte(usesKey), bs)
+			_ = b.Put([]byte(pageMetadataKey), value) // put metadata
+			bucketUses := make([]byte, sizeOfInt32)
+			_ = b.Put([]byte(usesKey), bucketUses) // put uses
 		}
 
 		return err
 	})
 
+	// if a new bucket was created
 	if err == nil {
 		p.IncrementSize(meta.Size)
 		metrics.UpdateCachePagesCount(1)
 	}
+
 	if errors.Is(err, bolt.ErrBucketExists) {
 		return nil
 	}
+
 	return err
 }
 
@@ -105,8 +109,7 @@ func writePageToDisk(key []byte, page *Page) error {
 	return w.Flush()
 }
 
-// Создаёт экземпляр структуры cache.PageMetadata, в которой хранится
-// информация о странице, помещаемой в кэш.
+// Creates a single item of cache.PageMetadata.
 func createCacheInfo(resp *http.Response, size int64) *PageMetadata {
 	meta := &PageMetadata{
 		Size:               size,
