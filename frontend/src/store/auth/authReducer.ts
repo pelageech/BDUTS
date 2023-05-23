@@ -1,23 +1,18 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-import { htmlToMap } from './actionCreators'
+import cheerio from 'cheerio';
 
 export interface AuthState {
     authData: {
-        accessToken: string | null
+        accessToken: string | null,
         isLoading: boolean
         error: string | null,
-    }
-    profileData: {
-        profile: string | null,
-        isLoading: boolean
-        error: string | null,
-    }
+    },
     serverData: {
-        server: string,
-        serverIdUrl: { [key: string]: string },
-        isLoading: boolean,
+        serverHtml: string,
+        serverUrl: string[],
+        isLoading: boolean
         error: string | null,
-    }
+    },
 }
 
 const initialState: AuthState = {
@@ -26,17 +21,12 @@ const initialState: AuthState = {
         isLoading: false,
         error: null,
     },
-    profileData: {
-        profile: null,
+    serverData: {
+        serverHtml: '<h1>There are no backends</h1>',
+        serverUrl: [],
         isLoading: false,
         error: null,
     },
-    serverData: {
-        server: '<h1>There are no backends</h1>',
-        serverIdUrl: {},
-        isLoading: false,
-        error: null,
-    }
 }
 
 export const authReducer = createSlice({
@@ -67,46 +57,24 @@ export const authReducer = createSlice({
                 error: action.payload,
             }
         }),
-        loadProfileStart: (state): AuthState => ({
+        getServersStart: (state): AuthState => ({
             ...state,
-            profileData: {
-                ...state.profileData,
+            serverData: {
+                ...state.serverData,
                 isLoading: true,
             }
         }),
-        loadProfileSucess: (state, action: PayloadAction<string>): AuthState => ({
+        getServersSuccess: (state, action: PayloadAction<string>): AuthState => ({
             ...state,
-            profileData: {
-                ...state.profileData,
-                profile: action.payload,
+            serverData: {
+                ...state.serverData,
+                serverHtml: action.payload,
+                serverUrl: parseUrlsFromHtml(action.payload),
                 isLoading: false,
                 error: null,
             }
         }),
-        loadProfileFailure: (state, action: PayloadAction<string>): AuthState => ({
-            ...state,
-            profileData: {
-                ...state.profileData,
-                isLoading: false,
-                error: action.payload,
-            }
-        }),
-        loadServerStart: (state): AuthState => ({
-            ...state,
-            serverData: {
-                ...state.serverData,
-                isLoading: true,
-            }
-        }),
-        loadServerSucess: (state, action: PayloadAction<string>): AuthState => ({
-            ...state,
-            serverData: {
-                ...state.serverData,
-                server: action.payload,
-                serverIdUrl: htmlToMap(action.payload),
-            }
-        }),
-        loadServerFailure: (state, action: PayloadAction<string>): AuthState => ({
+        getServersFailure: (state, action: PayloadAction<string>): AuthState => ({
             ...state,
             serverData: {
                 ...state.serverData,
@@ -114,9 +82,28 @@ export const authReducer = createSlice({
                 error: action.payload,
             }
         }),
+        logoutSuccess: (): AuthState => initialState,
     },
 })
 
-export const { loadServerStart, loadServerSucess, loadServerFailure, loadProfileStart, loadProfileSucess, loadProfileFailure, loginStart, loginSucess, loginFailure} = authReducer.actions
+function parseUrlsFromHtml(html: string): string[] {
+    const $ = cheerio.load(html);
+    const urls: string[] = [];
+    $('table tr').each((_index: number, element: cheerio.Element) => {
+      const url = $(element).find('td:nth-child(2)').text();
+      urls.push(url);
+    });
+    return urls;
+  }
+
+export const { 
+    loginStart, 
+    loginSucess,
+    loginFailure,
+    logoutSuccess,
+    getServersStart,
+    getServersSuccess,
+    getServersFailure,
+ } = authReducer.actions
 
 export default authReducer.reducer

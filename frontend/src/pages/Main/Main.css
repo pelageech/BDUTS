@@ -1,0 +1,49 @@
+.main {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.profile-container {
+    text-align: center;
+    margin-top: 5%;
+}
+
+#html-container {
+    margin-bottom: 20px;
+    margin-top: -20%;
+}
+
+#html-container table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#html-container th,
+#html-container td {
+    border: 1px solid black;
+    padding: 8px;
+}
+
+#html-container th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+}
+
+#html-container td {
+    text-align: center;
+}
+
+form {
+    margin-bottom: 20px;
+}
+
+.error-message {
+    color: red;
+    margin-left: 5px;
+}
+
+button {
+    margin-left: 5px;
+}

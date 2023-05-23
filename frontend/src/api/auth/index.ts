@@ -6,7 +6,13 @@ import { ILoginResponse, ILoginRequest } from "./types";
 export const login = (params: ILoginRequest): AxiosPromise<ILoginResponse> =>
     axiosInstance.post(Endpoints.AUTH.LOGIN, params)
 
-export const getServers = (): AxiosPromise<string> => axiosInstance.get(Endpoints.AUTH.GETSERVERS)
+export const getServers = (): AxiosPromise<string> => axiosInstance.get(Endpoints.AUTH.GET)
 
-export const deleteServer = (serverUrl: string): AxiosPromise<void> => axiosInstance.delete(Endpoints.AUTH.DELETESERVERS,
+export const deleteServer = (serverUrl: string): AxiosPromise<void> => axiosInstance.delete(Endpoints.AUTH.DELETE,
     { data: { url: serverUrl } })
+
+export const addServer = (url: string, healthCheckTcpTimeout: number, maximalRequests: number): AxiosPromise<void> => axiosInstance.post(Endpoints.AUTH.ADD,
+    { url: url, healthCheckTcpTimeout: healthCheckTcpTimeout, maximalRequests: maximalRequests })
+
+export const addUser = (username: string, email: string): AxiosPromise<void> => axiosInstance.post(Endpoints.AUTH.SIGNUP,
+    { username: username, email: email })

@@ -3,8 +3,8 @@
 export interface ILoginRequest {
     username: string
     password: string
-  }
-  
-  export interface ILoginResponse {
+}
+
+export interface ILoginResponse {
     accessToken: string
-  }
+}

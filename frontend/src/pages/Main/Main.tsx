@@ -1,65 +1,97 @@
-import React, { MouseEventHandler, useState } from "react";
+import React, { FormEvent, useState } from "react";
 import Login from "./components/Login";
-import { useSelector } from "react-redux";
-import { IRootState, useAppDispatch } from "../../store";
-import { deleteServer } from "../../store/auth/actionCreators";
+import { IRootState, useAppDispatch, useAppSelector } from "../../store";
+import { addServer, deleteServer, getServers } from "../../store/auth/actionCreators";
+import "./Main.css";
 
 const Main = () => {
+    const dispatch = useAppDispatch();
 
-    const dispatch = useAppDispatch()
-
-    const servers = useSelector(
-        (state: IRootState) => state.auth.serverData.server
-    );
-
-    const isLoggedIn = useSelector(
+    const isLoggedIn = useAppSelector(
         (state: IRootState) => !!state.auth.authData.accessToken
     );
 
-    const serverIdUrl = useSelector(
-        (state: IRootState) => state.auth.serverData.serverIdUrl
+    const serverHtml = useAppSelector(
+        (state: IRootState) => state.auth.serverData.serverHtml
     );
 
-    const [serverId, setServerId] = useState<number>(0);
-    
-    const handleClick: MouseEventHandler<HTMLButtonElement> = (event) => {
-        const serverId = parseInt(event.currentTarget.dataset.serverid || '');
-        const url = serverIdUrl[serverId];
-        if (url) {
-            dispatch(deleteServer(url));
-            setServerId(0);
+    const serverUrls = useAppSelector(
+        (state: IRootState) => state.auth.serverData.serverUrl
+    );
+
+    const [deleteUrl, setDeleteUrl] = useState("");
+    const [url, setUrl] = useState("");
+    const [healthCheckTcpTimeout, setHealthCheckTcpTimeout] = useState<number>(0);
+    const [maximalRequests, setMaximalRequests] = useState<number>(0);
+    const [deleteError, setDeleteError] = useState("");
+    const [addError, setAddError] = useState("");
+
+
+    const handleDelete = (e: FormEvent) => {
+        e.preventDefault();
+        if (serverUrls.includes(deleteUrl) && deleteUrl !== "") {
+            dispatch(deleteServer(deleteUrl));
+            dispatch(getServers());
+            setDeleteUrl("");
         } else {
-            alert(`No URL found for ID ${serverId}`);
+            setDeleteUrl("");
+            setDeleteError("No URL found");
+            setTimeout(() => {
+                setDeleteError("");
+            }, 5000);
+            return;
         }
     };
 
+    const handleAdd = (e: FormEvent) => {
+        e.preventDefault();
+        if (url === "" || healthCheckTcpTimeout === 0 || maximalRequests === 0) {
+            setAddError("Please fill in all fields");
+            setTimeout(() => {
+                setAddError("");
+            }, 5000);
+            return;
+        } else if (serverUrls.includes(url)){
+            setAddError("Server already exists");
+            setTimeout(() => {
+                setAddError("");
+            }, 5000);
+            return;
+        }
+        dispatch(addServer({ url, healthCheckTcpTimeout, maximalRequests }));
+        dispatch(getServers());
+        setUrl("");
+        setMaximalRequests(0);
+        setHealthCheckTcpTimeout(0);
+    };
+
     const renderProfile = () => (
-        <div>
-            <div>Вы успушно авторизовались</div>
-            <button onClick={() => { window.location.reload() }}>Logout</button>
+        <div className="profile-container">
+            <div id="html-container" dangerouslySetInnerHTML={{ __html: serverHtml }} />
             <div>
-                <label htmlFor="serverIdInput">Server ID:</label>
-                <input
-                    id="serverIdInput"
-                    type="number"
-                    value={serverId}
-                    onChange={(e) => setServerId(parseInt(e.target.value))}
-                />
-                <button onClick={handleClick} data-serverid={serverId}>Delete</button>
+                <form onSubmit={handleDelete}>
+                    <label htmlFor="deleteServer">Server URL:</label>
+                    <input name="deleteServer" type="text" value={deleteUrl} onChange={(e) => setDeleteUrl(e.target.value)} />
+                    <button>Delete</button>
+                    {deleteError && <span className="error-message">{deleteError}</span>}
+                </form>
             </div>
-            <button onClick={() => { }}>Add</button>
-            <div id="html-container" dangerouslySetInnerHTML={{ __html: servers }} />
+            <div>
+                <form onSubmit={handleAdd}>
+                    <label htmlFor="serverUrl">Server URL:</label>
+                    <input name="serverUrl" type="text" value={url} onChange={(e) => setUrl(e.target.value)} />
+                    <label htmlFor="serverTcp">Server TCP:</label>
+                    <input name="serverTcp" type="number" value={healthCheckTcpTimeout} onChange={(e) => setHealthCheckTcpTimeout(parseInt(e.target.value))} />
+                    <label htmlFor="serverMaxReq">Server MaxReq:</label>
+                    <input name="serverMaxReq" type="number" value={maximalRequests} onChange={(e) => setMaximalRequests(parseInt(e.target.value))} />
+                    <button>Add</button>
+                    {addError && <span className="error-message">{addError}</span>}
+                </form>
+            </div>
         </div>
     );
 
-    return (
-        <div>
-            Main
-            {isLoggedIn ? renderProfile() : <Login />}
-        </div>
-    );
+    return <div className="main">{isLoggedIn ? renderProfile() : <Login />}</div>;
 };
 
 export default Main;
-
-

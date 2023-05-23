@@ -1,11 +1,11 @@
 const Endpoints = {
     AUTH: {
+        GET: '/serverPool',
         ADD: '/serverPool/add',
+        DELETE: '/serverPool/remove',
         LOGIN: '/admin/signin',
         SIGNUP: '/admin/signup',
         PASSWORD: '/admin/password',
-        GETSERVERS: '/serverPool',
-        DELETESERVERS: '/serverPool/remove?backend=http%3A%2F%2Flocalhost%3A3031',
     }
 }
 
