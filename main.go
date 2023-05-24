@@ -43,8 +43,8 @@ const (
 	usersDB            = "./db/users.db"
 	usersDBPermissions = 0o600
 
-	certFile = "resources/Cert.crt"
-	keyFile  = "resources/Key.key"
+	certFile = "/etc/letsencrypt/live/v1722521.hosted-by-vdsina.ru/fullchain.pem"
+	keyFile  = "/etc/letsencrypt/live/v1722521.hosted-by-vdsina.ru/privkey.pem"
 )
 
 var logger *log.Logger
