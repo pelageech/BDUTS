@@ -72,13 +72,14 @@ const Main = () => {
 
     const renderProfile = () => (
         <div className="profile-container">
-            {/* Таблица серверов */}
             <table className="server-table">
                 <thead>
                     <tr>
                         <th>ID</th>
                         <th>URL</th>
                         <th>TCP Timeout</th>
+                        <th>Max Requests</th>
+                        <th>Alive</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -87,12 +88,12 @@ const Main = () => {
                             <td>{index + 1}</td>
                             <td>{server.URL}</td>
                             <td>{server.HealthCheckTcpTimeout}</td>
+                            <td>{server.MaximalRequests}</td>
+                            <td>{server.Alive === true ? "true" : "false"}</td>
                         </tr>
                     ))}
                 </tbody>
             </table>
-
-            {/* Форма удаления сервера */}
             <div>
                 <form onSubmit={handleDelete}>
                     <label htmlFor="deleteServer">Server URL:</label>
@@ -106,8 +107,6 @@ const Main = () => {
                     {deleteError && <span className="error-message">{deleteError}</span>}
                 </form>
             </div>
-
-            {/* Форма добавления сервера */}
             <div>
                 <form onSubmit={handleAdd}>
                     <label htmlFor="serverUrl">Server URL:</label>
@@ -137,7 +136,6 @@ const Main = () => {
             </div>
         </div>
     );
-
     return <div className="main">{isLoggedIn ? renderProfile() : <Login />}</div>;
 };
 

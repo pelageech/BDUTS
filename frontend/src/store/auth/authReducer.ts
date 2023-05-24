@@ -7,7 +7,7 @@ export interface AuthState {
         error: string | null,
     },
     serverData: {
-        servers: { URL: string, HealthCheckTcpTimeout: number, MaximalRequests: number }[],
+        servers: { URL: string, HealthCheckTcpTimeout: number, MaximalRequests: number, Alive: boolean }[],
         urls: string[],
         isLoading: boolean
         error: string | null,
@@ -63,7 +63,7 @@ export const authReducer = createSlice({
                 isLoading: true,
             }
         }),
-        getServersSuccess: (state: AuthState, action: PayloadAction<{ URL: string, HealthCheckTcpTimeout: number, MaximalRequests: number }[]>): AuthState => ({
+        getServersSuccess: (state: AuthState, action: PayloadAction<{ URL: string, HealthCheckTcpTimeout: number, MaximalRequests: number, Alive: boolean }[]>): AuthState => ({
             ...state,
             serverData: {
                 ...state.serverData,
@@ -72,6 +72,7 @@ export const authReducer = createSlice({
                         URL: serverObj.URL,
                         HealthCheckTcpTimeout: serverObj.HealthCheckTcpTimeout,
                         MaximalRequests: serverObj.MaximalRequests,
+                        Alive: serverObj.Alive,
                     };
                 }),
                 urls: action.payload.map((serverObj) => serverObj.URL),
