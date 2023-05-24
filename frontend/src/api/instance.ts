@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { store } from '../store'
 
-export const axiosInstance = axios.create({ baseURL: 'https://195.2.93.80:8080' })
+export const axiosInstance = axios.create({ baseURL: 'http://127.0.0.1:8080' })
 
 axiosInstance.interceptors.request.use(
     (config) => {
