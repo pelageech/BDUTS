@@ -290,7 +290,11 @@ func main() {
 	http.Handle("/admin", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.DeleteUser))))
 
 	// Config TLS: setting a pair crt-key
-	Crt, _ := tls.LoadX509KeyPair(certFile, keyFile)
+	Crt, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		logger.Fatal("Failed to load crt and key", "err", err)
+	}
+
 	tlsConfig := &tls.Config{Certificates: []tls.Certificate{Crt}}
 
 	ln, err := tls.Listen("tcp", fmt.Sprintf(":%d", loadBalancer.Config().Port()), tlsConfig)
