@@ -2,12 +2,9 @@ package lb
 
 import (
 	"encoding/json"
-	"fmt"
-	"net/http"
-	"os"
-
 	"github.com/pelageech/BDUTS/backend"
 	"github.com/pelageech/BDUTS/config"
+	"net/http"
 )
 
 const int32BitsAmount = 31 // int32, not uint32
@@ -102,27 +99,26 @@ func (lb *LoadBalancer) GetServersHandler(rw http.ResponseWriter, req *http.Requ
 		http.Error(rw, "Only GET requests are supported", http.StatusMethodNotAllowed)
 		return
 	}
-	var b []byte
-	header, _ := os.ReadFile("views/header.html")
 
-	b = append(b, header...)
-	footer, _ := os.ReadFile("views/footer.html")
+	backends := make([]config.ServerConfig, 0, len(lb.Pool().Servers()))
 
-	urls := lb.Pool().Servers()
-
-	for k, v := range urls {
-		b = append(b, []byte(
-			fmt.Sprintf("<tr>"+
-				"<td>%d</td>"+
-				"<td>%s</td>"+
-				"<td>%d</td>"+
-				"<td>%t</td>"+
-				"</tr>", k+1, v.URL(), v.HealthCheckTcpTimeout().Milliseconds(), v.Alive()),
-		)...)
+	for _, v := range lb.Pool().Servers() {
+		backends = append(backends, config.ServerConfig{
+			URL:                   (*v).URL().String(),
+			HealthCheckTcpTimeout: (*v).HealthCheckTcpTimeout().Milliseconds(),
+			MaximalRequests:       int32((*v).MaximalRequests()),
+		})
 	}
-	b = append(b, footer...)
+
+	b, err := json.Marshal(backends)
+	if err != nil {
+		http.Error(rw, "Internal Server Error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	if _, err := rw.Write(b); err != nil {
 		http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 }
