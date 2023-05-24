@@ -36,6 +36,8 @@ const (
 	defaultUser     = "admin"
 	defaultPassword = "verySecureAdminPassword12345"
 
+	SignInError = "Invalid username or password"
+
 	usernameKey = "username"
 )
 
@@ -242,14 +244,14 @@ func (s *Service) generateToken(username string) (signedToken string, err error)
 func (s *Service) isAuthorized(username, password string) bool {
 	salt, hash, err := s.db.GetSaltAndHash(username)
 	if err != nil {
-		s.logger.Warn("Error getting salt and hash", "err", err)
+		s.logger.Warn("Error getting salt and hash", "username", username, "err", err)
 		return false
 	}
 
 	// Compare the password with the hash
 	err = bcrypt.CompareHashAndPassword([]byte(hash), []byte(password+salt))
 	if err != nil {
-		s.logger.Warn("Error comparing password and hash", "err", err)
+		s.logger.Warn("Error comparing password and hash", "username", username, "err", err)
 		return false
 	}
 	return true
@@ -277,7 +279,7 @@ func (s *Service) SignIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !s.isAuthorized(user.Username, user.Password) {
-		w.WriteHeader(http.StatusUnauthorized)
+		http.Error(w, SignInError, http.StatusUnauthorized)
 		return
 	}
 
