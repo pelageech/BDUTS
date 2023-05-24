@@ -2,9 +2,10 @@ package lb
 
 import (
 	"encoding/json"
+	"net/http"
+
 	"github.com/pelageech/BDUTS/backend"
 	"github.com/pelageech/BDUTS/config"
-	"net/http"
 )
 
 const int32BitsAmount = 31 // int32, not uint32
