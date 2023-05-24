@@ -4,14 +4,20 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"log"
 	"os"
 	"sort"
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/charmbracelet/log"
 )
 
+// CacheCleaner deals with cache and its size by deleting expired
+// or unnecessary pages. It goes in two steps: the first is removing
+// expired cache. The cleaner looks only a max-age directive.
+// The second step is removing unimportant pages: these are chosen
+// by LRU algorithm. Each of metadata of the pages contains an amount of
+// usage a particular page.
 type CacheCleaner struct {
 	dbFile      *os.File
 	maxFileSize int64
@@ -19,6 +25,7 @@ type CacheCleaner struct {
 	frequency   *time.Ticker
 }
 
+// NewCacheCleaner creates a single item of a cleaner.
 func NewCacheCleaner(dbFile *os.File, maxFileSize int64, fillFactor float64, frequency *time.Ticker) *CacheCleaner {
 	return &CacheCleaner{
 		dbFile:      dbFile,
@@ -28,6 +35,9 @@ func NewCacheCleaner(dbFile *os.File, maxFileSize int64, fillFactor float64, fre
 	}
 }
 
+// Observe occasionally sets up a cleaner's goroutine which
+// deletes expired and unnecessary pages from the cache.
+// The frequency is declared in CacheCleaner struct.
 func (p *CachingProperties) Observe() {
 	for {
 		<-p.cleaner.frequency.C
@@ -35,7 +45,7 @@ func (p *CachingProperties) Observe() {
 			func() {
 				size, err := p.deleteExpiredCache()
 				if err != nil {
-					log.Println("Expired cache: ", err)
+					logger.Warnf("Expired cache: %v", err)
 					return
 				}
 				log.Printf("Removed %d bytes of expired pages from cache\n", size)
@@ -43,7 +53,7 @@ func (p *CachingProperties) Observe() {
 			func() {
 				size, err := p.deletePagesLRU()
 				if err != nil {
-					log.Println("LRU: ", err)
+					log.Warnf("LRU: %v", err)
 					return
 				}
 				log.Printf("Removed %d bytes of the least recently used pages from cache\n", size)
@@ -67,7 +77,7 @@ func (p *CachingProperties) deleteExpiredCache() (int64, error) {
 	}
 
 	size := int64(0)
-	expiredKeys := make([]expiredItem, 0, 1024)
+	expiredKeys := make([]expiredItem, 0, initMemorySliceSize)
 
 	addExpiredKeys := func(name []byte, b *bolt.Bucket) error {
 		v := b.Get([]byte(pageMetadataKey))
@@ -97,7 +107,7 @@ func (p *CachingProperties) deleteExpiredCache() (int64, error) {
 	for _, item := range expiredKeys {
 		meta, err := p.RemovePageFromCache(item.key)
 		if err != nil {
-			log.Println(err)
+			logger.Errorf("Failed to remove page: %v", err)
 			continue
 		}
 		size += meta.Size
@@ -134,7 +144,6 @@ func (p *CachingProperties) deletePagesLRU() (int64, error) {
 			return nil
 		})
 	})
-
 	if err != nil {
 		return -1, err
 	}
@@ -147,7 +156,7 @@ func (p *CachingProperties) deletePagesLRU() (int64, error) {
 	for i := 0; p.isSizeExceeded() && i < len(lruItems); i++ {
 		meta, err := p.RemovePageFromCache(lruItems[i].key)
 		if err != nil {
-			log.Println(err)
+			logger.Errorf("Failed to remove page: %v", err)
 			continue
 		}
 		size += meta.Size

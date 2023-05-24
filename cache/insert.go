@@ -4,17 +4,16 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"github.com/pelageech/BDUTS/metrics"
-	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/pelageech/BDUTS/metrics"
 )
 
 var (
-	infinityTime = time.Unix(0, 0).AddDate(7999, 12, 31)
+	infinityTime = time.Unix(0, 0).AddDate(infinityTimeYear, infinityTimeMonth, infinityTimeDay)
 	nullTime     = time.Time{}
 )
 
@@ -33,7 +32,7 @@ func (p *CachingProperties) InsertPageInCache(key []byte, req *http.Request, res
 	requestDirectives := loadRequestDirectives(req.Header)
 	responseDirectives := loadResponseDirectives(resp.Header)
 
-	if requestDirectives.NoStore || responseDirectives.NoStore {
+	if requestDirectives.NoStore || responseDirectives.NoStore || req.Method != http.MethodGet {
 		return errors.New("can't be stored in cache")
 	}
 
@@ -48,7 +47,6 @@ func (p *CachingProperties) InsertPageInCache(key []byte, req *http.Request, res
 		return err
 	}
 
-	log.Println("Successfully saved, page's size = ", meta.Size)
 	return nil
 }
 
@@ -60,25 +58,29 @@ func (p *CachingProperties) insertPageMetadataToDB(key []byte, meta *PageMetadat
 
 	err = p.db.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucket(key)
-		if err == bolt.ErrBucketExists {
+		if errors.Is(err, bolt.ErrBucketExists) {
 			b = tx.Bucket(key)
 		}
-		if err == nil || err == bolt.ErrBucketExists {
-			_ = b.Put([]byte(pageMetadataKey), value)
-			bs := make([]byte, 4)
-			_ = b.Put([]byte(usesKey), bs)
+
+		if err == nil || errors.Is(err, bolt.ErrBucketExists) {
+			_ = b.Put([]byte(pageMetadataKey), value) // put metadata
+			bucketUses := make([]byte, sizeOfInt32)
+			_ = b.Put([]byte(usesKey), bucketUses) // put uses
 		}
 
 		return err
 	})
 
+	// if a new bucket was created
 	if err == nil {
 		p.IncrementSize(meta.Size)
 		metrics.UpdateCachePagesCount(1)
 	}
-	if err == bolt.ErrBucketExists {
+
+	if errors.Is(err, bolt.ErrBucketExists) {
 		return nil
 	}
+
 	return err
 }
 
@@ -89,11 +91,11 @@ func writePageToDisk(key []byte, page *Page) error {
 	}
 
 	path := makePath(key, subHashCount)
-	if err := os.MkdirAll(path, 0770); err != nil {
+	if err := os.MkdirAll(path, readWriteExecuteOwnerGroup); err != nil {
 		return err
 	}
 
-	file, err := os.Create(path + "/" + string(key[:]))
+	file, err := os.Create(path + "/" + string(key))
 	if err != nil {
 		return err
 	}
@@ -107,8 +109,7 @@ func writePageToDisk(key []byte, page *Page) error {
 	return w.Flush()
 }
 
-// Создаёт экземпляр структуры cache.PageMetadata, в которой хранится
-// информация о странице, помещаемой в кэш.
+// Creates a single item of cache.PageMetadata.
 func createCacheInfo(resp *http.Response, size int64) *PageMetadata {
 	meta := &PageMetadata{
 		Size:               size,

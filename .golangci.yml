@@ -18,3 +18,44 @@ linters:
     - dupl
     - dupword
     - durationcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - execinquery
+    - exhaustive
+    - exportloopref
+    - forbidigo
+    - forcetypeassert
+    - gci
+    - ginkgolinter
+    - gocheckcompilerdirectives
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - godot
+    - gofmt
+    - gofumpt
+    - goheader
+    - goimports
+    - gomnd
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - grouper
+    - importas
+    - interfacebloat
+    - ireturn
+    - maintidx
+    - makezero
+    - misspell
+    - prealloc
+    - whitespace
+
+issues:
+  exclude-rules:
+    - path: 'backend/backend.go'
+      linters:
+        - errorlint
+    - path: 'admin_app/main.go'
+      linters:
+        - forbidigo

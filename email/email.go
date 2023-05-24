@@ -1,3 +1,4 @@
+// Package email implements a service for sending emails.
 package email
 
 import (
@@ -21,6 +22,8 @@ const (
 		" you did not change your password, please contact the administrator."
 )
 
+// Sender is a struct that contains all the configuration
+// of the email sender.
 type Sender struct {
 	auth   smtp.Auth
 	from   string
@@ -29,6 +32,7 @@ type Sender struct {
 	logger *log.Logger
 }
 
+// New creates a new Sender.
 func New(username, password, host, port string, logger *log.Logger) *Sender {
 	return &Sender{
 		auth: smtp.PlainAuth(
@@ -54,11 +58,14 @@ func (s *Sender) send(to, subject, body string) (err error) {
 	return
 }
 
+// SendSignUpEmail sends an email with a temporary password to the user.
 func (s *Sender) SendSignUpEmail(to, username, password string) (err error) {
 	msg := fmt.Sprintf(msgNewUser, username, password)
 	return s.send(to, subjectNewUser, msg)
 }
 
+// SendChangedPasswordEmail sends an email notifying the user
+// that their password has been changed.
 func (s *Sender) SendChangedPasswordEmail(to string) (err error) {
 	return s.send(to, subjectPasswordChanged, msgPasswordChanged)
 }
