@@ -42,6 +42,9 @@ const (
 
 	usersDB            = "./db/users.db"
 	usersDBPermissions = 0o600
+
+	certFile = "resources/Cert.crt"
+	keyFile  = "resources/Key.key"
 )
 
 var logger *log.Logger
@@ -287,7 +290,7 @@ func main() {
 	http.Handle("/admin", cors(authSvc.AuthenticationMiddleware(http.HandlerFunc(authSvc.DeleteUser))))
 
 	// Config TLS: setting a pair crt-key
-	Crt, _ := tls.LoadX509KeyPair("resources/Cert.crt", "resources/Key.key")
+	Crt, _ := tls.LoadX509KeyPair(certFile, keyFile)
 	tlsConfig := &tls.Config{Certificates: []tls.Certificate{Crt}}
 
 	ln, err := tls.Listen("tcp", fmt.Sprintf(":%d", loadBalancer.Config().Port()), tlsConfig)
