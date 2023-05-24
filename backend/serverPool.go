@@ -70,7 +70,7 @@ func (p *ServerPool) Current() int32 {
 // IncrementCurrent increments the current server index.
 func (p *ServerPool) IncrementCurrent() {
 	p.current++
-	if p.current == int32(len(p.Servers())) {
+	if p.current >= int32(len(p.Servers())) {
 		p.current = 0
 	}
 }
@@ -78,7 +78,7 @@ func (p *ServerPool) IncrementCurrent() {
 // DecrementCurrent decrements the current server index.
 func (p *ServerPool) DecrementCurrent() {
 	p.current--
-	if p.current == 0 {
+	if p.current <= 0 {
 		p.current = int32(len(p.Servers())) - 1
 	}
 }
