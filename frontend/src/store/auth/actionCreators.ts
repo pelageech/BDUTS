@@ -60,7 +60,7 @@ export const getServers = () =>
     async (dispatch: Dispatch<any>): Promise<void> => {
         try {
             dispatch(getServersStart())
-            const res = await api.auth.getServers()
+            const res  = await api.auth.getServers()
             dispatch(getServersSuccess(res.data))
         } catch (e: any) {
             console.error(e)
@@ -103,14 +103,3 @@ export const changePassword = (arg: { oldPass: string, newPass: string }) =>
             console.error(e)
         }
     }
-
-// export const addServerThunk = createAsyncThunk(
-//     'auth/addServer',
-//     async (arg: { url: string, healthCheckTcpTimeout: number, maximalRequests: number }) => {
-//         try {
-//             await api.auth.addServer(arg.url, arg.healthCheckTcpTimeout, arg.maximalRequests);
-//         } catch (e: any) {
-//             console.error(e)
-//         }
-//     }
-// )

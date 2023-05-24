@@ -7,12 +7,24 @@ const SignUp = () => {
 
     const dispatch = useAppDispatch();
 
-    const [username, setUsername] = useState('');
-    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState("");
+    const [email, setEmail] = useState("");
+    const [error, setError] = useState("");
+    const [msg, setMsg] = useState("");
+
 
     const handleSignUp = (e: FormEvent) => {
         e.preventDefault();
+        if (username === "" || email === ""){
+            setError("Please fill in all fields");
+            setTimeout(() => {
+                setError("");
+            }, 5000);
+            return;
+        }
         dispatch(addUser({ username, email }));
+        setMsg("We've send a username and password to your email. Use them to login.");
+        
     };
 
     const renderProfile = () => (
@@ -27,6 +39,8 @@ const SignUp = () => {
                         <label htmlFor="email">Email:</label>
                         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                     </div>
+                    {error && <span className="error-message">{error}</span>}
+                    {msg && <span>{msg}</span>}
                     <button type="submit">Add user</button>
                 </form>
             </div>

@@ -11,6 +11,7 @@ const ChangePassword = () => {
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [error, setError] = useState("");
+    const [msg, setMsg] = useState("");
 
     const handleChangePassword = (e: FormEvent) => {
         e.preventDefault();
@@ -36,6 +37,7 @@ const ChangePassword = () => {
         const oldPass = currentPassword;
         const newPass = newPassword;
         dispatch(changePassword({ oldPass, newPass }))
+        setMsg("Password successfully changed")
     };
 
 
@@ -56,6 +58,7 @@ const ChangePassword = () => {
                         <input type="password" id="confirmPassword" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
                     </div>
                     {error && <span className="error-message">{error}</span>}
+                    {msg && <span className="success-message">{msg}</span>}
                     <button type="submit">Change password</button>
                 </form>
             </div>

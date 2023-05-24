@@ -1,4 +1,4 @@
-import { AxiosPromise } from "axios";
+import { AxiosPromise, AxiosResponse } from "axios";
 import Endpoints from "../endpoints";
 import { axiosInstance } from "../instance";
 import { ILoginResponse, ILoginRequest } from "./types";
@@ -6,7 +6,8 @@ import { ILoginResponse, ILoginRequest } from "./types";
 export const login = (params: ILoginRequest): AxiosPromise<ILoginResponse> =>
     axiosInstance.post(Endpoints.AUTH.LOGIN, params)
 
-export const getServers = (): AxiosPromise<string> => axiosInstance.get(Endpoints.AUTH.GET)
+export const getServers = (): Promise<AxiosResponse<{ URL: string; HealthCheckTcpTimeout: number; MaximalRequests: number; }[], any>> =>
+    axiosInstance.get(Endpoints.AUTH.GET);
 
 export const deleteServer = (serverUrl: string): AxiosPromise<void> => axiosInstance.delete(Endpoints.AUTH.DELETE,
     { data: { url: serverUrl } })

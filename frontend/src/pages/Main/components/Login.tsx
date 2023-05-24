@@ -2,8 +2,6 @@ import React, { FormEvent, useState } from "react";
 import { IRootState, useAppDispatch, useAppSelector } from "../../../store";
 import { loginUser } from "../../../store/auth/actionCreators";
 import "./Login.css";
-import Cookies from "js-cookie";
-import { wait } from "@testing-library/user-event/dist/utils";
 
 const Login = () => {
     const dispatch = useAppDispatch();

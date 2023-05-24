@@ -1,8 +1,9 @@
-import React, { FormEvent, useState } from "react";
+import React, { FormEvent, useEffect, useState } from "react";
 import Login from "./components/Login";
 import { IRootState, useAppDispatch, useAppSelector } from "../../store";
 import { addServer, deleteServer, getServers } from "../../store/auth/actionCreators";
 import "./Main.css";
+import { getServersStart } from "../../store/auth/authReducer";
 
 const Main = () => {
     const dispatch = useAppDispatch();
@@ -11,12 +12,16 @@ const Main = () => {
         (state: IRootState) => !!state.auth.authData.accessToken
     );
 
-    const serverHtml = useAppSelector(
-        (state: IRootState) => state.auth.serverData.serverHtml
+    const servers = useAppSelector(
+        (state: IRootState) => state.auth.serverData.servers
     );
 
+    useEffect(() => {
+        dispatch(getServersStart());
+    }, [dispatch]);
+
     const serverUrls = useAppSelector(
-        (state: IRootState) => state.auth.serverData.serverUrl
+        (state: IRootState) => state.auth.serverData.urls
     );
 
     const [deleteUrl, setDeleteUrl] = useState("");
@@ -51,7 +56,7 @@ const Main = () => {
                 setAddError("");
             }, 5000);
             return;
-        } else if (serverUrls.includes(url)){
+        } else if (serverUrls.includes(url)) {
             setAddError("Server already exists");
             setTimeout(() => {
                 setAddError("");
@@ -67,23 +72,65 @@ const Main = () => {
 
     const renderProfile = () => (
         <div className="profile-container">
-            <div id="html-container" dangerouslySetInnerHTML={{ __html: serverHtml }} />
+            {/* Таблица серверов */}
+            <table className="server-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>URL</th>
+                        <th>TCP Timeout</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {servers.map((server, index) => (
+                        <tr key={index}>
+                            <td>{index + 1}</td>
+                            <td>{server.URL}</td>
+                            <td>{server.HealthCheckTcpTimeout}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+
+            {/* Форма удаления сервера */}
             <div>
                 <form onSubmit={handleDelete}>
                     <label htmlFor="deleteServer">Server URL:</label>
-                    <input name="deleteServer" type="text" value={deleteUrl} onChange={(e) => setDeleteUrl(e.target.value)} />
+                    <input
+                        name="deleteServer"
+                        type="text"
+                        value={deleteUrl}
+                        onChange={(e) => setDeleteUrl(e.target.value)}
+                    />
                     <button>Delete</button>
                     {deleteError && <span className="error-message">{deleteError}</span>}
                 </form>
             </div>
+
+            {/* Форма добавления сервера */}
             <div>
                 <form onSubmit={handleAdd}>
                     <label htmlFor="serverUrl">Server URL:</label>
-                    <input name="serverUrl" type="text" value={url} onChange={(e) => setUrl(e.target.value)} />
+                    <input
+                        name="serverUrl"
+                        type="text"
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                    />
                     <label htmlFor="serverTcp">Server TCP:</label>
-                    <input name="serverTcp" type="number" value={healthCheckTcpTimeout} onChange={(e) => setHealthCheckTcpTimeout(parseInt(e.target.value))} />
+                    <input
+                        name="serverTcp"
+                        type="number"
+                        value={healthCheckTcpTimeout}
+                        onChange={(e) => setHealthCheckTcpTimeout(parseInt(e.target.value))}
+                    />
                     <label htmlFor="serverMaxReq">Server MaxReq:</label>
-                    <input name="serverMaxReq" type="number" value={maximalRequests} onChange={(e) => setMaximalRequests(parseInt(e.target.value))} />
+                    <input
+                        name="serverMaxReq"
+                        type="number"
+                        value={maximalRequests}
+                        onChange={(e) => setMaximalRequests(parseInt(e.target.value))}
+                    />
                     <button>Add</button>
                     {addError && <span className="error-message">{addError}</span>}
                 </form>
