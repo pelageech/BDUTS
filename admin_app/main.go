@@ -78,7 +78,7 @@ var (
 
 	delUser = flag.Bool("del-user", false, "deletes a user, requires login and token")
 
-	tr = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} // todo: configure tls in right way
+	tr = &http.Transport{TLSClientConfig: &tls.Config{}}
 	c  = &http.Client{Transport: tr}
 )
 
