@@ -93,6 +93,13 @@ func (lb *LoadBalancer) RemoveServerHandler(rw http.ResponseWriter, req *http.Re
 	}
 }
 
+type getResponseJSON struct {
+	URL                   string
+	HealthCheckTcpTimeout int64
+	MaximalRequests       int
+	Alive                 bool
+}
+
 // GetServersHandler takes all the information about the backends from the server pool and puts
 // an HTML page to http.ResponseWriter with the info in <table>...</table> tags.
 func (lb *LoadBalancer) GetServersHandler(rw http.ResponseWriter, req *http.Request) {
@@ -101,13 +108,14 @@ func (lb *LoadBalancer) GetServersHandler(rw http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	backends := make([]config.ServerConfig, 0, len(lb.Pool().Servers()))
+	backends := make([]getResponseJSON, 0, len(lb.Pool().Servers()))
 
 	for _, v := range lb.Pool().Servers() {
-		backends = append(backends, config.ServerConfig{
+		backends = append(backends, getResponseJSON{
 			URL:                   (*v).URL().String(),
 			HealthCheckTcpTimeout: (*v).HealthCheckTcpTimeout().Milliseconds(),
-			MaximalRequests:       int32((*v).MaximalRequests()),
+			MaximalRequests:       (*v).MaximalRequests(),
+			Alive:                 v.Alive(),
 		})
 	}
 
