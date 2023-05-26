@@ -42,8 +42,8 @@ const (
 	usersDB            = "./db/users.db"
 	usersDBPermissions = 0o600
 
-	certFile = "resources/Cert.crt"
-	keyFile  = "resources/Key.key"
+	certFile = "resources/fullchain.pem"
+	keyFile  = "resources/privkey.pem"
 )
 
 var logger *log.Logger
