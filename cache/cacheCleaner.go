@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/charmbracelet/log"
 )
 
 // CacheCleaner deals with cache and its size by deleting expired
@@ -48,15 +47,15 @@ func (p *CachingProperties) Observe() {
 					logger.Warnf("Expired cache: %v", err)
 					return
 				}
-				log.Printf("Removed %d bytes of expired pages from cache\n", size)
+				logger.Infof("Removed %d bytes of expired pages from cache\n", size)
 			}()
 			func() {
 				size, err := p.deletePagesLRU()
 				if err != nil {
-					log.Warnf("LRU: %v", err)
+					logger.Warnf("LRU: %v", err)
 					return
 				}
-				log.Printf("Removed %d bytes of the least recently used pages from cache\n", size)
+				logger.Infof("Removed %d bytes of the least recently used pages from cache\n", size)
 			}()
 		}
 	}
@@ -87,8 +86,10 @@ func (p *CachingProperties) deleteExpiredCache() (int64, error) {
 			return err
 		}
 
+		nameCopy := make([]byte, 0, len(name))
+		copy(nameCopy, name)
 		if isExpired(&info, time.Duration(0)) {
-			expiredKeys = append(expiredKeys, expiredItem{name, info.Size})
+			expiredKeys = append(expiredKeys, expiredItem{nameCopy, info.Size})
 		}
 		return nil
 	}
@@ -99,7 +100,7 @@ func (p *CachingProperties) deleteExpiredCache() (int64, error) {
 		return tx.ForEach(addExpiredKeys)
 	})
 	if err != nil {
-		log.Printf("Error while viewing cache in CacheCleaner: %v", err)
+		logger.Errorf("Error while viewing cache in CacheCleaner: %v", err)
 		return -1, err
 	}
 
@@ -148,7 +149,7 @@ func (p *CachingProperties) deletePagesLRU() (int64, error) {
 		return -1, err
 	}
 
-	sort.Slice(lruItems, func(i, j int) bool {
+	sort.Slice(lruItems, func(i, j int) bool { // could be faster use heap for popping the least
 		return lruItems[i].uses < lruItems[j].uses
 	})
 

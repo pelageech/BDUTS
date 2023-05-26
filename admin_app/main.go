@@ -78,7 +78,7 @@ var (
 
 	delUser = flag.Bool("del-user", false, "deletes a user, requires login and token")
 
-	tr = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} // todo: configure tls in right way
+	tr = &http.Transport{TLSClientConfig: &tls.Config{}}
 	c  = &http.Client{Transport: tr}
 )
 
@@ -284,7 +284,10 @@ func deleteHandle() {
 }
 
 func handleResponse(resp *http.Response) error {
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
 	if resp.StatusCode == http.StatusUnauthorized {
 		return fmt.Errorf("401 Unauthorized")
 	}

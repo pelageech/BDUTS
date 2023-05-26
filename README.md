@@ -40,33 +40,6 @@ where:<br>
 - **"maxCacheSize"** is a maximal size _in bytes_ for storing cached pages;
 - **"observeFrequency"** is a period of observing cache _in milliseconds_ and detecting whether it is necessary to delete rotten or little-used pagesю
 
-### Caching
-The last step is optional but necessary if you want caching to work properly.
-
-For each possible path you should put their key constructors explicitly to the file ```resources/cache_config.json```.
-Follow the pattern:
-```
-[
-  {
-    "location" : "/",
-    "requestKey" : "REQ_METHOD;REQ_HOST;REQ_URI"
-  },
-  {
-    "location" : "/draw",
-    "requestKey" : "REQ_METHOD;REQ_HOST;REQ_URI;REQ_QUERY"
-  },
-  ...
-]
-```
-Hash of the requests will be calculated based on ```requestKey```.
-All the possible directives:
-- **REQ_METHOD**  : include method
-- **REQ_HOST**    : include host
-- **REQ_URI**     : include path
-- **REQ_QUERY**   : include GET-Query (after ?)
-
-_Note: wrong directives will be ignored. If there is no any correct directive, then ```"REQ_METHOD;REQ_HOST;REQ_URI"``` is used as default._
-
 ## Let's start our balancer
 Just build the project ```go build .``` and run it.
 Or run immediately ```go run .```.
