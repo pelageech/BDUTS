@@ -8,3 +8,4 @@ data
 grafana
 db/users.db
 db/users.db.lock
+frontend/src/cert
