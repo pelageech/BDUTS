@@ -27,7 +27,6 @@ const (
 	dbFillFactor      = 0.9
 	lbConfigPath      = "./resources/config.json"
 	serversConfigPath = "./resources/servers.json"
-	cacheConfigPath   = "./resources/cache_config.json"
 
 	loggerPrefixMain  = "BDUTS"
 	loggerPrefixCache = "BDUTS_CACHE"
@@ -43,8 +42,8 @@ const (
 	usersDB            = "./db/users.db"
 	usersDBPermissions = 0o600
 
-	certFile = "resources/fullchain.pem"
-	keyFile  = "resources/privkey.pem"
+	certFile = "resources/Cert.crt"
+	keyFile  = "resources/Key.key"
 )
 
 var logger *log.Logger
@@ -66,25 +65,6 @@ func loadBalancerConfigure() *config.LoadBalancerConfig {
 		logger.Fatal("Failed to read LoadBalancerConfig", "err", err)
 	}
 	return lbConfig
-}
-
-func cacheConfigure() *config.CacheConfig {
-	cacheReader, err := config.NewCacheReader(cacheConfigPath)
-	if err != nil {
-		logger.Fatal("Failed to create CacheReader", "err", err)
-	}
-	defer func(cacheReader *config.CacheReader) {
-		err := cacheReader.Close()
-		if err != nil {
-			logger.Fatal("Failed to close CacheReader", "err", err)
-		}
-	}(cacheReader)
-
-	cacheConfig, err := config.ReadCacheConfig(cacheReader)
-	if err != nil {
-		logger.Fatal("Failed to read CacheConfig", "err", err)
-	}
-	return cacheConfig
 }
 
 func serversConfigure() []config.ServerConfig {
@@ -152,8 +132,6 @@ func main() {
 		time.Duration(lbConfJSON.ObserveFrequency)*time.Millisecond,
 	)
 
-	cacheConfig := cacheConfigure()
-
 	// database
 	logger.Info("Opening cache database")
 	if err := os.Mkdir(cache.DbDirectory, readWriteExecuteOwner); err != nil && !os.IsExist(err) {
@@ -170,7 +148,7 @@ func main() {
 	controller := cacheCleanerConfigure(dbControllerTicker, lbConfig.MaxCacheSize())
 	defer dbControllerTicker.Stop()
 
-	cacheProps := cache.NewCachingProperties(boltdb, cacheConfig, controller)
+	cacheProps := cache.NewCachingProperties(boltdb, controller)
 	cacheProps.CalculateSize()
 
 	// health checker configuration
