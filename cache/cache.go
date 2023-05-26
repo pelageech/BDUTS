@@ -20,7 +20,6 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/charmbracelet/log"
-	"github.com/pelageech/BDUTS/config"
 	"github.com/pelageech/BDUTS/metrics"
 )
 
@@ -41,7 +40,7 @@ const (
 	// DbName is a name of the database.
 	DbName = "database.db"
 
-	// DefaultKey is used if there's no key parameter of cache for url.
+	// DefaultKey is used if there's no key parameter of cache for url. Not used now.
 	DefaultKey = "REQ_METHOD;REQ_HOST;REQ_URI"
 
 	// PagesPath is the directory where the pages are written to.
@@ -79,8 +78,8 @@ var (
 )
 
 // UrlToKeyBuilder is a map that contains parsers for each string.
-// The parser takes a part of URI by string from the request.
-type UrlToKeyBuilder map[string][]func(r *http.Request) string
+// The parser takes a part of URI by string from the request. Not used.
+type UrlToKeyBuilder map[string]func(r *http.Request) string
 
 // CachingProperties takes over the cache and the pages there.
 // The structure of the cache reminds file systems in common operating systems.
@@ -88,11 +87,11 @@ type UrlToKeyBuilder map[string][]func(r *http.Request) string
 // The driver is a boltDB database containing buckets named by request hash.
 // Each of buckets has metadata struct and an amount of usage the page during its life.
 type CachingProperties struct {
-	db            *bolt.DB
-	keyBuilderMap UrlToKeyBuilder
-	cleaner       *CacheCleaner
-	Size          int64
-	PagesCount    int
+	db *bolt.DB
+	//	keyBuilderMap UrlToKeyBuilder
+	cleaner    *CacheCleaner
+	Size       int64
+	PagesCount int
 }
 
 // Page is a structure that is the cache unit storing on a disk.
@@ -151,28 +150,17 @@ type responseDirectives struct {
 	SMaxAge         time.Time
 }
 
-func NewCachingProperties(db *bolt.DB, cacheConfig *config.CacheConfig, cleaner *CacheCleaner) *CachingProperties {
-	keyBuilder := make(UrlToKeyBuilder)
-
-	for _, v := range cacheConfig.Pairs() {
-		keyBuilder[v.Location] = config.ParseRequestKey(v.RequestKey)
-	}
-
+func NewCachingProperties(db *bolt.DB, cleaner *CacheCleaner) *CachingProperties {
 	return &CachingProperties{
-		db:            db,
-		keyBuilderMap: keyBuilder,
-		cleaner:       cleaner,
-		Size:          0,
-		PagesCount:    0,
+		db:         db,
+		cleaner:    cleaner,
+		Size:       0,
+		PagesCount: 0,
 	}
 }
 
 func (p *CachingProperties) DB() *bolt.DB {
 	return p.db
-}
-
-func (p *CachingProperties) KeyBuilderMap() UrlToKeyBuilder {
-	return p.keyBuilderMap
 }
 
 func (p *CachingProperties) Cleaner() *CacheCleaner {
@@ -284,19 +272,7 @@ func makePath(hash []byte, divide int) string {
 // in order to construct a key for mapping this one with
 // values of page on a disk and its metadata in DB.
 func (p *CachingProperties) constructKeyFromRequest(req *http.Request) string {
-	result := ""
-
-	keyBuilderMap := p.KeyBuilderMap()
-	keyBuilder, ok := keyBuilderMap[req.URL.Path]
-	if !ok {
-		keyBuilder = config.ParseRequestKey(DefaultKey)
-	}
-
-	for _, addStringKey := range keyBuilder {
-		result += addStringKey(req)
-	}
-
-	return result
+	return req.URL.String()
 }
 
 func isExpired(info *PageMetadata, afterDeath time.Duration) bool {
@@ -315,7 +291,10 @@ func loadRequestDirectives(header http.Header) *requestDirectives {
 	}
 
 	cacheControlString := header.Get("cache-control")
-	cacheControl := strings.Split(cacheControlString, ";")
+	cacheControl := strings.Split(cacheControlString, ",")
+	for i := range cacheControl {
+		cacheControl[i] = strings.TrimSpace(cacheControl[i])
+	}
 	for _, v := range cacheControl {
 		switch v {
 		case "only-if-cached":
@@ -364,7 +343,10 @@ func loadResponseDirectives(header http.Header) *responseDirectives {
 	}
 
 	cacheControlString := header.Get("cache-control")
-	cacheControl := strings.Split(cacheControlString, ";")
+	cacheControl := strings.Split(cacheControlString, ",")
+	for i := range cacheControl {
+		cacheControl[i] = strings.TrimSpace(cacheControl[i])
+	}
 	for _, v := range cacheControl {
 		switch v {
 		case "must-revalidate":
