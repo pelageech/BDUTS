@@ -40,7 +40,7 @@ const (
 	// DbName is a name of the database.
 	DbName = "database.db"
 
-	// DefaultKey is used if there's no key parameter of cache for url. Not used now
+	// DefaultKey is used if there's no key parameter of cache for url. Not used now.
 	DefaultKey = "REQ_METHOD;REQ_HOST;REQ_URI"
 
 	// PagesPath is the directory where the pages are written to.
@@ -87,11 +87,11 @@ type UrlToKeyBuilder map[string]func(r *http.Request) string
 // The driver is a boltDB database containing buckets named by request hash.
 // Each of buckets has metadata struct and an amount of usage the page during its life.
 type CachingProperties struct {
-	db            *bolt.DB
-	keyBuilderMap UrlToKeyBuilder // not used
-	cleaner       *CacheCleaner
-	Size          int64
-	PagesCount    int
+	db *bolt.DB
+	//	keyBuilderMap UrlToKeyBuilder
+	cleaner    *CacheCleaner
+	Size       int64
+	PagesCount int
 }
 
 // Page is a structure that is the cache unit storing on a disk.
