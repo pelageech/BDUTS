@@ -86,8 +86,10 @@ func (p *CachingProperties) deleteExpiredCache() (int64, error) {
 			return err
 		}
 
+		nameCopy := make([]byte, 0, len(name))
+		copy(nameCopy, name)
 		if isExpired(&info, time.Duration(0)) {
-			expiredKeys = append(expiredKeys, expiredItem{name, info.Size})
+			expiredKeys = append(expiredKeys, expiredItem{nameCopy, info.Size})
 		}
 		return nil
 	}
