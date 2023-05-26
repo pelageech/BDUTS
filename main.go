@@ -42,8 +42,8 @@ const (
 	usersDB            = "./db/users.db"
 	usersDBPermissions = 0o600
 
-	certFile = "resources/fullchain.pem"
-	keyFile  = "resources/privkey.pem"
+	certFile = "resources/Cert.crt"
+	keyFile  = "resources/Key.key"
 )
 
 var logger *log.Logger
@@ -186,7 +186,7 @@ func main() {
 	logger.Info("Ready!")
 
 	// set up health check
-
+	go loadBalancer.HealthChecker()
 	go loadBalancer.CacheProps().Observe()
 
 	dbService := db.Service{}
