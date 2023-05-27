@@ -219,25 +219,22 @@ func (p *CachingProperties) CalculateSize() {
 	p.PagesCount = pagesCount
 }
 
-func (p *CachingProperties) ClearCache() {
+func (p *CachingProperties) ClearCache() error {
 	err := p.DB().Update(func(tx *bolt.Tx) error {
 		return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
 			return tx.DeleteBucket(name)
 		})
 	})
 	if err != nil {
-		logger.Errorf("Error while clearing db: %v", err)
+		return err
 	}
 
-	err = filepath.WalkDir(PagesPath, func(path string, d fs.DirEntry, err error) error {
+	return filepath.WalkDir(PagesPath, func(path string, d fs.DirEntry, err error) error {
 		if path == PagesPath {
 			return nil
 		}
 		return os.RemoveAll(path)
 	})
-	if err != nil {
-		logger.Errorf("Error while deleting pages: %v", err)
-	}
 }
 
 // OpenDatabase opens a database file.

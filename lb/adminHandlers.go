@@ -131,3 +131,17 @@ func (lb *LoadBalancer) GetServersHandler(rw http.ResponseWriter, req *http.Requ
 	}
 	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 }
+
+func (lb *LoadBalancer) ClearCacheHandler(rw http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodDelete {
+		http.Error(rw, "Only DELETE requests are supported", http.StatusMethodNotAllowed)
+		return
+	}
+
+	err := lb.CacheProps().ClearCache()
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+	}
+
+	rw.WriteHeader(http.StatusNoContent)
+}
