@@ -81,7 +81,7 @@ var (
 
 	clear = flag.Bool("clear", false, "clear cache")
 
-	tr = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	tr = &http.Transport{TLSClientConfig: &tls.Config{}}
 	c  = &http.Client{Transport: tr}
 )
 
