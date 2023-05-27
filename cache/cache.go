@@ -291,7 +291,7 @@ func loadRequestDirectives(header http.Header) *requestDirectives {
 	}
 
 	cacheControlString := header.Get("cache-control")
-	cacheControl := strings.Split(cacheControlString, ",")
+	cacheControl := strings.Split(cacheControlString, ";")
 	for i := range cacheControl {
 		cacheControl[i] = strings.TrimSpace(cacheControl[i])
 	}
@@ -343,7 +343,7 @@ func loadResponseDirectives(header http.Header) *responseDirectives {
 	}
 
 	cacheControlString := header.Get("cache-control")
-	cacheControl := strings.Split(cacheControlString, ",")
+	cacheControl := strings.Split(cacheControlString, ";")
 	for i := range cacheControl {
 		cacheControl[i] = strings.TrimSpace(cacheControl[i])
 	}
