@@ -1,6 +1,0 @@
-{
-  "port" : 8080,
-  "healthCheckPeriod" : 120000,
-  "maxCacheSize" : 10000000,
-  "observeFrequency" : 10000
-}

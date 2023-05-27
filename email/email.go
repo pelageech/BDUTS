@@ -2,6 +2,7 @@
 package email
 
 import (
+	"errors"
 	"fmt"
 	"net/smtp"
 
@@ -22,6 +23,19 @@ const (
 		" you did not change your password, please contact the administrator."
 )
 
+var (
+	// ErrEmptyUsername is returned when the username is empty.
+	ErrEmptyUsername = errors.New("username cannot be empty")
+	// ErrEmptyPassword is returned when the password is empty.
+	ErrEmptyPassword = errors.New("password cannot be empty")
+	// ErrEmptyHost is returned when the host is empty.
+	ErrEmptyHost = errors.New("host cannot be empty")
+	// ErrEmptyPort is returned when the port is empty.
+	ErrEmptyPort = errors.New("port cannot be empty")
+	// ErrEmptyLogger is returned when the logger is nil.
+	ErrEmptyLogger = errors.New("logger cannot be nil")
+)
+
 // Sender is a struct that contains all the configuration
 // of the email sender.
 type Sender struct {
@@ -33,7 +47,23 @@ type Sender struct {
 }
 
 // New creates a new Sender.
-func New(username, password, host, port string, logger *log.Logger) *Sender {
+func New(username, password, host, port string, logger *log.Logger) (*Sender, error) {
+	if username == "" {
+		return nil, ErrEmptyUsername
+	}
+	if password == "" {
+		return nil, ErrEmptyPassword
+	}
+	if host == "" {
+		return nil, ErrEmptyHost
+	}
+	if port == "" {
+		return nil, ErrEmptyPort
+	}
+	if logger == nil {
+		return nil, ErrEmptyLogger
+	}
+
 	return &Sender{
 		auth: smtp.PlainAuth(
 			"",
@@ -45,7 +75,7 @@ func New(username, password, host, port string, logger *log.Logger) *Sender {
 		host:   host,
 		port:   port,
 		logger: logger,
-	}
+	}, nil
 }
 
 func (s *Sender) send(to, subject, body string) (err error) {
