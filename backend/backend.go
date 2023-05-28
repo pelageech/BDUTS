@@ -80,10 +80,13 @@ func (b *Backend) Alive() bool {
 // AssignRequest returns true if backend's channel is not full.
 // Apart from that, channel gets a new item.
 func (b *Backend) AssignRequest() bool {
+	timer := time.NewTimer(holdUpAfterAssign * time.Millisecond)
+	defer timer.Stop()
+
 	select {
 	case b.requestChan <- true:
 		return true
-	case <-time.After(holdUpAfterAssign * time.Millisecond):
+	case <-timer.C:
 		return false
 	}
 }
