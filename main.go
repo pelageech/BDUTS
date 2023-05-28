@@ -219,7 +219,10 @@ func main() {
 	smtpPassword := os.Getenv("SMTP_PASSWORD")
 	smtpHost := os.Getenv("SMTP_HOST")
 	smtpPort := os.Getenv("SMTP_PORT")
-	sender := email.New(smtpUser, smtpPassword, smtpHost, smtpPort, logger)
+	sender, err := email.New(smtpUser, smtpPassword, smtpHost, smtpPort, logger)
+	if err != nil {
+		logger.Fatal("Unable to set up email sender", "err", err)
+	}
 
 	// set up auth
 	validate := validator.New()
