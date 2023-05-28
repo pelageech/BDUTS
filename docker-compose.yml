@@ -8,11 +8,6 @@ services:
       mynetwork:
         ipv4_address: 192.168.0.3
     environment:
-      - POSTGRES_USER=
-      - USER_PASSWORD=
-      - DB_HOST=
-      - DB_NAME=
-      - DB_PORT=
       - SMTP_USER=
       - SMTP_PASSWORD=
       - SMTP_HOST=
