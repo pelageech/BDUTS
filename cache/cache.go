@@ -220,11 +220,35 @@ func (p *CachingProperties) CalculateSize() {
 }
 
 func (p *CachingProperties) ClearCache() error {
+	checkDisk := func(hash []byte) error {
+		path := makePath(hash, subHashCount)
+		path += "/" + string(hash)
+
+		_, err := os.Stat(path)
+		return err
+	}
+
 	err := p.DB().Update(func(tx *bolt.Tx) error {
 		return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+			m := b.Get([]byte(pageMetadataKey))
+			if m == nil {
+				return errors.New("buckets must contain " + pageMetadataKey)
+			}
+			var meta PageMetadata
+			err := json.Unmarshal(m, &meta)
+			if err != nil {
+				return err
+			}
+			if err := checkDisk(name); err != nil {
+				return err
+			}
+			p.IncrementSize(-meta.Size)
+			metrics.UpdateCachePagesCount(-1)
 			return tx.DeleteBucket(name)
 		})
 	})
+	metrics.GlobalMetrics.CacheSize.Set(float64(p.Size))
+
 	if err != nil {
 		return err
 	}
