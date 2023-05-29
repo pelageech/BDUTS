@@ -60,7 +60,7 @@ export const getServers = () =>
     async (dispatch: Dispatch<any>): Promise<void> => {
         try {
             dispatch(getServersStart())
-            const res  = await api.auth.getServers()
+            const res = await api.auth.getServers()
             dispatch(getServersSuccess(res.data))
         } catch (e: any) {
             console.error(e)
@@ -99,6 +99,15 @@ export const changePassword = (arg: { oldPass: string, newPass: string }) =>
     async (): Promise<void> => {
         try {
             await api.changePass.changePassword(arg.oldPass, arg.newPass);
+        } catch (e: any) {
+            console.error(e)
+        }
+    }
+
+export const clearCache = () =>
+    async (): Promise<void> => {
+        try {
+            await api.auth.clearCache();
         } catch (e: any) {
             console.error(e)
         }

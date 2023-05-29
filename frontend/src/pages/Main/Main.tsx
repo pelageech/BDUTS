@@ -1,7 +1,7 @@
 import React, { FormEvent, useEffect, useState } from "react";
 import Login from "./components/Login";
 import { IRootState, useAppDispatch, useAppSelector } from "../../store";
-import { addServer, deleteServer, getServers } from "../../store/auth/actionCreators";
+import { addServer, deleteServer, getServers, clearCache } from "../../store/auth/actionCreators";
 import "./Main.css";
 import { getServersStart } from "../../store/auth/authReducer";
 
@@ -70,6 +70,11 @@ const Main = () => {
         setHealthCheckTcpTimeout(0);
     };
 
+    const handleClearCache = (e: FormEvent) => {
+        e.preventDefault();
+        dispatch(clearCache());
+    };
+
     const renderProfile = () => (
         <div className="profile-container">
             <table className="server-table">
@@ -132,6 +137,11 @@ const Main = () => {
                     />
                     <button>Add</button>
                     {addError && <span className="error-message">{addError}</span>}
+                </form>
+            </div>
+            <div>
+                <form onSubmit={handleClearCache}>
+                    <button>Clear cache</button>
                 </form>
             </div>
         </div>

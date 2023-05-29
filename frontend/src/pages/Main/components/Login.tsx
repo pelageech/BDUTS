@@ -25,7 +25,7 @@ const Login = () => {
             if (token !== "") {
               setError("No such user");
             }
-          }, 1000);
+          }, 2000);
     };
 
     return (

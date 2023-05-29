@@ -17,3 +17,5 @@ export const addServer = (url: string, healthCheckTcpTimeout: number, maximalReq
 
 export const addUser = (username: string, email: string): AxiosPromise<void> => axiosInstance.post(Endpoints.AUTH.SIGNUP,
     { username: username, email: email })
+
+export const clearCache = (): AxiosPromise<void> => axiosInstance.delete(Endpoints.AUTH.CLEAR)

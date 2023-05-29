@@ -29,7 +29,10 @@ const Header = () => {
                     <Link to="/changepassword" className="button">
                         Change password
                     </Link>
-                    <button  onClick={handleLogout}>
+                    <a href="https://v1722521.hosted-by-vdsina.ru:3000/" target="_blank" className="button">
+                        Grafana
+                    </a>
+                    <button onClick={handleLogout}>
                         Logout
                     </button>
                 </div>

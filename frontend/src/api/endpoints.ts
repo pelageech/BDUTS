@@ -6,6 +6,7 @@ const Endpoints = {
         LOGIN: '/admin/signin',
         SIGNUP: '/admin/signup',
         PASSWORD: '/admin/password',
+        CLEAR: '/admin/clear'
     }
 }
 
