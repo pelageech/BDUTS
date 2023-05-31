@@ -32,7 +32,7 @@ func (p *CachingProperties) InsertPageInCache(key []byte, req *http.Request, res
 	requestDirectives := loadRequestDirectives(req.Header)
 	responseDirectives := loadResponseDirectives(resp.Header)
 
-	if requestDirectives.NoStore || responseDirectives.NoStore || req.Method != http.MethodGet {
+	if requestDirectives.NoStore || responseDirectives.NoStore || req.Method != http.MethodGet || responseDirectives.Private {
 		return errors.New("can't be stored in cache")
 	}
 

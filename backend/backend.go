@@ -100,6 +100,10 @@ func (b *Backend) Free() bool {
 	}
 }
 
+func (b *Backend) MaximalRequests() int {
+	return cap(b.requestChan)
+}
+
 type responseError struct {
 	request    *http.Request
 	statusCode int

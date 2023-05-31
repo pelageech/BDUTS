@@ -11,8 +11,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -217,6 +219,48 @@ func (p *CachingProperties) CalculateSize() {
 	p.PagesCount = pagesCount
 }
 
+func (p *CachingProperties) ClearCache() error {
+	checkDisk := func(hash []byte) error {
+		path := makePath(hash, subHashCount)
+		path += "/" + string(hash)
+
+		_, err := os.Stat(path)
+		return err
+	}
+
+	err := p.DB().Update(func(tx *bolt.Tx) error {
+		return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+			m := b.Get([]byte(pageMetadataKey))
+			if m == nil {
+				return errors.New("buckets must contain " + pageMetadataKey)
+			}
+			var meta PageMetadata
+			err := json.Unmarshal(m, &meta)
+			if err != nil {
+				return err
+			}
+			if err := checkDisk(name); err != nil {
+				return err
+			}
+			p.IncrementSize(-meta.Size)
+			metrics.UpdateCachePagesCount(-1)
+			return tx.DeleteBucket(name)
+		})
+	})
+	metrics.GlobalMetrics.CacheSize.Set(float64(p.Size))
+
+	if err != nil {
+		return err
+	}
+
+	return filepath.WalkDir(PagesPath, func(path string, d fs.DirEntry, err error) error {
+		if path == PagesPath {
+			return nil
+		}
+		return os.RemoveAll(path)
+	})
+}
+
 // OpenDatabase opens a database file.
 func OpenDatabase(path string) (*bolt.DB, error) {
 	db, err := bolt.Open(path, readWriteOwner, nil)
@@ -291,7 +335,7 @@ func loadRequestDirectives(header http.Header) *requestDirectives {
 	}
 
 	cacheControlString := header.Get("cache-control")
-	cacheControl := strings.Split(cacheControlString, ",")
+	cacheControl := strings.Split(cacheControlString, ";")
 	for i := range cacheControl {
 		cacheControl[i] = strings.TrimSpace(cacheControl[i])
 	}
@@ -343,7 +387,7 @@ func loadResponseDirectives(header http.Header) *responseDirectives {
 	}
 
 	cacheControlString := header.Get("cache-control")
-	cacheControl := strings.Split(cacheControlString, ",")
+	cacheControl := strings.Split(cacheControlString, ";")
 	for i := range cacheControl {
 		cacheControl[i] = strings.TrimSpace(cacheControl[i])
 	}

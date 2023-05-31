@@ -50,6 +50,7 @@ const (
 	signUpRequestPath = "/admin/signup"
 	changeRequestPath = "/admin/password"
 	deleteRequestPath = "/admin"
+	clearRequestPath  = "/admin/clear"
 )
 
 var (
@@ -77,6 +78,8 @@ var (
 	confirm = flag.String("confirm", empty, "confirm a new password")
 
 	delUser = flag.Bool("del-user", false, "deletes a user, requires login and token")
+
+	clear = flag.Bool("clear", false, "clear cache")
 
 	tr = &http.Transport{TLSClientConfig: &tls.Config{}}
 	c  = &http.Client{Transport: tr}
@@ -283,6 +286,28 @@ func deleteHandle() {
 	}
 }
 
+func clearHandler() {
+	req, err := http.NewRequest(http.MethodDelete, proto+*host+clearRequestPath, nil)
+	if err != nil {
+		fmt.Println("An error occurred while creating a request: ", err)
+		os.Exit(1)
+	}
+
+	req.Header.Add("Authorization", "Bearer "+*token)
+
+	resp, err := c.Do(req)
+	if err != nil {
+		fmt.Println("An error occurred while processing the request: ", err)
+		os.Exit(1)
+	}
+
+	err = handleResponse(resp)
+	if err != nil {
+		fmt.Println("Something went wrong: ", err)
+		os.Exit(1)
+	}
+}
+
 func handleResponse(resp *http.Response) error {
 	defer func(Body io.ReadCloser) {
 		_ = Body.Close()
@@ -310,10 +335,12 @@ func handleArgs() {
 			"\t-signin -H localhost:8080 -login admin -password admin\n" +
 			"where, of course, your own host, login and password. There will be a bearer token.\n\n" +
 			"To add a new backend use this:\n" +
-			"\t-H localhost:8080 -add http://192.168.15.1:9090 -tout 1000 -max 10 -t <token>\n" +
+			"\t-H localhost:8080 -add http://192.168.15.1:9090 -timeout 1000 -max 10 -t <token>\n" +
 			"Notice that -tout and -max are optional.\n\n" +
 			"To remove a backend use this:\n" +
 			"\t-H localhost:8080 -remove http://192.168.15.1:9090 -t <token>\n\n" +
+			"To clear cache:" +
+			"\t-H localhost:8080 -clear -t <token>" +
 			"Administrating:\n" +
 			"- Sign In\n" +
 			"\t-signin -H localhost:8080 -login admin -password admin\n\n" +
@@ -357,6 +384,11 @@ func handleArgs() {
 
 	if *delUser {
 		deleteHandle()
+		return
+	}
+
+	if *clear {
+		clearHandler()
 		return
 	}
 }

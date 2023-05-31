@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@500&display=swap');
+
+.header {
+  width: 100%;
+  background-color: #aee0e0;
+}
+
+.button-container {
+  display: flex;
+}
+
+.button {
+  flex: 1;
+  text-align: center;
+  padding: 10px;
+  background-color: #007bff;
+  color: #ffffff;
+  text-decoration: none;
+  font-family: 'Kanit', sans-serif;
+  font-weight: 700;
+  transition: background-color 0.3s ease;
+  border-right: 1px solid #0056b3;
+}
+
+.button:last-child {
+  border-right: none;
+}
+
+.button:hover {
+  background-color: #0056b3;
+}
