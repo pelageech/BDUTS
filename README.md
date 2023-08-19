@@ -2,6 +2,8 @@
 <img alt="BDUTS!!! Gopher has blown up the logo" src="./logo/bduts_logo.png" width="228"><br>
 The easy Go Load Balancer repository includes a distribution of requests by backends and caching.
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/pelageech/BDUTS.svg)](https://pkg.go.dev/github.com/pelageech/BDUTS)
+
 # Configuration
 
 ### Backends
